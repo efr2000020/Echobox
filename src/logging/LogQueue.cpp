@@ -1,0 +1,30 @@
+#include "LogQueue.hpp"
+
+namespace litespec::logging {
+
+bool LogQueue::push(const LogRecord& r) {
+    std::lock_guard lock(m_mutex);
+    const std::size_t next = (m_head + 1) % CAPACITY;
+    if (next == m_tail) {
+        ++m_dropped;
+        return false;
+    }
+    m_slots[m_head] = r;
+    m_head = next;
+    return true;
+}
+
+std::size_t LogQueue::drain(std::vector<LogRecord>& out, std::size_t& outDroppedSinceLastDrain) {
+    std::lock_guard lock(m_mutex);
+    std::size_t n = 0;
+    while (m_tail != m_head) {
+        out.push_back(m_slots[m_tail]);
+        m_tail = (m_tail + 1) % CAPACITY;
+        ++n;
+    }
+    outDroppedSinceLastDrain = m_dropped;
+    m_dropped = 0;
+    return n;
+}
+
+} // namespace litespec::logging
