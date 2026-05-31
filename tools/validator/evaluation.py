@@ -1,20 +1,21 @@
 """Offline ground-truth labeler + greedy scoring + grid search.
 
-The ground-truth labeler is intentionally NOT the production algorithm: it
+The ground-truth labeler is intentionally NOT a production algorithm: it
 cheats by using a non-causal (whole-file) per-bin median floor that a real
 real-time detector cannot use. Its job is only to produce approximate call
-labels we can score the causal BandEnergyDetector against. Always eyeball
-the overlay before trusting a score.
+labels we can score the active causal detector against. Always eyeball the
+overlay before trusting a score.
 """
 from __future__ import annotations
 
+import dataclasses
 import itertools
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 import numpy as np
 
-from .detector import BandEnergyDetector, DetectorConfig, Detection
+from .native import Detector, DetectorConfig, Detection
 
 
 # --- ground truth -----------------------------------------------------------
@@ -155,17 +156,18 @@ def grid_search(file_cache: Iterable[Tuple[str, np.ndarray, int]],
 
     for combo in itertools.product(*[sweeps[k] for k in keys]):
         overrides = dict(zip(keys, combo))
-        cfg_kwargs = asdict(base_cfg)
-        cfg_kwargs.update(overrides)
-        cfg = DetectorConfig(**cfg_kwargs)
+        # Sweep values land in `tunables` (forwarded to the native detector's
+        # setTunable); base_cfg's static fields (algorithm, fft_size, freq
+        # window) stay fixed across the sweep.
+        merged_tunables = {**base_cfg.tunables, **overrides}
 
         tp = fp = fn = 0
         per_file: List[Tuple[str, int, int, int, int]] = []
         min_rec = 1.0
         for path, mags, sr in file_cache:
-            det = BandEnergyDetector(DetectorConfig(**{
-                **cfg_kwargs, "sample_rate": sr,
-            }))
+            cfg = dataclasses.replace(
+                base_cfg, sample_rate=sr, tunables=merged_tunables)
+            det = Detector(cfg)
             dets = det.run_on_spectrogram(mags)
             rep = score(dets, gt_cache[path])
             tp += rep.tp

@@ -2,41 +2,237 @@
 
 Two operating modes selected at the top of the window:
 
-  * Offline detection  — runs BandEnergyDetector locally on a chosen WAV and
-                         draws annotation rectangles over the spectrogram.
-                         No C++ binary involved.
-
-  * ESP32 streaming    — sends a chosen WAV to a networked ESP32 (which acts
-                         as the microphone for the production C++ binary
-                         running on the Pi). The GUI is just the streamer;
-                         detection / recording happens downstream on the Pi.
+  * Offline detection  — runs the active detector locally on a chosen WAV
+                         and draws annotation rectangles over the spectrogram.
+                         The detector and its tunable form are discovered
+                         dynamically from the native validator library, so
+                         the GUI is algorithm-agnostic.
+  * ALSA Loopback      — streams a WAV into snd-aloop so the production C++
+                         binary captures it as if from a real microphone.
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
-import threading
+import dataclasses
 import traceback
-from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtCore import (
     QObject, QRectF, Qt, QThread, pyqtSignal, pyqtSlot,
 )
-from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication, QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox,
     QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
-    QRadioButton, QSpinBox, QStackedWidget, QStatusBar, QVBoxLayout, QWidget,
+    QRadioButton, QScrollArea, QSizePolicy, QSpinBox, QSplitter, QStackedWidget,
+    QStatusBar, QVBoxLayout, QWidget,
 )
 
-from . import detector as det_mod
-from . import esp32_stream
-from .dsp import HOP, NFFT, load_wav_float, stft_mags
+from . import alsa_stream
+from . import native
+from .dsp import HOP, NFFT, load_wav_float
+
+
+# ---------------------------------------------------------------------------
+# ALSA Loopback mode (formerly fake-mic)
+# ---------------------------------------------------------------------------
+
+class _AlsaWorker(QObject):
+    """Feeds the WAV into the loopback device on a worker thread."""
+    progress = pyqtSignal(int, int)      # (frames_done, total_frames)
+    message  = pyqtSignal(str)
+    failed   = pyqtSignal(str)
+    finished = pyqtSignal()
+
+    def __init__(self, wav_path: str, device: str, loop: bool):
+        super().__init__()
+        self.wav_path = wav_path
+        self.device   = device
+        self.loop     = loop
+        self._stop    = False
+
+    def stop(self) -> None:
+        self._stop = True
+
+    @pyqtSlot()
+    def run(self) -> None:
+        try:
+            alsa_stream.stream_wav_to_alsa(
+                self.wav_path, self.device, self.loop,
+                on_progress=lambda d, t: self.progress.emit(d, t),
+                is_stopping=lambda: self._stop
+            )
+        except Exception as e:
+            self.failed.emit(str(e))
+            return
+        self.finished.emit()
+
+
+class LoopbackModeWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._card: Optional[str] = None
+        self._wav_path: str = ""
+        self._thread: Optional[QThread] = None
+        self._worker: Optional[_AlsaWorker] = None
+
+        self._build_ui()
+        self.refresh_device()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+
+        # Device status
+        self.status_lbl = QLabel()
+        self.status_lbl.setWordWrap(True)
+        self.status_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(self.status_lbl)
+
+        recheck = QPushButton("Re-check device")
+        recheck.clicked.connect(self.refresh_device)
+        layout.addWidget(recheck)
+
+        # File picker
+        file_row = QHBoxLayout()
+        self.path_edit = QLineEdit()
+        self.path_edit.setPlaceholderText("Choose a 384 kHz / S16 / mono WAV…")
+        self.path_edit.setReadOnly(True)
+        browse = QPushButton("Browse…")
+        browse.clicked.connect(self._on_browse)
+        file_row.addWidget(self.path_edit)
+        file_row.addWidget(browse)
+        layout.addLayout(file_row)
+
+        self.wav_lbl = QLabel("No file selected.")
+        self.wav_lbl.setWordWrap(True)
+        layout.addWidget(self.wav_lbl)
+
+        # Controls
+        ctrl = QHBoxLayout()
+        self.play_btn = QPushButton("Play")
+        self.play_btn.clicked.connect(self._on_play)
+        self.stop_btn = QPushButton("Stop")
+        self.stop_btn.clicked.connect(self._on_stop)
+        self.stop_btn.setEnabled(False)
+        self.loop_chk = QCheckBox("Loop")
+        self.loop_chk.setChecked(True)
+        ctrl.addWidget(self.play_btn)
+        ctrl.addWidget(self.stop_btn)
+        ctrl.addWidget(self.loop_chk)
+        ctrl.addStretch(1)
+        layout.addLayout(ctrl)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        layout.addWidget(self.progress)
+
+        self.log = QPlainTextEdit()
+        self.log.setReadOnly(True)
+        layout.addWidget(self.log, 1)
+
+    def refresh_device(self) -> None:
+        self._card = alsa_stream.detect_loopback_card()
+        if self._card is None:
+            self.status_lbl.setText(
+                "<b style='color:#c0392b'>snd-aloop not loaded.</b><br>"
+                "Run once (in this session, prefix with <code>!</code>):<br>"
+                "<code>sudo modprobe snd-aloop id=UltraMic384K</code>")
+            self.play_btn.setEnabled(False)
+            return
+
+        cap = alsa_stream.CAPTURE_DEV.format(card=self._card)
+        note = "" if self._card == alsa_stream.CARD_ID else (
+            f"  (loaded as '{self._card}', not '{alsa_stream.CARD_ID}' — "
+            f"reload with id={alsa_stream.CARD_ID} for name parity with the Pi)")
+        
+        self.status_lbl.setText(
+            f"<b style='color:#27ae60'>Loopback ready:</b> card '{self._card}'.{note}<br>"
+            f"Point the app at:<br><code>./deploy/bin/Echobox --device {cap}</code>")
+        self.play_btn.setEnabled(bool(self._wav_path))
+
+    def _on_browse(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Select WAV", "", "WAV files (*.wav)")
+        if not path:
+            return
+        self._wav_path = path
+        self.path_edit.setText(path)
+        
+        try:
+            import wave
+            with wave.open(path, "rb") as w:
+                info = alsa_stream.AlsaWavInfo(
+                    rate=w.getframerate(), channels=w.getnchannels(),
+                    width=w.getsampwidth(), frames=w.getnframes())
+        except Exception as e:
+            self.wav_lbl.setText(f"<span style='color:#c0392b'>Cannot read WAV: {e}</span>")
+            self.play_btn.setEnabled(False)
+            return
+
+        fmt = (f"{info.rate} Hz, {info.width * 8}-bit, "
+               f"{'mono' if info.channels == 1 else f'{info.channels}ch'}, "
+               f"{info.duration_s:.2f}s")
+        if info.is_production_format:
+            self.wav_lbl.setText(f"<b>{fmt}</b> — matches the Ultramic format.")
+        else:
+            self.wav_lbl.setText(
+                f"<b>{fmt}</b><br><span style='color:#d35400'>"
+                "Warning: not 384 kHz/S16/mono. It will play at its own rate, "
+                "but won't exercise the production 384 kHz capture path.</span>")
+        self.play_btn.setEnabled(self._card is not None)
+
+    def _on_play(self) -> None:
+        if not self._wav_path or self._card is None:
+            return
+        
+        device = alsa_stream.PLAYBACK_DEV.format(card=self._card)
+        self._thread = QThread(self)
+        self._worker = _AlsaWorker(self._wav_path, device, self.loop_chk.isChecked())
+        self._worker.moveToThread(self._thread)
+        self._worker.progress.connect(self._on_progress)
+        self._worker.failed.connect(self._on_failed)
+        self._worker.finished.connect(self._on_finished)
+        self._thread.started.connect(self._worker.run)
+        self._thread.start()
+
+        self.play_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self._log(f"Playing {Path(self._wav_path).name}"
+                  f"{' (looping)' if self.loop_chk.isChecked() else ''}")
+
+    def _on_stop(self) -> None:
+        if self._worker:
+            self._worker.stop()
+        self.stop_btn.setEnabled(False)
+        self._log("Stopping…")
+
+    def _on_progress(self, done: int, total: int) -> None:
+        self.progress.setValue(int(done * 100 / total) if total else 0)
+
+    def _on_failed(self, msg: str) -> None:
+        self._log("ERROR: " + msg)
+        self._teardown()
+
+    def _on_finished(self) -> None:
+        self._log("Done.")
+        self._teardown()
+
+    def _teardown(self) -> None:
+        if self._thread:
+            self._thread.quit()
+            self._thread.wait(2000)
+            self._thread = None
+        self._worker = None
+        self.progress.setValue(0)
+        self.play_btn.setEnabled(bool(self._wav_path) and self._card is not None)
+        self.stop_btn.setEnabled(False)
+
+    def _log(self, msg: str) -> None:
+        self.log.appendPlainText(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +244,7 @@ class _OfflineWorker(QObject):
     finished = pyqtSignal(object)   # (sample_rate, mags, detections) or Exception
     progress = pyqtSignal(str)
 
-    def __init__(self, wav_path: str, cfg: det_mod.DetectorConfig):
+    def __init__(self, wav_path: str, cfg: native.DetectorConfig):
         super().__init__()
         self.wav_path = wav_path
         self.cfg = cfg
@@ -59,16 +255,34 @@ class _OfflineWorker(QObject):
             self.progress.emit("Loading WAV…")
             sr, samples = load_wav_float(self.wav_path)
             self.progress.emit("Computing STFT…")
-            mags = stft_mags(samples)
+            mags = native.stft(samples, sr, hpf_cutoff_hz=20000.0)
             # Re-instantiate the detector with the actual sample rate.
-            cfg = self.cfg.__class__(**{**asdict(self.cfg), "sample_rate": sr})
-            detector = det_mod.BandEnergyDetector(cfg)
+            cfg = dataclasses.replace(self.cfg, sample_rate=sr)
+            detector = native.Detector(cfg)
             self.progress.emit("Running detector…")
             dets = detector.run_on_spectrogram(mags)
             self.finished.emit((sr, mags, dets))
         except Exception as e:   # noqa: BLE001 - surface anything to the UI
             traceback.print_exc()
             self.finished.emit(e)
+
+
+def _float_step_and_decimals(default: float, max_value: float) -> tuple[float, int]:
+    """Pick a sensible singleStep/decimals for a float tunable.
+
+    Drives QDoubleSpinBox UX without baking algorithm-specific values into the
+    GUI: small-magnitude defaults (e.g. 1e-6) get fine steps and many decimals;
+    large-range knobs get coarse steps and few. Users can always type any value.
+    """
+    magnitude = max(abs(default), 1e-12)
+    order = math.floor(math.log10(magnitude))
+    if order <= -3:
+        return 10 ** (order - 1), max(2, -order + 2)
+    if magnitude < 0.1:
+        return 0.01, 4
+    if max_value <= 10.0:
+        return 0.05, 3
+    return 0.5, 2
 
 
 class OfflineModeWidget(QWidget):
@@ -80,16 +294,26 @@ class OfflineModeWidget(QWidget):
         self._detections: list = []
         self._thread: Optional[QThread] = None
         self._worker: Optional[_OfflineWorker] = None
+        # algorithm name -> {tunable key -> widget}. Populated when the
+        # algorithm picker changes; widgets are owned by the form layout.
+        self._tunable_widgets: Dict[str, QWidget] = {}
+        self._algorithm_count: int = 0   # 0 = none registered, drives both pickers
 
         self._build_ui()
+        self._populate_algorithms()
         self._refresh_run_button()
 
     # -- UI ----------------------------------------------------------------
 
     def _build_ui(self) -> None:
+        # Layout: a thin global action row on top, then a horizontal splitter
+        # whose left pane is a scrollable controls column and right pane is a
+        # vertical splitter that gives the spectrogram the bulk of the space
+        # with the detection log tucked below it. Both splitters are user-
+        # draggable so the layout adapts to whatever the user values most.
         root = QVBoxLayout(self)
 
-        # Row 1: file picker + run + status
+        # Global action row: file picker + run button, always at the top.
         file_row = QHBoxLayout()
         self.btn_open = QPushButton("Open WAV…")
         self.btn_open.clicked.connect(self._on_open)
@@ -102,51 +326,199 @@ class OfflineModeWidget(QWidget):
         file_row.addWidget(self.btn_run)
         root.addLayout(file_row)
 
-        # Row 2: detector params (compact, single form)
-        params = QGroupBox("Detector parameters")
-        form = QFormLayout(params)
-        self.sp_lo  = QSpinBox(); self.sp_lo.setRange(0, 384000); self.sp_lo.setValue(20000)
-        self.sp_hi  = QSpinBox(); self.sp_hi.setRange(0, 384000); self.sp_hi.setValue(190000)
-        self.sp_snr = QDoubleSpinBox(); self.sp_snr.setRange(0.0, 200.0); self.sp_snr.setSingleStep(0.5); self.sp_snr.setValue(12.0)
-        self.sp_minf = QDoubleSpinBox(); self.sp_minf.setRange(0.0, 1.0); self.sp_minf.setSingleStep(0.05); self.sp_minf.setDecimals(2); self.sp_minf.setValue(0.10)
-        self.sp_maxf = QDoubleSpinBox(); self.sp_maxf.setRange(0.0, 1.0); self.sp_maxf.setSingleStep(0.05); self.sp_maxf.setDecimals(2); self.sp_maxf.setValue(0.75)
-        self.sp_topk = QSpinBox(); self.sp_topk.setRange(1, 64); self.sp_topk.setValue(8)
-        self.sp_min_act = QSpinBox(); self.sp_min_act.setRange(1, 100); self.sp_min_act.setValue(2)
-        self.sp_hang = QSpinBox(); self.sp_hang.setRange(1, 200); self.sp_hang.setValue(8)
-        form.addRow("freq_lo_hz",         self.sp_lo)
-        form.addRow("freq_hi_hz",         self.sp_hi)
-        form.addRow("band_snr_threshold", self.sp_snr)
-        form.addRow("min_flatness",       self.sp_minf)
-        form.addRow("max_flatness",       self.sp_maxf)
-        form.addRow("top_k",              self.sp_topk)
-        form.addRow("min_active_frames",  self.sp_min_act)
-        form.addRow("hangover_frames",    self.sp_hang)
-        root.addWidget(params)
+        main_split = QSplitter(Qt.Orientation.Horizontal)
 
-        # Row 3: spectrogram view
+        # --- Left pane: scrollable controls column ------------------------
+        # Wrapping the controls in a QScrollArea means a tall tunable manifest
+        # never dictates the window's minimum height, and the spectrogram
+        # never gets squeezed to make room for an extra knob.
+        controls = QWidget()
+        controls_layout = QVBoxLayout(controls)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+
+        alg_row = QHBoxLayout()
+        alg_row.addWidget(QLabel("Algorithm:"))
+        self.cmb_algorithm = QComboBox()
+        self.cmb_algorithm.currentTextChanged.connect(self._on_algorithm_changed)
+        alg_row.addWidget(self.cmb_algorithm, stretch=1)
+        controls_layout.addLayout(alg_row)
+
+        # EXPERIMENTAL: sensitivity preset dropdown. Picking a preset loads
+        # the algorithm's bundle of tunable values into the form below so
+        # the user can still tweak individual knobs after a preset.
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(QLabel("Sensitivity (experimental):"))
+        self.cmb_preset = QComboBox()
+        self.cmb_preset.currentTextChanged.connect(self._on_preset_changed)
+        preset_row.addWidget(self.cmb_preset, stretch=1)
+        controls_layout.addLayout(preset_row)
+
+        # Detection window (algorithm-independent — configure() args, not tunables).
+        window = QGroupBox("Detection window")
+        win_form = QFormLayout(window)
+        self.sp_lo = QSpinBox(); self.sp_lo.setRange(0, 384000); self.sp_lo.setValue(20000)
+        self.sp_hi = QSpinBox(); self.sp_hi.setRange(0, 384000); self.sp_hi.setValue(190000)
+        win_form.addRow("freq_lo_hz", self.sp_lo)
+        win_form.addRow("freq_hi_hz", self.sp_hi)
+        controls_layout.addWidget(window)
+
+        # Dynamic tunable form, rebuilt whenever the algorithm changes.
+        self.params_box  = QGroupBox("Algorithm tunables")
+        self.params_form = QFormLayout(self.params_box)
+        controls_layout.addWidget(self.params_box)
+        controls_layout.addStretch(1)   # keep groups top-aligned in tall windows
+
+        controls_scroll = QScrollArea()
+        controls_scroll.setWidget(controls)
+        controls_scroll.setWidgetResizable(True)
+        controls_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        controls_scroll.setMinimumWidth(240)
+        main_split.addWidget(controls_scroll)
+
+        # --- Right pane: spectrogram (big) + log (small) ------------------
+        right_split = QSplitter(Qt.Orientation.Vertical)
+
         self.plot = pg.PlotWidget()
         self.plot.setLabel("bottom", "Time", units="s")
         self.plot.setLabel("left",   "Frequency", units="kHz")
         self.plot.showGrid(x=True, y=True, alpha=0.25)
         self.plot.getViewBox().setDefaultPadding(0.0)
+        self.plot.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                QSizePolicy.Policy.Expanding)
         self.img = pg.ImageItem()
         self.img.setLookupTable(pg.colormap.get("inferno").getLookupTable())
         self.plot.addItem(self.img)
         self._boxes: list = []
-        root.addWidget(self.plot, stretch=1)
+        right_split.addWidget(self.plot)
 
-        # Row 4: detections list + status
+        log_panel = QWidget()
+        log_layout = QVBoxLayout(log_panel)
+        log_layout.setContentsMargins(0, 0, 0, 0)
         self.lbl_status = QLabel("Idle.")
-        root.addWidget(self.lbl_status)
+        log_layout.addWidget(self.lbl_status)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True)
         self.log.setPlaceholderText("Detections will be listed here.")
-        self.log.setMaximumHeight(160)
-        root.addWidget(self.log)
+        log_layout.addWidget(self.log)
+        right_split.addWidget(log_panel)
+        right_split.setStretchFactor(0, 5)   # plot dominates the right column
+        right_split.setStretchFactor(1, 1)
+        right_split.setSizes([520, 140])
+
+        main_split.addWidget(right_split)
+        main_split.setStretchFactor(0, 0)    # controls don't grow on resize
+        main_split.setStretchFactor(1, 1)    # spectrogram column gets the room
+        main_split.setSizes([280, 820])
+        main_split.setChildrenCollapsible(False)
+
+        root.addWidget(main_split, stretch=1)
+
+    # -- algorithm + form wiring ------------------------------------------
+
+    def _populate_algorithms(self) -> None:
+        try:
+            algorithms = native.list_algorithms()
+        except Exception as e:
+            algorithms = []
+            self.lbl_status.setText("Native lib error: %s" % e)
+        self._algorithm_count = len(algorithms)
+        self.cmb_algorithm.blockSignals(True)
+        self.cmb_algorithm.clear()
+        if algorithms:
+            self.cmb_algorithm.addItems(algorithms)
+            self.cmb_algorithm.setEnabled(len(algorithms) > 1)
+        else:
+            self.cmb_algorithm.addItem("<none — run ./build_dev.sh "
+                                       "or set ECHOBOX_ALGORITHMS_DIR>")
+            self.cmb_algorithm.setEnabled(False)
+        self.cmb_algorithm.blockSignals(False)
+        if algorithms:
+            self._rebuild_tunable_form(algorithms[0])
+
+    def _rebuild_tunable_form(self, algorithm: str) -> None:
+        # Tear down any existing rows. takeRow removes both label + field.
+        while self.params_form.rowCount() > 0:
+            self.params_form.removeRow(0)
+        self._tunable_widgets.clear()
+
+        try:
+            tunables = native.list_tunables(algorithm=algorithm)
+        except Exception as e:
+            self.lbl_status.setText("Cannot describe '%s': %s" % (algorithm, e))
+            return
+
+        for t in tunables:
+            if t.is_int:
+                w = QSpinBox()
+                w.setRange(int(t.min), int(t.max))
+                w.setValue(int(t.default))
+            else:
+                w = QDoubleSpinBox()
+                w.setRange(float(t.min), float(t.max))
+                step, decimals = _float_step_and_decimals(t.default, t.max)
+                w.setSingleStep(step)
+                w.setDecimals(decimals)
+                w.setValue(float(t.default))
+            if t.doc:
+                w.setToolTip(t.doc)
+            self.params_form.addRow(t.key, w)
+            self._tunable_widgets[t.key] = w
+
+        self._repopulate_preset_dropdown(algorithm)
+
+    def _repopulate_preset_dropdown(self, algorithm: str) -> None:
+        # The first entry is always "<none>" so the user can opt out of any
+        # preset and edit tunables freely. After "<none>", entries come from
+        # the algorithm's own listPresets().
+        try:
+            presets = native.list_presets(algorithm=algorithm)
+        except Exception:
+            presets = []
+        self.cmb_preset.blockSignals(True)
+        self.cmb_preset.clear()
+        self.cmb_preset.addItem("<none>")
+        for p in presets:
+            self.cmb_preset.addItem(p.name)
+            if p.doc:
+                self.cmb_preset.setItemData(
+                    self.cmb_preset.count() - 1, p.doc, Qt.ItemDataRole.ToolTipRole)
+        self.cmb_preset.setEnabled(len(presets) > 0)
+        self.cmb_preset.blockSignals(False)
+
+    def _on_algorithm_changed(self, name: str) -> None:
+        if name and self._algorithm_count > 0:
+            self._rebuild_tunable_form(name)
+
+    def _on_preset_changed(self, name: str) -> None:
+        # "<none>" means "don't apply a preset" — leave the spinboxes alone.
+        if not name or name.startswith("<") or self._algorithm_count == 0:
+            return
+        algorithm = self.cmb_algorithm.currentText()
+        try:
+            values = native.preset_tunables(algorithm=algorithm, preset=name)
+        except Exception as e:
+            self.lbl_status.setText("Cannot apply preset '%s': %s" % (name, e))
+            return
+        # Push the preset's tunable values into the existing spinboxes so the
+        # user sees (and can tweak) exactly what changed.
+        for key, value in values.items():
+            w = self._tunable_widgets.get(key)
+            if w is None:
+                continue
+            if isinstance(w, QSpinBox):
+                w.setValue(int(round(value)))
+            else:
+                w.setValue(float(value))
+        self.lbl_status.setText("Applied preset '%s'." % name)
 
     # -- handlers ----------------------------------------------------------
 
     def _refresh_run_button(self) -> None:
-        self.btn_run.setEnabled(bool(self._wav_path) and self._thread is None)
+        self.btn_run.setEnabled(
+            bool(self._wav_path)
+            and self._thread is None
+            and self._algorithm_count > 0
+        )
 
     def _on_open(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Open WAV", "", "WAV files (*.wav)")
@@ -157,16 +529,20 @@ class OfflineModeWidget(QWidget):
         self.lbl_file.setStyleSheet("color: white")
         self._refresh_run_button()
 
-    def _build_config(self) -> det_mod.DetectorConfig:
-        return det_mod.DetectorConfig(
+    def _build_config(self) -> native.DetectorConfig:
+        tunables: Dict[str, float] = {}
+        for key, w in self._tunable_widgets.items():
+            tunables[key] = float(w.value())
+        algorithm = self.cmb_algorithm.currentText()
+        # Preset values are already baked into the spinboxes via
+        # _on_preset_changed, so we don't pass sensitivity here — that would
+        # apply the preset a second time and could fight a tweak the user
+        # made after picking the preset. The tunables dict is the truth.
+        return native.DetectorConfig(
+            algorithm=algorithm,
             freq_lo_hz=float(self.sp_lo.value()),
             freq_hi_hz=float(self.sp_hi.value()),
-            band_snr_threshold=float(self.sp_snr.value()),
-            min_flatness=float(self.sp_minf.value()),
-            max_flatness=float(self.sp_maxf.value()),
-            top_k=int(self.sp_topk.value()),
-            min_active_frames=int(self.sp_min_act.value()),
-            hangover_frames=int(self.sp_hang.value()),
+            tunables=tunables,
         )
 
     def _on_run(self) -> None:
@@ -178,6 +554,7 @@ class OfflineModeWidget(QWidget):
             return
 
         self.btn_run.setEnabled(False)
+        self.cmb_algorithm.setEnabled(False)
         self.log.clear()
         self.lbl_status.setText("Running…")
 
@@ -197,6 +574,8 @@ class OfflineModeWidget(QWidget):
             self._thread.wait()
         self._thread = None
         self._worker = None
+        # Re-enable the algorithm picker iff there's actually a choice to make.
+        self.cmb_algorithm.setEnabled(self._algorithm_count > 1)
         self._refresh_run_button()
 
         if isinstance(result, Exception):
@@ -249,166 +628,6 @@ class OfflineModeWidget(QWidget):
                  for i, e in enumerate(dets, 1)]
         self.log.setPlainText("\n".join(lines))
 
-
-# ---------------------------------------------------------------------------
-# ESP32 streaming mode
-# ---------------------------------------------------------------------------
-
-class _StreamWorker(QObject):
-    progress = pyqtSignal(float, float)   # (progress_0_to_1, elapsed_s)
-    finished = pyqtSignal(bool, str)      # (success, message)
-
-    def __init__(self, host: str, port: int, wav_path: str, chunk_ms: int):
-        super().__init__()
-        self.host = host
-        self.port = port
-        self.wav_path = wav_path
-        self.chunk_ms = chunk_ms
-        self.stop_event = threading.Event()
-
-    @pyqtSlot()
-    def run(self) -> None:
-        try:
-            esp32_stream.stream_wav_to_esp32(
-                host=self.host, port=self.port, wav_path=self.wav_path,
-                chunk_ms=self.chunk_ms,
-                on_progress=lambda p, e: self.progress.emit(p, e),
-                stop_event=self.stop_event,
-            )
-            if self.stop_event.is_set():
-                self.finished.emit(False, "Stopped by user.")
-            else:
-                self.finished.emit(True, "Streaming complete.")
-        except Exception as e:   # noqa: BLE001
-            self.finished.emit(False, str(e))
-
-    def stop(self) -> None:
-        self.stop_event.set()
-
-
-class Esp32ModeWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._wav_path: Optional[str] = None
-        self._thread: Optional[QThread] = None
-        self._worker: Optional[_StreamWorker] = None
-        self._build_ui()
-        self._refresh_buttons()
-
-    def _build_ui(self) -> None:
-        root = QVBoxLayout(self)
-
-        cfg = QGroupBox("ESP32")
-        form = QFormLayout(cfg)
-        self.ed_host = QLineEdit(); self.ed_host.setPlaceholderText("192.168.1.42")
-        self.sp_port = QSpinBox(); self.sp_port.setRange(1, 65535)
-        self.sp_port.setValue(esp32_stream.DEFAULT_PORT)
-        self.sp_chunk = QSpinBox(); self.sp_chunk.setRange(1, 500)
-        self.sp_chunk.setValue(20); self.sp_chunk.setSuffix(" ms")
-        form.addRow("Host / IP",          self.ed_host)
-        form.addRow("Port",               self.sp_port)
-        form.addRow("Chunk duration",     self.sp_chunk)
-        root.addWidget(cfg)
-
-        file_row = QHBoxLayout()
-        self.btn_open = QPushButton("Open WAV…")
-        self.btn_open.clicked.connect(self._on_open)
-        self.lbl_file = QLabel("<no file>")
-        self.lbl_file.setStyleSheet("color: gray")
-        file_row.addWidget(self.btn_open)
-        file_row.addWidget(self.lbl_file, stretch=1)
-        root.addLayout(file_row)
-
-        ctl = QHBoxLayout()
-        self.btn_stream = QPushButton("Stream")
-        self.btn_stream.clicked.connect(self._on_stream)
-        self.btn_stop = QPushButton("Stop")
-        self.btn_stop.clicked.connect(self._on_stop)
-        ctl.addWidget(self.btn_stream)
-        ctl.addWidget(self.btn_stop)
-        ctl.addStretch(1)
-        root.addLayout(ctl)
-
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 1000)
-        self.progress.setFormat("%p%")
-        root.addWidget(self.progress)
-
-        self.log = QPlainTextEdit(); self.log.setReadOnly(True)
-        self.log.setPlaceholderText("Status log will appear here.")
-        root.addWidget(self.log, stretch=1)
-        for line in (
-            "Mode 2 streams a WAV file to a networked ESP32 over TCP.",
-            "The ESP32 firmware is expected to act as the microphone for",
-            "the production LiteSpectrum binary running on the Pi (USB-audio",
-            "or I2S, depending on how the ESP32 is wired). See validator/README.md",
-            "for the wire format the firmware needs to implement.",
-        ):
-            self.log.appendPlainText(line)
-
-    def _refresh_buttons(self) -> None:
-        streaming = self._thread is not None
-        self.btn_stream.setEnabled(bool(self._wav_path)
-                                   and bool(self.ed_host.text().strip())
-                                   and not streaming)
-        self.btn_stop.setEnabled(streaming)
-        self.btn_open.setEnabled(not streaming)
-        self.ed_host.setEnabled(not streaming)
-        self.sp_port.setEnabled(not streaming)
-        self.sp_chunk.setEnabled(not streaming)
-
-    def _on_open(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Open WAV", "", "WAV files (*.wav)")
-        if not path:
-            return
-        self._wav_path = path
-        self.lbl_file.setText(Path(path).name)
-        self.lbl_file.setStyleSheet("color: white")
-        self._refresh_buttons()
-
-    def _on_stream(self) -> None:
-        if self._thread is not None or not self._wav_path:
-            return
-        host = self.ed_host.text().strip()
-        if not host:
-            QMessageBox.warning(self, "Missing host", "Enter an ESP32 host / IP.")
-            return
-
-        self.progress.setValue(0)
-        self.log.appendPlainText("→ Connecting to %s:%d …" % (host, self.sp_port.value()))
-
-        self._thread = QThread(self)
-        self._worker = _StreamWorker(host, self.sp_port.value(),
-                                     self._wav_path, self.sp_chunk.value())
-        self._worker.moveToThread(self._thread)
-        self._worker.progress.connect(self._on_progress)
-        self._worker.finished.connect(self._on_finished)
-        self._thread.started.connect(self._worker.run)
-        self._thread.start()
-        self._refresh_buttons()
-
-    def _on_stop(self) -> None:
-        if self._worker is not None:
-            self._worker.stop()
-            self.log.appendPlainText("→ Stop requested…")
-
-    @pyqtSlot(float, float)
-    def _on_progress(self, p: float, elapsed: float) -> None:
-        self.progress.setValue(int(p * 1000))
-        if int(p * 100) % 10 == 0:
-            self.log.appendPlainText("  %5.1f%%  %.1fs" % (p * 100, elapsed))
-
-    @pyqtSlot(bool, str)
-    def _on_finished(self, ok: bool, msg: str) -> None:
-        if self._thread is not None:
-            self._thread.quit()
-            self._thread.wait()
-        self._thread = None
-        self._worker = None
-        self.log.appendPlainText("← " + msg)
-        self._refresh_buttons()
-
-
 # ---------------------------------------------------------------------------
 # Main window
 # ---------------------------------------------------------------------------
@@ -416,7 +635,7 @@ class Esp32ModeWidget(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("LiteSpectrum Validator")
+        self.setWindowTitle("Echobox Validator")
         self.resize(1100, 750)
 
         central = QWidget()
@@ -427,23 +646,26 @@ class MainWindow(QMainWindow):
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Mode:"))
         self.rb_offline = QRadioButton("Offline detection")
-        self.rb_stream  = QRadioButton("ESP32 stream")
+        self.rb_alsa    = QRadioButton("ALSA Loopback (fake-mic)")
+        
         self.rb_offline.setChecked(True)
         grp = QButtonGroup(self)
         grp.addButton(self.rb_offline, 0)
-        grp.addButton(self.rb_stream,  1)
+        grp.addButton(self.rb_alsa,    1)
         grp.idClicked.connect(self._switch_mode)
+        
         mode_row.addWidget(self.rb_offline)
-        mode_row.addWidget(self.rb_stream)
+        mode_row.addWidget(self.rb_alsa)
         mode_row.addStretch(1)
         root.addLayout(mode_row)
 
         # Stacked mode pages
         self.stack = QStackedWidget()
         self.page_offline = OfflineModeWidget()
-        self.page_stream  = Esp32ModeWidget()
+        self.page_alsa    = LoopbackModeWidget()
+        
         self.stack.addWidget(self.page_offline)
-        self.stack.addWidget(self.page_stream)
+        self.stack.addWidget(self.page_alsa)
         root.addWidget(self.stack, stretch=1)
 
         # Status bar

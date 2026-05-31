@@ -40,6 +40,12 @@ public:
                       DetectorState& outState,
                       Annotation& outAnnotation) override;
 
+    bool setTunable(const char* key, double value) override;
+    bool getTunable(const char* key, double* outValue) const override;
+    std::span<const TunableInfo> listTunables() const override;
+    bool applyPreset(const char* name) override;
+    std::span<const PresetInfo>  listPresets()  const override;
+
 private:
     int         m_sampleRate;
     std::size_t m_fftSize;
@@ -53,7 +59,7 @@ private:
     // fall entirely outside the window are dropped.
     static constexpr int   MAX_BANDS = 4;
     static constexpr float BAND_EDGES_HZ[MAX_BANDS + 1] = {
-        20000.0f, 45000.0f, 80000.0f, 130000.0f, 190000.0f
+        20000.0f, 45000.0f, 80000.0f, 130000.0f, 192000.0f
     };
 
     struct Band {
@@ -84,6 +90,10 @@ private:
     std::uint32_t m_eventStart;
     float         m_eventLoHz;
     float         m_eventHiHz;
+    // Peak top-K mean band SNR observed during the currently open event.
+    // Logged on event-end so each saved file can be correlated with how
+    // emphatically the detector thought it was a call.
+    float         m_eventPeakSnr;
 
     // Diagnostics
     int   m_frameCount;
@@ -91,17 +101,19 @@ private:
     int   m_peakBandInHeartbeat;
 
     // --- Tuning parameters (validated against real recordings; see project HANDOFF) ---
-    static constexpr float ALPHA_RISE = 0.995f;
-    static constexpr float ALPHA_FALL = 0.90f;
-    static constexpr float MIN_ABS_FLOOR = 1e-6f;
+    // Defaults are the ship values; the offline validator reaches in via
+    // setTunable() to grid-search without recompiling.
+    float m_alphaRise         = 0.995f;
+    float m_alphaFall         = 0.90f;
+    float m_minAbsFloor       = 1e-6f;
 
-    static constexpr int   TOP_K = 8;
-    static constexpr float BAND_SNR_THRESHOLD = 12.0f;
+    int   m_topK              = 8;
+    float m_bandSnrThreshold  = 12.0f;
 
-    static constexpr float MIN_FLATNESS = 0.10f;
-    static constexpr float MAX_FLATNESS = 0.75f;
+    float m_minFlatness       = 0.10f;
+    float m_maxFlatness       = 0.75f;
 
-    static constexpr int WARMUP_FRAMES     = 40;
-    static constexpr int MIN_ACTIVE_FRAMES = 2;
-    static constexpr int HANGOVER_FRAMES   = 8;
+    int   m_warmupFramesLimit = 40;
+    int   m_minActiveFrames   = 2;
+    int   m_hangoverFrames    = 8;
 };

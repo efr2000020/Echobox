@@ -5,7 +5,7 @@
 #include <span>
 #include <vector>
 
-namespace litespec::dsp {
+namespace echobox::dsp {
 
 /**
  * IFftEngine implementation backed by KissFFT.
@@ -38,4 +38,4 @@ private:
     std::vector<kiss_fft_cpx>  m_complexOutput;
 };
 
-} // namespace litespec::dsp
+} // namespace echobox::dsp

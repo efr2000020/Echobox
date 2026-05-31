@@ -6,7 +6,7 @@
 #include <memory>
 #include <stdexcept>
 
-namespace litespec::dsp {
+namespace echobox::dsp {
 
 KissFftEngine::KissFftEngine(std::size_t hopSize, std::size_t fftSize)
     : m_hopSize(hopSize),
@@ -59,4 +59,4 @@ std::unique_ptr<IFftEngine> makeFftEngine(std::size_t hopSize, std::size_t fftSi
     return std::make_unique<KissFftEngine>(hopSize, fftSize);
 }
 
-} // namespace litespec::dsp
+} // namespace echobox::dsp

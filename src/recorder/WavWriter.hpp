@@ -6,7 +6,7 @@
 #include <string>
 #include <sndfile.h>
 
-namespace litespec::recorder {
+namespace echobox::recorder {
 
 /**
  * Tiny RAII wrapper around libsndfile for WAV/PCM_16 writes.
@@ -47,4 +47,4 @@ private:
     bool                  m_closed{false};
 };
 
-} // namespace litespec::recorder
+} // namespace echobox::recorder

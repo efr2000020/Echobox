@@ -1,7 +1,7 @@
 #pragma once
 #include <atomic>
 
-namespace litespec::common {
+namespace echobox::common {
 
 /**
  * Installs SIGINT / SIGTERM handlers that set a process-wide atomic flag.
@@ -17,4 +17,4 @@ private:
     static std::atomic<bool> s_exitRequested;
 };
 
-} // namespace litespec::common
+} // namespace echobox::common

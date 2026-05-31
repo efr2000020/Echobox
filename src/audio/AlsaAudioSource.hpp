@@ -8,7 +8,7 @@
 struct _snd_pcm;
 typedef struct _snd_pcm snd_pcm_t;
 
-namespace litespec::audio {
+namespace echobox::audio {
 
 /**
  * ALSA capture source. Tuned for a Dodotronic Ultramic 384K (USB-audio,
@@ -51,4 +51,4 @@ private:
     int         m_actualRate{0};
 };
 
-} // namespace litespec::audio
+} // namespace echobox::audio

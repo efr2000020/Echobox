@@ -2,7 +2,7 @@
 #include "Config.hpp"
 #include <string>
 
-namespace litespec::app {
+namespace echobox::app {
 
 struct CliResult {
     enum class Kind { Ok, HelpRequested, VersionRequested, Error };
@@ -24,4 +24,4 @@ CliResult parseCli(int argc, char** argv, Config& cfg);
 const char* helpText();
 const char* versionText();
 
-} // namespace litespec::app
+} // namespace echobox::app

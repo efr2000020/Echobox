@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace litespec::audio {
+namespace echobox::audio {
 
 AlsaAudioSource::AlsaAudioSource(Params params) : m_params(std::move(params)) {}
 
@@ -136,4 +136,4 @@ int AlsaAudioSource::read(std::span<std::int16_t> dest) {
     return static_cast<int>(got) * ch;
 }
 
-} // namespace litespec::audio
+} // namespace echobox::audio

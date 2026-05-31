@@ -10,7 +10,7 @@
 #include <memory>
 #include <thread>
 
-namespace litespec::recorder {
+namespace echobox::recorder {
 
 class WavWriter;
 
@@ -20,6 +20,11 @@ struct RecorderConfig {
     int                   channels{1};
     std::uint32_t         preRollMs{1000};
     std::uint32_t         silenceMs{100};
+    /** Min / max WAV length, end-to-end (pre-roll + active + hangover).
+     *  Files shorter than min are deleted instead of finalized.
+     *  maxLengthMs == 0 disables the cap. */
+    std::uint32_t         minLengthMs{0};
+    std::uint32_t         maxLengthMs{50};
     /** How often the recorder polls the detector state. */
     std::uint32_t         pollIntervalMs{5};
 };
@@ -75,4 +80,4 @@ private:
     std::filesystem::path                 m_currentTempPath;
 };
 
-} // namespace litespec::recorder
+} // namespace echobox::recorder

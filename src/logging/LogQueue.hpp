@@ -6,7 +6,7 @@
 #include <mutex>
 #include <vector>
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 // Bounded MPSC queue. Producers acquire a short mutex (only to copy a
 // ~256-byte record into a ring slot — no I/O is ever done inside the lock).
@@ -34,4 +34,4 @@ private:
     std::mutex  m_mutex;
 };
 
-} // namespace litespec::logging
+} // namespace echobox::logging

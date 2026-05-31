@@ -1,28 +1,40 @@
 #include "app/Application.hpp"
 #include "app/CliParser.hpp"
+#include "app/ConfigValidator.hpp"
 
 #include <cstdio>
 
 int main(int argc, char** argv) {
-    litespec::app::Config cfg;
-    auto res = litespec::app::parseCli(argc, argv, cfg);
+    echobox::app::Config cfg;
+    auto res = echobox::app::parseCli(argc, argv, cfg);
     switch (res.kind) {
-        case litespec::app::CliResult::Kind::HelpRequested:
-            std::fputs(litespec::app::helpText(), stdout);
+        case echobox::app::CliResult::Kind::HelpRequested:
+            std::fputs(echobox::app::helpText(), stdout);
             return 0;
-        case litespec::app::CliResult::Kind::VersionRequested:
-            std::fputs(litespec::app::versionText(), stdout);
+        case echobox::app::CliResult::Kind::VersionRequested:
+            std::fputs(echobox::app::versionText(), stdout);
             return 0;
-        case litespec::app::CliResult::Kind::Error:
+        case echobox::app::CliResult::Kind::Error:
             std::fprintf(stderr, "error: %s\n\n", res.errorMessage.c_str());
-            std::fputs(litespec::app::helpText(), stderr);
+            std::fputs(echobox::app::helpText(), stderr);
             return 2;
-        case litespec::app::CliResult::Kind::Ok:
+        case echobox::app::CliResult::Kind::Ok:
             break;
     }
 
+    // Catch cross-flag combinations that look fine individually but break
+    // in concert. Report every violation in one go so the user fixes all
+    // of them in a single edit rather than one launch per error.
+    const auto configErrors = echobox::app::validateConfig(cfg);
+    if (!configErrors.empty()) {
+        for (const auto& msg : configErrors) {
+            std::fprintf(stderr, "error: %s\n", msg.c_str());
+        }
+        return 2;
+    }
+
     try {
-        litespec::app::Application app(std::move(cfg));
+        echobox::app::Application app(std::move(cfg));
         return app.run();
     } catch (const std::exception& e) {
         std::fprintf(stderr, "fatal: %s\n", e.what());

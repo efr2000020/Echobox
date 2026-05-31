@@ -1,5 +1,6 @@
 add_library(ls_app STATIC
     CliParser.cpp
+    ConfigValidator.cpp
     Application.cpp
 )
 target_include_directories(ls_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)

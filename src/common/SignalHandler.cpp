@@ -3,7 +3,7 @@
 #include <csignal>
 #include <cstring>
 
-namespace litespec::common {
+namespace echobox::common {
 
 std::atomic<bool> SignalHandler::s_exitRequested{false};
 
@@ -36,4 +36,4 @@ void SignalHandler::requestExit() {
     s_exitRequested.store(true, std::memory_order_release);
 }
 
-} // namespace litespec::common
+} // namespace echobox::common

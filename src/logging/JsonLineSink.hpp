@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <string>
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 // Appends LogRecords as JSON-lines to a rotating file under `dir`.
 // Rotation: when the active file reaches `maxBytes`, it is renamed with a .1
@@ -44,4 +44,4 @@ private:
     std::size_t           m_currentBytes{0};
 };
 
-} // namespace litespec::logging
+} // namespace echobox::logging

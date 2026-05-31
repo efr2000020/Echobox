@@ -5,7 +5,7 @@
 #include <span>
 #include <vector>
 
-namespace litespec::recorder {
+namespace echobox::recorder {
 
 /**
  * Always-overwriting circular buffer of int16 audio samples.
@@ -68,4 +68,4 @@ private:
     std::atomic<std::uint64_t>     m_writePos{0};
 };
 
-} // namespace litespec::recorder
+} // namespace echobox::recorder

@@ -1,15 +1,22 @@
-"""Batch CLI: detector tuning workflows + ESP32 streaming, no GUI required.
+"""Batch CLI: detector tuning workflows + ALSA loopback streaming, no GUI required.
 
-Examples:
-    python3 -m validator.cli run    recording.wav
-    python3 -m validator.cli score  clean.wav noisy.wav -v
-    python3 -m validator.cli grid   clean.wav noisy.wav \\
-        --band-snr-threshold 8 10 12 15 --max-flatness 0.65 0.75
-    python3 -m validator.cli overlay recording.wav -o out.png
+Algorithm-agnostic: every subcommand drives the active algorithm through the
+native validator library. Pick a specific plugin with ``--algorithm NAME``;
+omitted, the CLI uses the first registered algorithm.
+
+Examples::
+
+    python3 -m validator.cli describe                       # list tunables
+    python3 -m validator.cli run     recording.wav
+    python3 -m validator.cli score   clean.wav noisy.wav -v
+    python3 -m validator.cli grid    clean.wav noisy.wav \\
+        --sweep band_snr_threshold 8 10 12 15 \\
+        --sweep max_flatness 0.65 0.75
+    python3 -m validator.cli overlay  recording.wav -o out.png
     python3 -m validator.cli diagnose recording.wav
-    python3 -m validator.cli stream  --host 192.168.1.42 recording.wav
+    python3 -m validator.cli loopback recording.wav --loop
 
-    # Override a detector field for run/score/overlay:
+    # Override any static field or algorithm tunable for run / score / overlay:
     python3 -m validator.cli run recording.wav --set band_snr_threshold=10
 """
 from __future__ import annotations
@@ -22,68 +29,132 @@ from typing import Dict, List, Sequence
 
 import numpy as np
 
-from . import detector as det_mod
+from . import alsa_stream
 from . import evaluation as ev
-from . import esp32_stream
-from .dsp import HOP, NFFT, load_wav_float, stft_mags
+from . import native
+from .dsp import HOP, NFFT, load_wav_float
 
 
 # --- shared helpers ---------------------------------------------------------
 
-def _apply_set_overrides(cfg: det_mod.DetectorConfig,
-                         sets: Sequence[str]) -> det_mod.DetectorConfig:
-    """Apply --set key=value overrides to a DetectorConfig."""
-    fields = {f.name: f for f in dataclasses.fields(cfg)}
-    overrides: Dict[str, object] = {}
+def _apply_set_overrides(cfg: native.DetectorConfig,
+                         sets: Sequence[str]) -> native.DetectorConfig:
+    """Apply --set key=value overrides.
+
+    Static config fields (sample_rate, freq_lo_hz, ...) are replaced directly;
+    everything else is treated as an algorithm tunable and validated by the
+    native side at create() time.
+    """
+    static_fields = native.CONFIG_FIELDS
+    static_overrides: Dict[str, object] = {}
+    tunable_overrides: Dict[str, float] = dict(cfg.tunables)
     for kv in sets:
         key, _, val = kv.partition("=")
         key = key.strip().lower()
-        if key not in fields:
-            sys.exit("Unknown detector field '%s'. Known: %s"
-                     % (key, ", ".join(sorted(fields))))
-        ftype = fields[key].type
-        try:
-            overrides[key] = _coerce(val, ftype)
-        except ValueError as e:
-            sys.exit("Invalid value for %s: %s" % (key, e))
-    return dataclasses.replace(cfg, **overrides)
+        if key in static_fields:
+            try:
+                static_overrides[key] = _coerce_static(key, val)
+            except ValueError as e:
+                sys.exit("Invalid value for %s: %s" % (key, e))
+        else:
+            try:
+                tunable_overrides[key] = float(val)
+            except ValueError:
+                sys.exit("Invalid value for tunable %s: %r" % (key, val))
+    return dataclasses.replace(cfg, tunables=tunable_overrides, **static_overrides)
 
 
-def _coerce(s: str, hint):
-    if hint in (int, "int"):
-        return int(float(s))
-    if hint in (float, "float"):
-        return float(s)
-    return s
+def _coerce_static(key: str, val: str):
+    if key == "algorithm":
+        return val
+    if key in ("sample_rate", "fft_size"):
+        return int(float(val))
+    if key in ("freq_lo_hz", "freq_hi_hz"):
+        return float(val)
+    return val
 
 
-def _detector_from_args(args, sample_rate: int) -> det_mod.BandEnergyDetector:
-    cfg = det_mod.DetectorConfig(sample_rate=sample_rate)
+def _detector_from_args(args, sample_rate: int) -> native.Detector:
+    cfg = native.DetectorConfig(
+        algorithm=getattr(args, "algorithm", None),
+        sample_rate=sample_rate,
+        sensitivity=getattr(args, "sensitivity", None))
     if getattr(args, "freq_lo_hz", None) is not None:
         cfg = dataclasses.replace(cfg, freq_lo_hz=float(args.freq_lo_hz))
     if getattr(args, "freq_hi_hz", None) is not None:
         cfg = dataclasses.replace(cfg, freq_hi_hz=float(args.freq_hi_hz))
     if getattr(args, "set", None):
         cfg = _apply_set_overrides(cfg, args.set)
-    return det_mod.BandEnergyDetector(cfg)
+    return native.Detector(cfg)
 
 
 def _load_and_stft(path: str):
     sr, samples = load_wav_float(path)
-    mags = stft_mags(samples)
+    # HPF + STFT both happen native-side now, matching the production runtime.
+    mags = native.stft(samples, sr, hpf_cutoff_hz=20000.0)
     return sr, samples, mags
+
+
+def _parse_sweeps(sweep_args: Sequence[Sequence[str]]) -> Dict[str, List[float]]:
+    """Turn `--sweep key v1 v2 ...` (one or more) into {key: [values]}.
+
+    Values are coerced to float; the algorithm will narrow to int where its
+    tunable manifest says so.
+    """
+    sweeps: Dict[str, List[float]] = {}
+    for entry in sweep_args:
+        if len(entry) < 2:
+            sys.exit("--sweep needs a key and at least one value: --sweep KEY VAL [VAL ...]")
+        key = entry[0]
+        try:
+            values = [float(v) for v in entry[1:]]
+        except ValueError as e:
+            sys.exit("Invalid sweep value for %s: %s" % (key, e))
+        sweeps[key] = values
+    return sweeps
 
 
 # --- subcommands ------------------------------------------------------------
 
+def cmd_describe(args) -> None:
+    """List the active algorithm, its tunable manifest, and its presets."""
+    available = native.list_algorithms()
+    if not available:
+        sys.exit("No algorithms registered. Scanned %s." % native.algorithms_dir())
+    name = args.algorithm or available[0]
+    print("Algorithms available: %s" % ", ".join(available))
+    print("Active: %s" % name)
+    try:
+        tunables = native.list_tunables(algorithm=name)
+        presets  = native.list_presets(algorithm=name)
+    except (ValueError, RuntimeError) as e:
+        sys.exit("error: %s" % e)
+
+    if presets:
+        print("\nSensitivity presets (EXPERIMENTAL):")
+        for p in presets:
+            print("  %-10s  %s" % (p.name, p.doc))
+
+    if not tunables:
+        print("\n(no tunables)")
+        return
+    print("\nTunables:")
+    print("  %-22s %-6s %-10s %-22s  %s"
+          % ("key", "type", "default", "range", "doc"))
+    for t in tunables:
+        rng = "[%g, %g]" % (t.min, t.max)
+        print("  %-22s %-6s %-10g %-22s  %s"
+              % (t.key, t.type, t.default, rng, t.doc))
+
+
 def cmd_run(args) -> None:
-    tps = HOP
     for path in args.wavs:
         sr, _, mags = _load_and_stft(path)
         d = _detector_from_args(args, sr)
         dets = d.run_on_spectrogram(mags)
         secs_per_frame = HOP / sr
-        print("=== %s  (sr=%d, %d frames) ===" % (path, sr, mags.shape[0]))
+        print("=== %s  (sr=%d, %d frames, algorithm=%s) ==="
+              % (path, sr, mags.shape[0], d.algorithm))
         print("    detections: %d" % len(dets))
         for i, e in enumerate(dets, 1):
             print("    %3d:  t=%6.2f-%6.2fs   %5.1f-%5.1f kHz"
@@ -151,7 +222,7 @@ def cmd_overlay(args) -> None:
                       vmin=-100, vmax=-30)
         ax.set_ylim(0, min(200, sr / 2000))
         ax.set_ylabel("kHz")
-        ax.set_title("%s  (detections in green)" % path)
+        ax.set_title("%s  (%s, detections in green)" % (path, d.algorithm))
         secs_per_frame = HOP / sr
         for e in dets:
             ax.add_patch(plt.Rectangle(
@@ -167,10 +238,31 @@ def cmd_overlay(args) -> None:
 
 def cmd_diagnose(args) -> None:
     """Report the causal peak SNR each labelled call actually achieves —
-    useful for deciding where to set band_snr_threshold."""
+    useful for deciding where to set the algorithm's SNR threshold.
+
+    Models the per-bin EMA floor used by floor-based detectors, so the active
+    algorithm must expose ``alpha_rise``, ``alpha_fall``, and ``min_abs_floor``
+    as tunables. Algorithms with a different internal model (e.g. learned
+    detectors) won't expose these — diagnose will refuse rather than print a
+    number that doesn't match the algorithm it claims to describe.
+    """
+    REQUIRED = ("alpha_rise", "alpha_fall", "min_abs_floor")
     for path in args.wavs:
         sr, _, mags = _load_and_stft(path)
-        cfg = det_mod.DetectorConfig(sample_rate=sr)
+        cfg = native.DetectorConfig(
+            algorithm=getattr(args, "algorithm", None),
+            sample_rate=sr,
+            sensitivity=getattr(args, "sensitivity", None))
+        det = native.Detector(cfg)
+        floors = {k: det.get_tunable(k) for k in REQUIRED}
+        if any(v is None for v in floors.values()):
+            missing = [k for k, v in floors.items() if v is None]
+            sys.exit("diagnose: algorithm '%s' does not expose %s — "
+                     "diagnose is specific to floor-based detectors."
+                     % (det.algorithm, ", ".join(missing)))
+        alpha_rise, alpha_fall, min_abs_floor = (
+            floors["alpha_rise"], floors["alpha_fall"], floors["min_abs_floor"])
+
         n_frames, n_bins = mags.shape
         bin_res = sr / NFFT
         min_bin = int(cfg.freq_lo_hz / bin_res)
@@ -180,15 +272,15 @@ def cmd_diagnose(args) -> None:
         snr_per_frame = np.zeros(n_frames, dtype=np.float64)
         for fr in range(n_frames):
             band = mags[fr, min_bin:max_bin].astype(np.float64)
-            fl = np.maximum(floor[min_bin:max_bin], cfg.min_abs_floor)
+            fl = np.maximum(floor[min_bin:max_bin], min_abs_floor)
             snr_per_frame[fr] = (band / fl).max() if band.size else 0.0
-            a = np.where(band > floor[min_bin:max_bin], cfg.alpha_rise, cfg.alpha_fall)
+            a = np.where(band > floor[min_bin:max_bin], alpha_rise, alpha_fall)
             floor[min_bin:max_bin] = a * floor[min_bin:max_bin] + (1 - a) * band
 
         gt = ev.label_ground_truth(mags, sr, NFFT)
         secs_per_frame = HOP / sr
         call_snrs = []
-        print("=== %s : per-call causal peak-SNR ===" % path)
+        print("=== %s : per-call causal peak-SNR (%s) ===" % (path, det.algorithm))
         for g in gt:
             w = slice(max(0, g.start_frame - 2), g.end_frame + 3)
             msnr = float(snr_per_frame[w].max() if w.stop > w.start else 0.0)
@@ -204,20 +296,10 @@ def cmd_diagnose(args) -> None:
 
 
 def cmd_grid(args) -> None:
-    sweep_fields = {
-        "band_snr_threshold": getattr(args, "band_snr_threshold", None),
-        "min_flatness":       getattr(args, "min_flatness", None),
-        "max_flatness":       getattr(args, "max_flatness", None),
-        "min_active_frames":  getattr(args, "min_active_frames", None),
-        "hangover_frames":    getattr(args, "hangover_frames", None),
-        "top_k":              getattr(args, "top_k", None),
-    }
-    sweeps = {k: v for k, v in sweep_fields.items() if v}
+    sweeps = _parse_sweeps(args.sweep)
     if not sweeps:
-        sweeps = {
-            "band_snr_threshold": [8.0, 10.0, 12.0, 15.0],
-            "max_flatness":       [0.70, 0.75, 0.80],
-        }
+        sys.exit("grid: pass at least one --sweep KEY V1 V2 ... "
+                 "(see `describe` for tunable keys).")
 
     file_cache: List = []
     gt_cache: Dict = {}
@@ -226,7 +308,9 @@ def cmd_grid(args) -> None:
         file_cache.append((path, mags, sr))
         gt_cache[path] = ev.label_ground_truth(mags, sr, NFFT)
 
-    base = det_mod.DetectorConfig()
+    base = native.DetectorConfig(
+        algorithm=getattr(args, "algorithm", None),
+        sensitivity=getattr(args, "sensitivity", None))
     rows = ev.grid_search(file_cache, base, sweeps, gt_cache)
 
     print("Ranked by F1 (then worst-file recall). Top %d of %d combos:\n"
@@ -241,27 +325,24 @@ def cmd_grid(args) -> None:
         print()
 
 
-def cmd_stream(args) -> None:
-    """Stream a WAV to the ESP32 over TCP. Real-time paced."""
-    import threading
-    stop_event = threading.Event()
+def cmd_loopback(args) -> None:
+    """Stream a WAV to an ALSA loopback device. Real-time paced."""
+    card = alsa_stream.detect_loopback_card()
+    if card is None:
+        sys.exit("Error: snd-aloop not loaded. Run 'sudo modprobe snd-aloop id=UltraMic384K' first.")
 
-    def on_progress(p: float, elapsed: float) -> None:
-        sys.stdout.write("\r  streaming: %5.1f%%  (%.1fs)" % (p * 100, elapsed))
-        sys.stdout.flush()
+    device = args.device or alsa_stream.PLAYBACK_DEV.format(card=card)
+    print("Streaming %s -> %s %s..." % (args.wav, device, "(looping)" if args.loop else ""))
 
-    print("Streaming %s -> %s:%d ..." % (args.wav, args.host, args.port))
     try:
-        esp32_stream.stream_wav_to_esp32(
-            host=args.host, port=args.port, wav_path=args.wav,
-            chunk_ms=args.chunk_ms, on_progress=on_progress,
-            stop_event=stop_event,
+        alsa_stream.stream_wav_to_alsa(
+            args.wav, device, loop=args.loop,
+            on_progress=lambda d, t: sys.stdout.write("\r  %d/%d frames" % (d, t))
         )
         sys.stdout.write("\n  done.\n")
     except KeyboardInterrupt:
-        stop_event.set()
         sys.stdout.write("\n  cancelled.\n")
-    except (ConnectionError, OSError) as e:
+    except Exception as e:
         sys.stdout.write("\n  error: %s\n" % e)
         sys.exit(2)
 
@@ -271,18 +352,33 @@ def cmd_stream(args) -> None:
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="validator.cli",
-        description="BandEnergyDetector tuning + ESP32 streaming.",
+        description="Offline detector tuning + ALSA loopback streaming.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    def algorithm_arg(p):
+        p.add_argument("--algorithm",
+                       help="Plugin to run with (default: first registered). "
+                            "See `describe` for the list.")
+
     def detector_args(p):
+        algorithm_arg(p)
+        p.add_argument("--sensitivity",
+                       help="EXPERIMENTAL: coarse sensitivity preset "
+                            "(e.g. quiet/balanced/noisy). Applied before --set, "
+                            "so individual tunable overrides still win. "
+                            "See `describe` for the list.")
         p.add_argument("--freq-lo-hz", type=float)
         p.add_argument("--freq-hi-hz", type=float)
         p.add_argument("--set", action="append", default=[],
                        metavar="FIELD=VALUE",
-                       help="Override a DetectorConfig field, "
+                       help="Override a DetectorConfig field or algorithm tunable, "
                             "e.g. --set band_snr_threshold=10")
+
+    p = sub.add_parser("describe", help="List registered algorithms and their tunables")
+    algorithm_arg(p)
+    p.set_defaults(func=cmd_describe)
 
     p = sub.add_parser("run", help="Run detector and list detections")
     p.add_argument("wavs", nargs="+")
@@ -305,34 +401,40 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--out", default="overlay.png")
     p.set_defaults(func=cmd_overlay)
 
-    p = sub.add_parser("diagnose", help="Per-call causal peak SNR")
+    p = sub.add_parser("diagnose", help="Per-call causal peak SNR (floor-based detectors only)")
     p.add_argument("wavs", nargs="+")
+    algorithm_arg(p)
+    p.add_argument("--sensitivity",
+                   help="EXPERIMENTAL: read floor parameters from this preset")
     p.set_defaults(func=cmd_diagnose)
 
-    p = sub.add_parser("grid", help="Grid-search detector params")
+    p = sub.add_parser("grid", help="Grid-search detector tunables")
     p.add_argument("wavs", nargs="+")
+    algorithm_arg(p)
+    p.add_argument("--sensitivity",
+                   help="EXPERIMENTAL: starting preset for all sweep combinations")
     p.add_argument("--top", type=int, default=8)
-    p.add_argument("--band-snr-threshold", nargs="+", type=float)
-    p.add_argument("--min-flatness",       nargs="+", type=float)
-    p.add_argument("--max-flatness",       nargs="+", type=float)
-    p.add_argument("--min-active-frames",  nargs="+", type=int)
-    p.add_argument("--hangover-frames",    nargs="+", type=int)
-    p.add_argument("--top-k",              nargs="+", type=int)
+    p.add_argument("--sweep", action="append", nargs="+", default=[],
+                   metavar=("KEY", "VAL"),
+                   help="Sweep an algorithm tunable: --sweep band_snr_threshold 8 10 12. "
+                        "Repeat for multi-axis sweeps.")
     p.set_defaults(func=cmd_grid)
 
-    p = sub.add_parser("stream", help="Stream a WAV to an ESP32 over TCP")
+    p = sub.add_parser("loopback", help="Stream a WAV to an ALSA loopback (fake-mic)")
     p.add_argument("wav")
-    p.add_argument("--host", required=True, help="ESP32 IP or hostname")
-    p.add_argument("--port", type=int, default=esp32_stream.DEFAULT_PORT)
-    p.add_argument("--chunk-ms", type=int, default=20)
-    p.set_defaults(func=cmd_stream)
+    p.add_argument("--device", help="ALSA device name (default: auto-detect)")
+    p.add_argument("--loop", action="store_true", help="Loop the file continuously")
+    p.set_defaults(func=cmd_loopback)
 
     return ap
 
 
 def main(argv=None) -> None:
     args = build_parser().parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except (ValueError, RuntimeError) as e:
+        sys.exit("error: %s" % e)
 
 
 if __name__ == "__main__":

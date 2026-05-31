@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace litespec::recorder {
+namespace echobox::recorder {
 
 PreRollBuffer::PreRollBuffer(std::size_t capacitySamples)
     : m_capacity(capacitySamples), m_buf(capacitySamples, 0) {}
@@ -63,4 +63,4 @@ std::size_t PreRollBuffer::read(Cursor& cursor, std::span<std::int16_t> dest,
     return toRead;
 }
 
-} // namespace litespec::recorder
+} // namespace echobox::recorder

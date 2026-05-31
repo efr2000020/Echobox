@@ -5,7 +5,7 @@
 #include <cstring>
 #include <string_view>
 
-namespace litespec::app {
+namespace echobox::app {
 
 namespace {
 
@@ -64,20 +64,20 @@ CliResult err(std::string msg) {
 } // namespace
 
 const char* versionText() {
-    return "LiteSpectrum 0.2.0\n";
+    return "Echobox 0.2.0\n";
 }
 
 const char* helpText() {
     return
-        "LiteSpectrum — bat presence detector + recorder gate.\n"
+        "Echobox — bat presence detector + recorder gate.\n"
         "\n"
-        "Usage: LiteSpectrum [options]\n"
+        "Usage: Echobox [options]\n"
         "\n"
         "Listens to an ultrasonic microphone and saves a WAV recording whenever\n"
         "a bat call is detected, including a short lead-in before each call.\n"
         "\n"
         "Example:\n"
-        "  LiteSpectrum --device plughw:CARD=UltraMic384K --output-dir ./recordings\n"
+        "  Echobox --device plughw:CARD=UltraMic384K --output-dir ./recordings\n"
         "\n"
         "Audio capture:\n"
         "  --device <name>           ALSA capture device (default: \"default\")\n"
@@ -88,16 +88,20 @@ const char* helpText() {
         "  --fft-size <int>          FFT size (default: 4096)\n"
         "  --hop-size <int>          FFT hop in samples (default: 512)\n"
         "  --freq-lo-hz <int>        Lower edge of detection window (default: 20000)\n"
-        "  --freq-hi-hz <int>        Upper edge of detection window (default: 190000)\n"
+        "  --freq-hi-hz <int>        Upper edge of detection window (default: 192000, Nyquist)\n"
+        "  --sensitivity <name>      EXPERIMENTAL: coarse sensitivity preset, e.g.\n"
+        "                            quiet | balanced | noisy (algorithm-specific)\n"
         "\n"
         "Recorder:\n"
         "  --output-dir <path>       WAV output root (default: ./recordings)\n"
         "  --preroll-ms <int>        Pre-detection audio to include (default: 1000)\n"
-        "  --silence-ms <int>        Idle time after last activity before close (default: 100)\n"
+        "  --silence-ms <int>        Idle time after last activity before close (default: 2000)\n"
+        "  --min-length-ms <int>     Discard recordings shorter than this (default: 0, off)\n"
+        "  --max-length-ms <int>     Close recordings reaching this length (default: 5000, 0 = no cap)\n"
         "\n"
         "Logging:\n"
         "  --log-dir <path>          Log output dir (default: ./logs)\n"
-        "  --log-level off|debug|info|warn|error   (default: off)\n"
+        "  --log-level off|debug|info|warn|error   (default: debug)\n"
         "\n"
         "  -h, --help                Show this help and exit\n"
         "  -V, --version             Print version and exit\n";
@@ -130,7 +134,8 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
             long x; if (!parseInt(v, x) || x <= 0) return err("invalid --sample-rate");
             cfg.sampleRate = static_cast<int>(x);
         }
-        else if (k == "algorithm")     cfg.algorithm = std::string(v);
+        else if (k == "algorithm")     cfg.algorithm   = std::string(v);
+        else if (k == "sensitivity")   cfg.sensitivity = std::string(v);
         else if (k == "fft-size") {
             long x; if (!parseInt(v, x) || x <= 0) return err("invalid --fft-size");
             cfg.fftSize = static_cast<std::size_t>(x);
@@ -156,6 +161,14 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
             std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --silence-ms");
             cfg.silenceMs = u;
         }
+        else if (k == "min-length-ms") {
+            std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --min-length-ms");
+            cfg.minLengthMs = u;
+        }
+        else if (k == "max-length-ms") {
+            std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --max-length-ms");
+            cfg.maxLengthMs = u;
+        }
         else if (k == "log-dir")       cfg.logDir = std::string(v);
         else if (k == "log-level") {
             logging::LogLevel lvl;
@@ -169,10 +182,11 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
         }
     }
 
-    if (cfg.freqLoHz >= cfg.freqHiHz) {
-        return err("--freq-lo-hz must be less than --freq-hi-hz");
-    }
+    // Cross-flag invariants (freq-lo < freq-hi, max-length budget, etc.)
+    // live in ConfigValidator so the same module catches every "two flags
+    // that disagree" case in one place. CliParser only enforces per-flag
+    // bounds — i.e. that each value parses and is in its own legal range.
     return {};
 }
 
-} // namespace litespec::app
+} // namespace echobox::app

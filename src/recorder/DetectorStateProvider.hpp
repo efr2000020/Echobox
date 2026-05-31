@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-namespace litespec::recorder {
+namespace echobox::recorder {
 
 struct DetectorStateSnapshot {
     bool          active;
@@ -21,4 +21,4 @@ public:
     virtual DetectorStateSnapshot snapshot() const = 0;
 };
 
-} // namespace litespec::recorder
+} // namespace echobox::recorder

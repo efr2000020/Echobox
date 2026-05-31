@@ -9,7 +9,7 @@
 
 namespace fs = std::filesystem;
 
-namespace litespec::recorder {
+namespace echobox::recorder {
 
 WavWriter::WavWriter(fs::path tempPath, int sampleRate, int channels)
     : m_tempPath(std::move(tempPath)),
@@ -93,4 +93,4 @@ void WavWriter::abort() {
     fs::remove(m_tempPath, ec);
 }
 
-} // namespace litespec::recorder
+} // namespace echobox::recorder

@@ -4,7 +4,7 @@
 #include <span>
 #include <string>
 
-namespace litespec::audio {
+namespace echobox::audio {
 
 /**
  * Capture-side audio source abstraction.
@@ -42,4 +42,4 @@ public:
     virtual int read(std::span<std::int16_t> dest) = 0;
 };
 
-} // namespace litespec::audio
+} // namespace echobox::audio

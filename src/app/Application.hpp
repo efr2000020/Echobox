@@ -10,7 +10,7 @@
 #include <memory>
 #include <thread>
 
-namespace litespec::app {
+namespace echobox::app {
 
 /**
  * Top-level wiring + lifecycle.
@@ -49,4 +49,4 @@ private:
     std::thread       m_captureThread;
 };
 
-} // namespace litespec::app
+} // namespace echobox::app

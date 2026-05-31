@@ -9,7 +9,7 @@
 
 namespace fs = std::filesystem;
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 namespace {
 
@@ -151,4 +151,4 @@ void JsonLineSink::flush() {
     if (m_fp) std::fflush(m_fp);
 }
 
-} // namespace litespec::logging
+} // namespace echobox::logging

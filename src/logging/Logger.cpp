@@ -7,7 +7,7 @@
 #include <thread>
 #include <vector>
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 Logger& Logger::instance() {
     static Logger inst;
@@ -89,4 +89,4 @@ void Logger::consumerLoop() {
     }
 }
 
-} // namespace litespec::logging
+} // namespace echobox::logging

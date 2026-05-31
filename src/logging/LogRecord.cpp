@@ -1,7 +1,7 @@
 #include "LogRecord.hpp"
 #include <cstring>
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 const char* levelName(LogLevel lvl) {
     switch (lvl) {
@@ -25,4 +25,4 @@ bool parseLevel(const char* s, LogLevel& out) {
     return false;
 }
 
-} // namespace litespec::logging
+} // namespace echobox::logging

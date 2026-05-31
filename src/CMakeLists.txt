@@ -12,6 +12,10 @@ add_subdirectory(recorder)
 add_subdirectory(audio)
 add_subdirectory(dsp)
 add_subdirectory(app)
+# In development mode, build the native validator library for Python interop.
+if(ECHOBOX_DYNAMIC_PLUGINS)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/tools/validator/native validator_native)
+endif()
 
 add_executable(Echobox main.cpp)
 target_link_libraries(Echobox PRIVATE

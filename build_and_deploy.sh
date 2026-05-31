@@ -14,7 +14,7 @@ echo "--- Starting Build and Deploy ---"
 mkdir -p "$BUILD_DIR"
 
 # Configure
-BUILD_TYPE=${1:-Debug}
+BUILD_TYPE=Release
 echo "[1/3] Configuring with CMake (Ninja) in ${BUILD_TYPE} mode..."
 cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_INSTALL_PREFIX="$DEPLOY_DIR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
 

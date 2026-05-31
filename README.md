@@ -70,14 +70,13 @@ Recordings are saved into a `recordings` folder, organised into a sub-folder per
 
 ## Understanding the recording file names
 
-A saved file looks like this: `20260529_213544_842ms_45-80kHz.wav`
+A saved file looks like this: `20260529_213544842_18ms.wav`
 
-| Part        | Meaning                                                        |
-| ----------- | -------------------------------------------------------------- |
-| `20260529`  | Date — 29 May 2026                                             |
-| `213544`    | Time — 21:35:44                                                |
-| `842ms`     | How long the recorded activity lasted (842 milliseconds)       |
-| `45-80kHz`  | The frequency range the calls fell into (45 to 80 kHz)         |
+| Part         | Meaning                                                        |
+| ------------ | -------------------------------------------------------------- |
+| `20260529`   | Date — 29 May 2026                                             |
+| `213544842`  | Time — 21:35:44.842 (millisecond precision)                    |
+| `18ms`       | How long the recording lasted (18 milliseconds, end to end)    |
 
 ---
 
@@ -85,23 +84,64 @@ A saved file looks like this: `20260529_213544_842ms_45-80kHz.wav`
 
 Run `./Echobox --help` to see the full list.
 
-| Option              | What it does                                              | Default        |
-| ------------------- | --------------------------------------------------------- | -------------- |
-| `--device <name>`   | Which microphone to listen to                             | `default`      |
-| `--output-dir <p>`  | Where recordings are saved                                | `./recordings` |
-| `--preroll-ms <n>`  | How much audio to keep from *before* each call (ms)       | `1000`         |
-| `--silence-ms <n>`  | Quiet time after a call before the recording closes (ms)  | `2000`          |
-| `--freq-lo-hz <n>`  | Bottom of the frequency range to listen for               | `20000`        |
-| `--freq-hi-hz <n>`  | Top of the frequency range to listen for                  | `190000`       |
+| Option                | What it does                                              | Default        |
+| --------------------- | --------------------------------------------------------- | -------------- |
+| `--device <name>`     | Which microphone to listen to                             | `default`      |
+| `--output-dir <p>`    | Where recordings are saved                                | `./recordings` |
+| `--preroll-ms <n>`    | How much audio to keep from *before* each call (ms)       | `1000`         |
+| `--silence-ms <n>`    | Quiet time after a call before the recording closes (ms)  | `2000`         |
+| `--min-length-ms <n>` | Drop any recording shorter than this (`0` = off)          | `0`            |
+| `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `5000`  |
+| `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
+| `--freq-hi-hz <n>`    | Top of the frequency range to listen for                  | `192000`       |
+| `--sensitivity <name>` | **Experimental.** Coarse preset for noisy / quiet sites (see below) | *(off)* |
 
+Lengths above are end-to-end (pre-roll + detected activity + silence-after).
+Echobox refuses to start if `--max-length-ms` is smaller than
+`--preroll-ms + --silence-ms`, so a recording can never close before the
+detected call has had a chance to play out.
+
+---
+
+## Tuning for your site (experimental)
+
+> **Status:** `--sensitivity` and the presets it accepts are experimental.
+> Names and the values they map to may change between releases as we collect
+> more field data. The fine-grained tunables exposed by each algorithm are
+> the stable interface for advanced users.
+
+The detector has many internal knobs (SNR threshold, spectral flatness gates,
+debounce, etc.) that interact in non-obvious ways. To keep field deployment
+simple, each algorithm ships a small set of named **sensitivity presets** that
+move several knobs together to suit a kind of site.
+
+The bundled `BandEnergyDetector` ships three:
+
+| Preset      | When to use                                                                  |
+| ----------- | ---------------------------------------------------------------------------- |
+| `quiet`     | Low-noise sites (sheltered garden, rural attic). Maximises recall; tolerates more false positives in exchange for catching faint distant calls. |
+| `balanced`  | Default. Suits a typical unattended deployment.                              |
+| `noisy`     | Windy, suburban, near-roadway, or rustling-foliage sites. Strict on every dimension; only loud unambiguous calls survive. Use this if you see lots of false positives. |
+
+Pick one with `--sensitivity`:
+
+```bash
+./run.sh --device plughw:CARD=UltraMic384K --sensitivity noisy
+```
 ---
 
 ## Troubleshooting
 
-If something seems wrong, enable logging:
+Echobox ships with **`--log-level debug`** as the current default — every run
+writes a detailed log into `./logs/` so the algorithm's per-frame reasoning
+is captured around each saved WAV. That's useful while we're hunting
+false-positive causes, but it writes several hundred thousand lines per day
+and will eventually fill the SD card on an unattended unit. For long-term
+field deployments, set a quieter level explicitly:
 
 ```bash
 ./run.sh --device plughw:CARD=UltraMic384K --log-level info
+./run.sh --device plughw:CARD=UltraMic384K --log-level off    # silent
 ```
 
 - **Device errors** — Double-check the `--device` name with `arecord -l`.

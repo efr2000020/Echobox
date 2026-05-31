@@ -3,7 +3,7 @@
 #include <memory>
 #include <span>
 
-namespace litespec::dsp {
+namespace echobox::dsp {
 
 /**
  * STFT engine interface.
@@ -36,4 +36,4 @@ public:
 /** Factory for the build-selected FFT backend. */
 std::unique_ptr<IFftEngine> makeFftEngine(std::size_t hopSize, std::size_t fftSize);
 
-} // namespace litespec::dsp
+} // namespace echobox::dsp

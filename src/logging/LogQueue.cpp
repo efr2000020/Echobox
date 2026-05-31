@@ -1,6 +1,6 @@
 #include "LogQueue.hpp"
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 bool LogQueue::push(const LogRecord& r) {
     std::lock_guard lock(m_mutex);
@@ -27,4 +27,4 @@ std::size_t LogQueue::drain(std::vector<LogRecord>& out, std::size_t& outDropped
     return n;
 }
 
-} // namespace litespec::logging
+} // namespace echobox::logging

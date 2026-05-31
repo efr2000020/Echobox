@@ -23,7 +23,7 @@ extern "C" {
 }
 #endif
 
-namespace litespec::app {
+namespace echobox::app {
 
 namespace {
 
@@ -83,7 +83,7 @@ int Application::run() {
         logging::Logger::instance().start(logCfg);
     }
 
-    LS_INFO("app", "LiteSpectrum starting (sr=%d ch=%d alg=%s window=%d-%dHz)",
+    LS_INFO("app", "Echobox starting (sr=%d ch=%d alg=%s window=%d-%dHz)",
             m_cfg.sampleRate, m_cfg.channels, m_cfg.algorithm.c_str(),
             m_cfg.freqLoHz, m_cfg.freqHiHz);
 
@@ -110,15 +110,18 @@ int Application::run() {
     dcfg.hopSize    = m_cfg.hopSize;
     dcfg.freqLoHz   = static_cast<float>(m_cfg.freqLoHz);
     dcfg.freqHiHz   = static_cast<float>(m_cfg.freqHiHz);
-    dcfg.algorithm  = m_cfg.algorithm;
+    dcfg.algorithm   = m_cfg.algorithm;
+    dcfg.sensitivity = m_cfg.sensitivity;
     m_dsp = std::make_unique<dsp::DspPipeline>(dcfg, m_dspRing);
 
     recorder::RecorderConfig rcfg;
     rcfg.outputDir = m_cfg.outputDir;
     rcfg.sampleRate = m_cfg.sampleRate;
     rcfg.channels   = m_cfg.channels;
-    rcfg.preRollMs  = m_cfg.preRollMs;
-    rcfg.silenceMs  = m_cfg.silenceMs;
+    rcfg.preRollMs   = m_cfg.preRollMs;
+    rcfg.silenceMs   = m_cfg.silenceMs;
+    rcfg.minLengthMs = m_cfg.minLengthMs;
+    rcfg.maxLengthMs = m_cfg.maxLengthMs;
     m_recorder = std::make_unique<recorder::Recorder>(rcfg, m_preRoll, *m_dsp);
 
     try {
@@ -134,7 +137,7 @@ int Application::run() {
     m_running.store(true, std::memory_order_release);
     m_captureThread = std::thread(&Application::captureLoop, this);
 
-    std::printf("LiteSpectrum is running — listening on '%s', saving recordings to '%s'.\n"
+    std::printf("Echobox is running — listening on '%s', saving recordings to '%s'.\n"
                 "Press Ctrl+C to stop.\n",
                 m_cfg.device.c_str(), m_cfg.outputDir.string().c_str());
     std::fflush(stdout);
@@ -155,7 +158,7 @@ int Application::run() {
 
     LS_INFO("app", "stopped");
     logging::Logger::instance().stop();
-    std::puts("LiteSpectrum stopped.");
+    std::puts("Echobox stopped.");
     return 0;
 }
 
@@ -192,4 +195,4 @@ void Application::captureLoop() {
     }
 }
 
-} // namespace litespec::app
+} // namespace echobox::app

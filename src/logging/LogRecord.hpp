@@ -2,7 +2,7 @@
 #include <chrono>
 #include <cstddef>
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 enum class LogLevel : unsigned char {
     Debug = 0,
@@ -26,4 +26,4 @@ struct LogRecord {
     char     message[MESSAGE_MAX];
 };
 
-} // namespace litespec::logging
+} // namespace echobox::logging

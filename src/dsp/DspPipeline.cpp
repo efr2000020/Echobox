@@ -9,7 +9,7 @@
 #include <thread>
 #include <vector>
 
-namespace litespec::dsp {
+namespace echobox::dsp {
 
 namespace {
 
@@ -64,6 +64,18 @@ void DspPipeline::start() {
     m_tracker->configure(m_cfg.sampleRate, m_cfg.fftSize,
                          m_cfg.freqLoHz, m_cfg.freqHiHz);
 
+    // EXPERIMENTAL: apply the requested sensitivity preset, if any. We don't
+    // hard-fail on an unrecognised name — log a warning and continue with
+    // compiled defaults, so a typo doesn't take the unit offline overnight.
+    if (!m_cfg.sensitivity.empty()) {
+        if (m_tracker->applyPreset(m_cfg.sensitivity.c_str())) {
+            LS_INFO("dsp", "sensitivity preset '%s' applied", m_cfg.sensitivity.c_str());
+        } else {
+            LS_WARN("dsp", "sensitivity preset '%s' not recognised by '%s'; using defaults",
+                    m_cfg.sensitivity.c_str(), m_cfg.algorithm.c_str());
+        }
+    }
+
     LS_INFO("dsp", "pipeline start algo=%s sr=%d fft=%zu hop=%zu hpf=%.0fHz",
             m_cfg.algorithm.c_str(), m_cfg.sampleRate,
             m_cfg.fftSize, m_cfg.hopSize, hpfCutoff);
@@ -87,8 +99,8 @@ void DspPipeline::publish(bool active, float loHz, float hiHz) {
     }
 }
 
-litespec::recorder::DetectorStateSnapshot DspPipeline::snapshot() const {
-    litespec::recorder::DetectorStateSnapshot s{};
+echobox::recorder::DetectorStateSnapshot DspPipeline::snapshot() const {
+    echobox::recorder::DetectorStateSnapshot s{};
     s.active     = m_active.load(std::memory_order_acquire);
     const auto p = m_loHiBits.load(std::memory_order_acquire);
     unpackLoHi(p, s.loHz, s.hiHz);
@@ -127,4 +139,4 @@ void DspPipeline::loop() {
     }
 }
 
-} // namespace litespec::dsp
+} // namespace echobox::dsp

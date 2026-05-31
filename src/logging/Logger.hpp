@@ -9,13 +9,13 @@
 #include <string>
 #include <thread>
 
-namespace litespec::logging {
+namespace echobox::logging {
 
 class JsonLineSink;
 
 struct LoggerConfig {
     std::filesystem::path dir{"./logs"};
-    std::string           baseName{"litespectrum.log"};
+    std::string           baseName{"echobox.log"};
     LogLevel              minLevel{LogLevel::Info};
     std::size_t           maxBytesPerFile{10 * 1024 * 1024}; // 10 MiB
     unsigned int          keepFiles{5};
@@ -62,13 +62,13 @@ private:
     unsigned int          m_pollIntervalMs{20};
 };
 
-} // namespace litespec::logging
+} // namespace echobox::logging
 
 // Convenience macros. Subsystem is a short string literal identifying the
 // caller ("audio", "dsp", "recorder", ...).
 #define LS_LOG(level, subsystem, ...) \
-    ::litespec::logging::Logger::instance().log((level), (subsystem), __VA_ARGS__)
-#define LS_DEBUG(subsystem, ...) LS_LOG(::litespec::logging::LogLevel::Debug, subsystem, __VA_ARGS__)
-#define LS_INFO(subsystem, ...)  LS_LOG(::litespec::logging::LogLevel::Info,  subsystem, __VA_ARGS__)
-#define LS_WARN(subsystem, ...)  LS_LOG(::litespec::logging::LogLevel::Warn,  subsystem, __VA_ARGS__)
-#define LS_ERROR(subsystem, ...) LS_LOG(::litespec::logging::LogLevel::Error, subsystem, __VA_ARGS__)
+    ::echobox::logging::Logger::instance().log((level), (subsystem), __VA_ARGS__)
+#define LS_DEBUG(subsystem, ...) LS_LOG(::echobox::logging::LogLevel::Debug, subsystem, __VA_ARGS__)
+#define LS_INFO(subsystem, ...)  LS_LOG(::echobox::logging::LogLevel::Info,  subsystem, __VA_ARGS__)
+#define LS_WARN(subsystem, ...)  LS_LOG(::echobox::logging::LogLevel::Warn,  subsystem, __VA_ARGS__)
+#define LS_ERROR(subsystem, ...) LS_LOG(::echobox::logging::LogLevel::Error, subsystem, __VA_ARGS__)

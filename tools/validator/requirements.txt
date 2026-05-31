@@ -1,0 +1,6 @@
+numpy
+scipy
+PyQt6
+pyqtgraph
+pyalsaaudio
+matplotlib
