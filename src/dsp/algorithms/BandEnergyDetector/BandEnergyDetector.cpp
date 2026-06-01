@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /// @file
 /// BandEnergyDetector implementation. See BandEnergyDetector.hpp for the
 /// signal-processing rationale; this TU also defines the @c extern "C"

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Echobox Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """ctypes wrapper around libechobox_validator.so.
 
 This is the validator's *only* path to the detection algorithm — there is no

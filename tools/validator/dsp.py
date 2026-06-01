@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Echobox Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """WAV loading helpers.
 
 The STFT and HPF biquad that used to live here have moved into the native

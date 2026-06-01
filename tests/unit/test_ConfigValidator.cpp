@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "app/ConfigValidator.hpp"
 #include <catch2/catch_test_macros.hpp>
 

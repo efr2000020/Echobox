@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /// @file
 /// LogLevel name/parse helpers. See LogRecord.hpp for the enum and POD.
 

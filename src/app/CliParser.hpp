@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 /// @file
 /// Hand-rolled command-line parser. Zero external deps (no Boost, no argp) so

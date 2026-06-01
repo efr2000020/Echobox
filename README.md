@@ -148,3 +148,16 @@ thousand lines per day — don't leave a long-running field unit on `debug`.
 ## For developers
 
 The build produces a standalone binary in `deploy/bin/`. By default the detector is statically linked. To use hot-swappable plugins, pass `-DECHOBOX_DYNAMIC_PLUGINS=ON` to the build script. Tools for offline tuning and simulation are in `tools/`.
+
+---
+
+## License
+
+Echobox is released under the **GNU General Public License v3.0 or later**
+(GPL-3.0-or-later).
+
+You are free to use, study, modify, and redistribute it, provided that any
+derivative work is also released under the GPL. See [LICENSE](LICENSE) for
+the full text and [AUTHORS](AUTHORS) for the list of contributors.
+
+Copyright (C) 2026 The Echobox Authors.

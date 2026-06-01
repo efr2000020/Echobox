@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Echobox Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """ALSA loopback streaming logic, ported from fake-mic.
 
 Allows feeding a WAV file into an ALSA loopback device (snd-aloop) so that

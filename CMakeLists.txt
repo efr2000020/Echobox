@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Echobox Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 cmake_minimum_required(VERSION 3.16)
 project(Echobox VERSION 0.2.0 LANGUAGES C CXX)
 

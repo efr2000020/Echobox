@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /// @file
 /// Production binary entry point. Parses CLI, validates the config, hands
 /// the result to Application::run() and forwards its exit code.

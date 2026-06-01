@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "validator_c_api.h"
 
 #include "app/Config.hpp"               // for the production NFFT/HOP defaults

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /// @file
 /// KissFftEngine implementation. Also defines @c makeFftEngine() — replace
 /// this TU (or CMake-gate an alternative like @c FftwFftEngine.cpp) to swap

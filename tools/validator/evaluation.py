@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Echobox Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Offline ground-truth labeler + greedy scoring + grid search.
 
 The ground-truth labeler is intentionally NOT a production algorithm: it

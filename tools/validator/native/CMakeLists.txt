@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Echobox Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Validator native lib: a SHARED object the Python validator loads via ctypes.
 #
 # Lives under tools/ because it's tooling, not production code. The top-level

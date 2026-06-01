@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 /// @file
 /// Process-wide async logger. Producers format into a fixed-size slot and

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The Echobox Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 /// @file
 /// Wide-band bat-presence detector implementation. Ships built-in on

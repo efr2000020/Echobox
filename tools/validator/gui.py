@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Echobox Authors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """PyQt6 GUI for the validator.
 
 Two operating modes selected at the top of the window:
