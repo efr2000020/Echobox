@@ -1,4 +1,7 @@
 #pragma once
+/// @file
+/// Bounded MPSC ring buffer for log records.
+
 #include "LogRecord.hpp"
 #include <array>
 #include <atomic>
@@ -8,22 +11,32 @@
 
 namespace echobox::logging {
 
-// Bounded MPSC queue. Producers acquire a short mutex (only to copy a
-// ~256-byte record into a ring slot — no I/O is ever done inside the lock).
-// The single consumer thread drains in bulk by swapping under the same lock.
-//
-// The DSP / audio threads call push() on the hot path. A queue full event
-// causes the record to be dropped and counted — never blocks the caller.
+/**
+ * @brief Bounded multi-producer / single-consumer log-record queue.
+ *
+ * Producers acquire a short mutex — only to copy a ~256-byte record into a
+ * ring slot — and never do I/O inside the lock. The single consumer thread
+ * drains in bulk under the same lock.
+ *
+ * @note Hot-path producers (DSP / audio threads) call @c push() directly. A
+ *       full-queue event causes the record to be dropped and counted; the
+ *       caller is never blocked.
+ */
 class LogQueue {
 public:
     static constexpr std::size_t CAPACITY = 1024;
 
-    // Returns true if accepted, false if dropped (queue full).
+    /// Producer entry. @return @c true if accepted, @c false if dropped
+    /// because the queue was full at the moment of the call.
     bool push(const LogRecord& r);
 
-    // Move all pending records into `out` (appended). Returns the number drained.
-    // Also returns the number of records dropped since the last drain via
-    // `outDroppedSinceLastDrain` so the consumer can surface the loss.
+    /**
+     * @brief Consumer entry. Move all pending records into @p out (appended).
+     * @param out  Destination, appended to.
+     * @param outDroppedSinceLastDrain Out: number of records dropped since
+     *             the last drain, so the consumer can surface the loss.
+     * @return Number of records drained this call.
+     */
     std::size_t drain(std::vector<LogRecord>& out, std::size_t& outDroppedSinceLastDrain);
 
 private:

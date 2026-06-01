@@ -1,4 +1,8 @@
 #pragma once
+/// @file
+/// Small filesystem helpers. Header-only; used by the plugin loader to find
+/// the @c ./algorithms directory next to the binary.
+
 #include <string>
 #include <filesystem>
 
@@ -9,10 +13,13 @@
 
 namespace fs = std::filesystem;
 
+/// @brief Path-related helpers.
 class PathUtils {
 public:
     /**
-     * @brief Gets the absolute path to the directory containing the current executable.
+     * @brief Absolute path to the directory containing the current executable.
+     * @return Resolved directory on Linux; the current working directory as a
+     *         fallback if the platform-specific resolution fails.
      */
     static fs::path getExecutableDir() {
 #ifdef __linux__

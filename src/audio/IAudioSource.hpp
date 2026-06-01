@@ -1,4 +1,9 @@
 #pragma once
+/// @file
+/// Capture-side audio source interface. Implementations bridge a concrete
+/// backend (ALSA today; CoreAudio / a file replayer in tests) to the rest of
+/// the pipeline.
+
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -7,37 +12,48 @@
 namespace echobox::audio {
 
 /**
- * Capture-side audio source abstraction.
+ * @brief Capture-side audio source.
  *
- * Samples are returned as native int16, mono interleaved (channels()==1 is
- * the only configuration we support in production; the interface is shaped
- * to allow multichannel in future without a breaking change).
+ * Samples are returned as native @c int16, mono interleaved. @c channels()
+ * returning @c 1 is the only configuration the production binary supports;
+ * the interface is shaped to allow multichannel later without a breaking
+ * change.
  *
- * The owning thread calls open() once, then read() in a loop until close().
- * Implementations are expected to block read() for up to a short timeout
- * (~100 ms) when no samples are immediately available, returning 0 in that
- * case so the caller can re-check its shutdown flag.
+ * Lifecycle: the owning thread calls @c open() once, then @c read() in a
+ * loop until @c close(). Implementations should block @c read() for up to
+ * a short timeout (~100 ms) when no samples are immediately available and
+ * return @c 0 in that case so the caller can re-check its shutdown flag.
+ *
+ * @note Not thread-safe. One thread owns the source for its entire lifetime.
  */
 class IAudioSource {
 public:
     virtual ~IAudioSource() = default;
 
-    /** Opens the underlying device. Throws on failure. */
+    /**
+     * @brief Open the underlying device.
+     * @throws std::runtime_error on any backend failure (device missing, busy,
+     *         unsupported format, etc.). Message includes the backend's error.
+     */
     virtual void open() = 0;
 
-    /** Closes the device. Idempotent. */
+    /// Close the device. Idempotent and noexcept; safe in destructors.
     virtual void close() noexcept = 0;
 
+    /// Actual sample rate the device negotiated, in Hz. Valid after @c open().
     virtual int sampleRate() const = 0;
+    /// Channel count the device negotiated. Valid after @c open().
     virtual int channels()   const = 0;
 
-    /** Human-readable identifier for log lines. */
+    /// Human-readable identifier for log lines.
     virtual const std::string& name() const = 0;
 
     /**
-     * @return  > 0  number of int16 samples written to `dest`.
-     *         == 0  no samples this call (timeout); not an error.
-     *          < 0  fatal: source is no longer usable; caller should stop.
+     * @brief Block-read up to @c dest.size() interleaved samples.
+     * @param dest Output buffer.
+     * @return  @c >0 : number of @c int16 samples written to @c dest;
+     *          @c ==0: no samples this call (short timeout); not an error;
+     *          @c <0 : fatal — source is no longer usable; caller must stop.
      */
     virtual int read(std::span<std::int16_t> dest) = 0;
 };

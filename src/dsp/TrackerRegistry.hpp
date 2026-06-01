@@ -1,4 +1,9 @@
 #pragma once
+/// @file
+/// Singleton plugin registry for ISweepTracker implementations. Header-only
+/// because the registry is a small, allocation-light wrapper around @c dlopen
+/// and a flat @c std::map of plugin entry points.
+
 #include "ISweepTracker.hpp"
 #include <memory>
 #include <string>
@@ -12,11 +17,24 @@
 namespace fs = std::filesystem;
 
 /**
- * @brief Dynamic Plugin Registry for DSP algorithms.
- * Scans a directory for .so files and loads them.
+ * @brief Process-wide registry of available detector plugins.
+ *
+ * Supports two modes:
+ *   - @c ECHOBOX_DYNAMIC_PLUGINS=ON : @c scanPlugins() loads @c .so files
+ *     from a directory at startup (development workflow).
+ *   - @c ECHOBOX_DYNAMIC_PLUGINS=OFF: @c registerBuiltin() takes the
+ *     statically-linked detector's entry points (production workflow).
+ *
+ * Either way, @c createTracker(name) is the single entry point downstream
+ * code (e.g. @c DspPipeline) uses to instantiate one.
+ *
+ * @note Singleton. Not thread-safe; populate it from one thread at startup,
+ *       then treat it as read-only.
  */
 class TrackerRegistry {
 public:
+    /// One registered plugin: a dlopen handle (or null for built-ins) plus
+    /// its three C entry points.
     struct Plugin {
         void* handle;
         CreateTrackerFunc create;
@@ -30,8 +48,9 @@ public:
     }
 
     /**
-     * @brief Scans a directory for algorithm plugins.
-     * @param path The directory to scan.
+     * @brief Scan a directory for @c .so plugins and register everything that
+     *        exposes the three required C entry points.
+     * @param path Directory to scan. Missing directory is non-fatal (logged).
      */
     void scanPlugins(const std::string& path) {
         if (!fs::exists(path)) {
@@ -47,8 +66,10 @@ public:
     }
 
     /**
-     * @brief Registers a statically-linked tracker (release / single-binary
-     * builds). No dlopen — the entry points are resolved at link time.
+     * @brief Register a statically-linked tracker (release / single-binary
+     *        builds). No @c dlopen — entry points are resolved at link time.
+     *
+     * Idempotent: re-registering an already-known name is silently ignored.
      */
     void registerBuiltin(CreateTrackerFunc create,
                          DestroyTrackerFunc destroy,
@@ -60,7 +81,10 @@ public:
     }
 
     /**
-     * @brief Creates an instance of a tracker by name.
+     * @brief Create an instance of the named tracker.
+     * @param name Tracker name as reported by its @c get_tracker_name() entry point.
+     * @return Owned tracker with the plugin's @c destroy entry point as its
+     *         deleter, or @c nullptr if @p name isn't registered.
      */
     std::unique_ptr<ISweepTracker, std::function<void(ISweepTracker*)>> createTracker(const std::string& name) {
         auto it = m_plugins.find(name);
@@ -72,6 +96,7 @@ public:
         return nullptr;
     }
 
+    /// Names of every currently-registered tracker, in @c std::map order.
     std::vector<std::string> getAvailableAlgorithms() const {
         std::vector<std::string> names;
         for (const auto& [name, _] : m_plugins) {

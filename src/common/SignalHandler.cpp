@@ -1,3 +1,6 @@
+/// @file
+/// SignalHandler implementation. See SignalHandler.hpp for the contract.
+
 #include "SignalHandler.hpp"
 
 #include <csignal>

@@ -1,4 +1,7 @@
 #pragma once
+/// @file
+/// Single-producer / single-consumer lock-free ring buffer used to hand
+/// audio samples from the capture thread to the DSP thread.
 
 #include <vector>
 #include <atomic>
@@ -6,8 +9,14 @@
 #include <span>
 
 /**
- * @brief A Single-Producer Single-Consumer Lock-Free Ring Buffer.
- * Designed for real-time audio data handover.
+ * @brief Single-producer / single-consumer lock-free ring buffer.
+ *
+ * Capacity-N constructor allocates @c N+1 slots so the empty/full distinction
+ * is unambiguous without a separate count.
+ *
+ * @warning Exactly one thread may call @c push() and exactly one (different)
+ *          thread may call @c pop(). Calling either from multiple threads is
+ *          undefined behaviour.
  */
 template <typename T>
 class LockFreeRingBuffer {
@@ -15,7 +24,8 @@ public:
     explicit LockFreeRingBuffer(size_t capacity)
         : m_buffer(capacity + 1), m_capacity(capacity + 1) {}
 
-    // Producers: Write data to the buffer
+    /// Producer: enqueue one element. Returns @c false when the buffer is
+    /// full (the producer is expected to handle this without blocking).
     bool push(const T& value) {
         size_t head = m_head.load(std::memory_order_relaxed);
         size_t next_head = (head + 1) % m_capacity;
@@ -29,7 +39,8 @@ public:
         return true;
     }
 
-    // Consumers: Read data from the buffer
+    /// Consumer: dequeue one element into @p value. Returns @c false when
+    /// the buffer is empty.
     bool pop(T& value) {
         size_t tail = m_tail.load(std::memory_order_relaxed);
 
@@ -42,6 +53,9 @@ public:
         return true;
     }
 
+    /// Number of elements currently enqueued. Approximate from either side:
+    /// the producer may push or the consumer may pop concurrently with this
+    /// call.
     size_t available_read() const {
         size_t head = m_head.load(std::memory_order_acquire);
         size_t tail = m_tail.load(std::memory_order_acquire);

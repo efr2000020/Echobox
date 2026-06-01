@@ -1,17 +1,26 @@
 #pragma once
+/// @file
+/// Direct-form-I biquad filter used as the DSP pipeline's pre-FFT high-pass.
+
 #include <cmath>
 #include <numbers>
 
+/**
+ * @brief Direct-form-I biquad. Header-only and trivially copyable.
+ *
+ * Coefficients are normalized to @c a0 at @c configure time so @c process()
+ * is one multiply-add per coefficient with no per-sample division.
+ */
 class BiquadFilter {
 public:
-    BiquadFilter() : x1(0), x2(0), y1(0), y2(0), 
+    BiquadFilter() : x1(0), x2(0), y1(0), y2(0),
                      b0(0), b1(0), b2(0), a1(0), a2(0) {}
 
     /**
-     * @brief Configures the coefficients for a High-Pass Filter.
-     * @param cutoffFreq The frequency to cut off at (e.g., 20000.0f).
-     * @param sampleRate The current audio stream sample rate.
-     * @param Q The resonance/quality factor. 0.707 (Butterworth) provides a flat response.
+     * @brief Configure for a 2nd-order high-pass response.
+     * @param cutoffFreq The -3 dB corner frequency, in Hz.
+     * @param sampleRate Stream sample rate, in Hz. No-op on @c sampleRate==0.
+     * @param Q          Resonance/quality factor; @c 0.707 (Butterworth) is flat.
      */
     void configureHighPass(float cutoffFreq, float sampleRate, float Q = 0.707f) {
         if (sampleRate == 0) return;
@@ -33,7 +42,9 @@ public:
     }
 
     /**
-     * @brief Processes a single float sample. Marked inline for maximum performance.
+     * @brief Filter one sample.
+     * @return The filtered output for @p x0 given the current state.
+     * @note Inlined deliberately — called once per input sample at 384 kHz.
      */
     inline float process(float x0) {
         // The core difference equation
@@ -48,6 +59,7 @@ public:
         return y0;
     }
 
+    /// Zero the delay lines without touching the coefficients.
     void reset() {
         x1 = x2 = y1 = y2 = 0.0f;
     }

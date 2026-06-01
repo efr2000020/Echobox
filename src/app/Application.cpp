@@ -1,3 +1,6 @@
+/// @file
+/// Application implementation. See Application.hpp for the public contract.
+
 #include "Application.hpp"
 
 #include "audio/AlsaAudioSource.hpp"

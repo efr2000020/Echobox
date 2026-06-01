@@ -1,3 +1,6 @@
+/// @file
+/// JsonLineSink implementation. See JsonLineSink.hpp for the contract.
+
 #include "JsonLineSink.hpp"
 #include <cerrno>
 #include <chrono>

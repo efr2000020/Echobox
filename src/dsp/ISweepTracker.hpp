@@ -1,4 +1,10 @@
 #pragma once
+/// @file
+/// Public detector-plugin ABI. Every detector — built-in or @c dlopen'd —
+/// implements @c ISweepTracker and exports the three plugin entry points at
+/// the bottom of this file. Layout-compatible structs are mirrored in
+/// @c tools/validator/native/validator_c_api.h for the Python FFI side.
+
 #include <span>
 #include <cstddef>
 #include <cstdint>

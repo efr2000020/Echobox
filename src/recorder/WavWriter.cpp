@@ -1,3 +1,6 @@
+/// @file
+/// WavWriter implementation. See WavWriter.hpp for the public contract.
+
 #include "WavWriter.hpp"
 #include "logging/Logger.hpp"
 

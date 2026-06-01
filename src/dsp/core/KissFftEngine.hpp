@@ -1,4 +1,8 @@
 #pragma once
+/// @file
+/// KissFFT-backed IFftEngine implementation. Selected as the production
+/// backend by @c makeFftEngine() in this same TU.
+
 #include "IFftEngine.hpp"
 #include <kiss_fftr.h>
 #include <cstddef>
@@ -8,10 +12,10 @@
 namespace echobox::dsp {
 
 /**
- * IFftEngine implementation backed by KissFFT.
+ * @brief @c IFftEngine implementation backed by KissFFT.
  *
  * Pre-allocates the overlap history, window, scratch and complex output
- * buffers; process() does no allocations and no I/O.
+ * buffers at construction; @c process() does no allocations and no I/O.
  */
 class KissFftEngine final : public IFftEngine {
 public:

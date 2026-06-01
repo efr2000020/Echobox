@@ -1,3 +1,7 @@
+/// @file
+/// Production binary entry point. Parses CLI, validates the config, hands
+/// the result to Application::run() and forwards its exit code.
+
 #include "app/Application.hpp"
 #include "app/CliParser.hpp"
 #include "app/ConfigValidator.hpp"

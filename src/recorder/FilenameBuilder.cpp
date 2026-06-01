@@ -1,3 +1,6 @@
+/// @file
+/// FilenameBuilder implementation. See FilenameBuilder.hpp for the layout.
+
 #include "FilenameBuilder.hpp"
 #include <chrono>
 #include <cstdio>

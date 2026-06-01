@@ -1,4 +1,8 @@
 #pragma once
+/// @file
+/// Process-wide async logger. Producers format into a fixed-size slot and
+/// hand off to a bounded ring; a single consumer thread writes JSON-lines.
+
 #include "LogRecord.hpp"
 #include "LogQueue.hpp"
 #include <atomic>
@@ -13,23 +17,33 @@ namespace echobox::logging {
 
 class JsonLineSink;
 
+/// @brief Construction-time configuration for the logger.
 struct LoggerConfig {
     std::filesystem::path dir{"./logs"};
     std::string           baseName{"echobox.log"};
+    /// Records below this level are dropped before they reach the queue.
     LogLevel              minLevel{LogLevel::Info};
+    /// Active file is rotated when it grows past this size.
     std::size_t           maxBytesPerFile{10 * 1024 * 1024}; // 10 MiB
+    /// Number of rotated files to keep on disk.
     unsigned int          keepFiles{5};
-    // How long the consumer sleeps when the queue is empty.
+    /// Consumer thread sleep when the queue is empty, in ms.
     unsigned int          pollIntervalMs{20};
 };
 
-// Process-wide async logger. Producers call log(...) (cheap: format into a
-// fixed-size slot, hand off to a bounded ring). A single consumer thread
-// drains the ring and writes JSON-lines.
-//
-// Lifecycle: start() before any producer thread runs; stop() after all
-// producer threads have joined. Re-entrant log() during shutdown is safe but
-// records may be lost after stop() returns.
+/**
+ * @brief Process-wide async logger.
+ *
+ * Producers call @c log(...) — cheap: format into a fixed-size slot, hand off
+ * to a bounded ring. A single consumer thread drains the ring and writes
+ * JSON-lines to a rotating file via @c JsonLineSink.
+ *
+ * Lifecycle: @c start() before any producer thread runs; @c stop() after all
+ * producer threads have joined. Re-entrant @c log() during shutdown is safe
+ * but records may be lost after @c stop() returns.
+ *
+ * @note Singleton.
+ */
 class Logger {
 public:
     static Logger& instance();
@@ -37,10 +51,18 @@ public:
     void start(const LoggerConfig& cfg);
     void stop();
 
-    // Producer entry. Real-time safe: no allocation, mutex held only long
-    // enough to copy ~256 bytes into a ring slot. Returns false if the record
-    // was dropped (queue full or logger not running). Subsystem and the
-    // formatted message are truncated to the LogRecord field sizes.
+    /**
+     * @brief Producer entry. Real-time safe: no allocation; the queue mutex
+     *        is held only long enough to copy ~256 bytes into a ring slot.
+     *
+     * @param level     Severity. Filtered against @c LoggerConfig::minLevel
+     *                  before any work is done.
+     * @param subsystem Short tag identifying the caller (@c "audio", @c "dsp",
+     *                  @c "recorder", ...). Truncated to @c SUBSYSTEM_MAX.
+     * @param fmt       @c printf-style format string.
+     * @return @c false if the record was dropped (queue full or logger not
+     *         running); otherwise @c true.
+     */
     bool log(LogLevel level, const char* subsystem, const char* fmt, ...)
         __attribute__((format(printf, 4, 5)));
 
@@ -64,11 +86,14 @@ private:
 
 } // namespace echobox::logging
 
-// Convenience macros. Subsystem is a short string literal identifying the
-// caller ("audio", "dsp", "recorder", ...).
+/// @name Convenience producer macros
+/// @{
+/// @c subsystem is a short string literal identifying the caller
+/// (@c "audio", @c "dsp", @c "recorder", ...).
 #define LS_LOG(level, subsystem, ...) \
     ::echobox::logging::Logger::instance().log((level), (subsystem), __VA_ARGS__)
 #define LS_DEBUG(subsystem, ...) LS_LOG(::echobox::logging::LogLevel::Debug, subsystem, __VA_ARGS__)
 #define LS_INFO(subsystem, ...)  LS_LOG(::echobox::logging::LogLevel::Info,  subsystem, __VA_ARGS__)
 #define LS_WARN(subsystem, ...)  LS_LOG(::echobox::logging::LogLevel::Warn,  subsystem, __VA_ARGS__)
 #define LS_ERROR(subsystem, ...) LS_LOG(::echobox::logging::LogLevel::Error, subsystem, __VA_ARGS__)
+/// @}

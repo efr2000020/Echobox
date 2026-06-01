@@ -1,31 +1,35 @@
 #pragma once
+/// @file
+/// Wide-band bat-presence detector implementation. Ships built-in on
+/// production builds; loadable as a plugin on dev builds.
+
 #include "../../ISweepTracker.hpp"  // src/dsp/algorithms/BandEnergyDetector/ -> src/dsp/
 #include <span>
 #include <cstdint>
 #include <vector>
 
 /**
- * Wide-band bat PRESENCE detector.
+ * @brief Wide-band bat *presence* detector.
  *
- * The detector integrates energy across several sub-bands spanning the
- * configured detection window. A frame is "active" if ANY sub-band's energy
- * rises sufficiently above that sub-band's own adaptive noise floor.
+ * Integrates energy across several sub-bands spanning the configured
+ * detection window. A frame is "active" if any sub-band's energy rises
+ * sufficiently above that sub-band's own adaptive noise floor.
  *
  * Why this design:
  *  - Steep-FM bats (e.g. Myotis) sweep across 100+ kHz within a single FFT
  *    frame. A single-peak search picks one bin and discards the rest of the
  *    sweep, and tends to lock onto the loud low-frequency tail — so faint
  *    high-frequency calls get masked. Energy integration has no "winner": a
- *    high-frequency sweep contributes its energy and is judged on its own merit.
+ *    high-frequency sweep contributes its energy and is judged on its merit.
  *  - Per-sub-band floors mean each frequency region gets a fair, level-
  *    appropriate threshold. High-frequency calls are physically fainter
  *    (atmospheric absorption rises with frequency) and sit on a much lower
  *    noise floor; a per-band SNR ratio handles both automatically, where a
  *    single absolute threshold could not.
  *
- * The detector emits the standard Annotation (start/end frame + freq span of
- * the firing sub-band) when an event closes, and publishes a per-frame
- * DetectorState so the downstream recorder can react on the leading edge.
+ * Emits the standard @c Annotation (start/end frame + freq span of the
+ * firing sub-band) when an event closes, and publishes a per-frame
+ * @c DetectorState so the downstream recorder can react on the leading edge.
  */
 class BandEnergyDetector : public ISweepTracker {
 public:

@@ -1,3 +1,8 @@
+/// @file
+/// KissFftEngine implementation. Also defines @c makeFftEngine() — replace
+/// this TU (or CMake-gate an alternative like @c FftwFftEngine.cpp) to swap
+/// the FFT backend.
+
 #include "KissFftEngine.hpp"
 #include "Window.hpp"
 

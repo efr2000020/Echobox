@@ -1,3 +1,8 @@
+/// @file
+/// BandEnergyDetector implementation. See BandEnergyDetector.hpp for the
+/// signal-processing rationale; this TU also defines the @c extern "C"
+/// plugin entry points at the bottom.
+
 #include "BandEnergyDetector.hpp"
 #include "logging/Logger.hpp"
 

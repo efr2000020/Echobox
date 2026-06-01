@@ -1,3 +1,7 @@
+/// @file
+/// Recorder implementation. See Recorder.hpp for the contract; this TU also
+/// holds the temporal state machine that drives the open/append/close cycle.
+
 #include "Recorder.hpp"
 #include "WavWriter.hpp"
 #include "logging/Logger.hpp"

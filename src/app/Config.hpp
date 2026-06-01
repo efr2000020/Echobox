@@ -1,4 +1,9 @@
 #pragma once
+/// @file
+/// Single Config struct that holds every operator-tunable option for the
+/// production binary. Populated by CliParser, validated by ConfigValidator,
+/// then handed to Application which fans the fields out to each subsystem.
+
 #include "logging/LogRecord.hpp"
 
 #include <cstdint>
@@ -7,6 +12,14 @@
 
 namespace echobox::app {
 
+/**
+ * @brief Runtime configuration for the production binary.
+ *
+ * Every field has a sane default that matches a shipping field unit; the CLI
+ * exposes a flag for each. Defaults that must stay in lock-step with another
+ * module (e.g. @c snrThreshold tracking @c BandEnergyDetector's compiled
+ * default) are called out in the per-field comments below.
+ */
 struct Config {
     // --- Audio capture ---
     std::string     device{"default"};

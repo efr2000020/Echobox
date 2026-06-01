@@ -1,12 +1,17 @@
 #pragma once
+/// @file
+/// Analysis windows for FFT pre-multiplication.
+
 #include <vector>
 #include <cmath>
 #include <numbers>
 
 namespace dsp {
 
+/// @brief Factory for analysis windows used by FFT engines.
 class Window {
 public:
+    /// Standard symmetric Hann window of length @p size.
     static std::vector<float> createHann(size_t size) {
         std::vector<float> window(size);
         for (size_t i = 0; i < size; ++i) {

@@ -1,4 +1,7 @@
 #pragma once
+/// @file
+/// RAII wrapper around libsndfile for the recorder's WAV/PCM_16 outputs.
+
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -9,31 +12,45 @@
 namespace echobox::recorder {
 
 /**
- * Tiny RAII wrapper around libsndfile for WAV/PCM_16 writes.
+ * @brief RAII WAV/PCM_16 writer.
  *
- * Opens lazily on the first write so the file is not created until we are
- * actually going to put samples in it. closeAndRename() finalizes the file
- * and atomically renames it to its final name (file is closed before rename
- * to keep behavior consistent across filesystems).
+ * Opens lazily on the first @c write() so a temp file is not created until
+ * there is data to put in it. @c closeAndRename() finalizes the file and
+ * renames it to its canonical name (close-before-rename keeps behaviour
+ * consistent across filesystems).
+ *
+ * @note Non-copyable. One writer instance owns one open file.
  */
 class WavWriter {
 public:
+    /**
+     * @param tempPath   Working path used while writing; @c closeAndRename
+     *                   moves it to the final path. Parent dirs are created
+     *                   on first write.
+     * @param sampleRate Sample rate stamped into the WAV header.
+     * @param channels   Channel count stamped into the WAV header.
+     */
     WavWriter(std::filesystem::path tempPath, int sampleRate, int channels);
     ~WavWriter();
 
     WavWriter(const WavWriter&)            = delete;
     WavWriter& operator=(const WavWriter&) = delete;
 
-    /** Writes int16 samples (channels-interleaved if multi-channel). */
+    /// Write @c int16 samples (channel-interleaved for multi-channel WAVs).
+    /// No-op after @c closeAndRename / @c abort.
     void write(std::span<const std::int16_t> samples);
 
-    /** Total frames (samples per channel) written so far. */
+    /// Total frames (samples per channel) written so far.
     std::uint64_t framesWritten() const { return m_framesWritten; }
 
-    /** Close + rename. Idempotent: subsequent calls are no-ops. */
+    /**
+     * @brief Close the file and rename @c tempPath to @p finalPath.
+     * Idempotent: subsequent calls are no-ops. Falls back to copy+remove if
+     * @p finalPath is on a different filesystem from @c tempPath.
+     */
     void closeAndRename(const std::filesystem::path& finalPath);
 
-    /** Close + delete the temp file without producing a final file. */
+    /// Close and delete the temp file without producing a final file.
     void abort();
 
 private:

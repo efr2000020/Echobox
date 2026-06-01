@@ -1,3 +1,6 @@
+/// @file
+/// ConfigValidator implementation. See ConfigValidator.hpp for the contract.
+
 #include "ConfigValidator.hpp"
 
 #include <optional>

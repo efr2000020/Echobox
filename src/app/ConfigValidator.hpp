@@ -1,4 +1,9 @@
 #pragma once
+/// @file
+/// Cross-flag config sanity checks. @c CliParser enforces per-flag bounds;
+/// this module enforces invariants that span flags (e.g. max-length ≥
+/// pre-roll + silence).
+
 #include "Config.hpp"
 
 #include <string>
@@ -7,23 +12,18 @@
 namespace echobox::app {
 
 /**
- * Cross-flag config sanity checks.
+ * @brief Validate cross-flag invariants on a populated @c Config.
  *
- * CLI argument parsing in CliParser already enforces *per-flag* bounds
- * (non-negative integers, recognised log levels, etc.). This module handles
- * *combinations* of flags that look fine individually but break in concert
- * — e.g. a max-length-ms shorter than (pre-roll + silence) would close every
- * recording before the detector could even publish a leading edge.
+ * @param cfg Configuration to check; not mutated.
+ * @return Empty vector when every invariant holds, otherwise one
+ *         human-readable error string per violation.
  *
- * `validateConfig` returns an empty vector when every invariant holds;
- * otherwise one human-readable error string per violated invariant. All
- * checks run unconditionally so the operator sees every problem at once
- * and can fix them in a single edit cycle rather than N relaunches.
+ * Every check runs unconditionally so the operator sees the full list in
+ * one launch instead of fixing one error at a time.
  *
- * Extending: write a new `check_X(const Config&)` helper in the .cpp file
- * returning `std::optional<std::string>`, then add one line to
- * `validateConfig` to call it. No registration ceremony, no plugin layer —
- * just one new helper per new invariant.
+ * @note Adding a new invariant: write a new @c checkX(const Config&) helper
+ *       in the @c .cpp returning @c std::optional<std::string>, then add one
+ *       @c run() line to @c validateConfig. No registration ceremony.
  */
 std::vector<std::string> validateConfig(const Config& cfg);
 

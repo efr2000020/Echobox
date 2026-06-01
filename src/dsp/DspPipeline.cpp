@@ -1,3 +1,6 @@
+/// @file
+/// DspPipeline implementation. See DspPipeline.hpp for the public contract.
+
 #include "DspPipeline.hpp"
 #include "TrackerRegistry.hpp"
 #include "logging/Logger.hpp"
@@ -12,6 +15,9 @@
 namespace echobox::dsp {
 
 namespace {
+
+// Pack/unpack two floats into one uint64 so the recorder can read both with
+// a single atomic load (see m_loHiBits in the header).
 
 std::uint64_t packLoHi(float lo, float hi) {
     std::uint32_t loBits = 0, hiBits = 0;

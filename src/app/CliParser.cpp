@@ -1,3 +1,6 @@
+/// @file
+/// CliParser implementation. See CliParser.hpp for the public contract.
+
 #include "CliParser.hpp"
 
 #include <cerrno>

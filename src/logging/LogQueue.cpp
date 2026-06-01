@@ -1,3 +1,6 @@
+/// @file
+/// LogQueue implementation. See LogQueue.hpp for the contract.
+
 #include "LogQueue.hpp"
 
 namespace echobox::logging {

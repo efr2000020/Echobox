@@ -1,4 +1,9 @@
 #pragma once
+/// @file
+/// Top-level glue: owns one audio source, the DSP pipeline, the recorder,
+/// and the capture thread. Construction is cheap; @c run() wires everything
+/// up and blocks until shutdown.
+
 #include "Config.hpp"
 #include "audio/IAudioSource.hpp"
 #include "common/LockFreeRingBuffer.hpp"
@@ -15,22 +20,34 @@
 namespace echobox::app {
 
 /**
- * Top-level wiring + lifecycle.
+ * @brief Top-level wiring and process lifecycle.
  *
- * Owns one audio source, the FFT/detector DSP pipeline, the recorder, and the
- * logger configuration. Constructs them in dependency order, runs the audio
- * capture loop on its own thread, and tears everything down in reverse order
- * on exit.
+ * Owns the audio source, the FFT/detector DSP pipeline, the recorder, and
+ * the logger configuration. Subsystems are constructed in dependency order,
+ * the audio capture loop runs on its own thread, and teardown happens in
+ * reverse order on exit.
+ *
+ * @note Owns the capture thread. Non-copyable.
  */
 class Application {
 public:
+    /// @param cfg Configuration consumed (moved-from) by the constructor.
     explicit Application(Config cfg);
     ~Application();
 
     Application(const Application&)            = delete;
     Application& operator=(const Application&) = delete;
 
-    /** Blocks until SIGINT/SIGTERM or a fatal error. Returns exit code. */
+    /**
+     * @brief Run the application until shutdown is requested.
+     *
+     * Opens the audio device, starts the DSP and recorder threads, then
+     * blocks the calling thread on a poll of @c SignalHandler::shouldExit
+     * until SIGINT/SIGTERM arrives or a fatal subsystem error occurs.
+     *
+     * @return Process exit code: @c 0 normal, @c 2 audio source failure,
+     *         @c 3 DSP start failure.
+     */
     int run();
 
 private:

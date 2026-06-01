@@ -1,3 +1,6 @@
+/// @file
+/// PreRollBuffer implementation. See PreRollBuffer.hpp for the contract.
+
 #include "PreRollBuffer.hpp"
 #include <algorithm>
 #include <cstring>

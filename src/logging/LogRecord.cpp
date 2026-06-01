@@ -1,3 +1,6 @@
+/// @file
+/// LogLevel name/parse helpers. See LogRecord.hpp for the enum and POD.
+
 #include "LogRecord.hpp"
 #include <cstring>
 

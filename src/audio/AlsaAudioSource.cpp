@@ -1,3 +1,6 @@
+/// @file
+/// AlsaAudioSource implementation. See AlsaAudioSource.hpp for the contract.
+
 #include "AlsaAudioSource.hpp"
 #include "logging/Logger.hpp"
 

@@ -1,3 +1,6 @@
+/// @file
+/// Logger implementation. See Logger.hpp for the contract.
+
 #include "Logger.hpp"
 #include "JsonLineSink.hpp"
 #include <chrono>

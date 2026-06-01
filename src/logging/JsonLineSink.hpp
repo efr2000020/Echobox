@@ -1,4 +1,7 @@
 #pragma once
+/// @file
+/// File sink for the Logger: JSON-lines with size-based rotation.
+
 #include "LogRecord.hpp"
 #include <cstddef>
 #include <cstdio>
@@ -7,11 +10,15 @@
 
 namespace echobox::logging {
 
-// Appends LogRecords as JSON-lines to a rotating file under `dir`.
-// Rotation: when the active file reaches `maxBytes`, it is renamed with a .1
-// suffix (older .N files shifted up to .keep) and a fresh file is opened.
-//
-// All I/O happens on the LoggerThread; the sink itself is not thread-safe.
+/**
+ * @brief Appends @c LogRecord values as JSON-lines to a rotating file.
+ *
+ * Rotation: when the active file reaches @c maxBytes, it is renamed with a
+ * @c .1 suffix (older @c .N files shifted up to @c .keep) and a fresh file
+ * is opened.
+ *
+ * @note Not thread-safe. All I/O happens on the @c Logger consumer thread.
+ */
 class JsonLineSink {
 public:
     JsonLineSink(std::filesystem::path dir,
@@ -24,8 +31,8 @@ public:
     JsonLineSink& operator=(const JsonLineSink&) = delete;
 
     void write(const LogRecord& r);
-    // Surfaces drops from the upstream queue as a synthetic record so the loss
-    // is visible in the file.
+    /// Surface drops from the upstream queue as a synthetic record so the
+    /// loss is visible in the file.
     void writeDropped(std::size_t droppedCount);
     void flush();
 
