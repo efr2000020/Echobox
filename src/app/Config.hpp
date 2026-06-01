@@ -19,11 +19,13 @@ struct Config {
     std::size_t     hopSize{512};
     int             freqLoHz{20000};
     int             freqHiHz{192000};   // Nyquist of the 384 kHz Ultramic.
-    // EXPERIMENTAL: coarse sensitivity preset name (e.g. "quiet"/"balanced"/
-    // "noisy"). Empty = use the detector's compiled defaults. Each algorithm
-    // owns its own preset names; see `--help` and the validator's `describe`
-    // command for the list a given plugin supports.
-    std::string     sensitivity{};
+    // SNR threshold used by the active detector to decide a frame is "hot".
+    // Plumbed through to the tracker as the `band_snr_threshold` tunable. The
+    // default below must track BandEnergyDetector's compiled default so a user
+    // who never passes --snr-threshold sees identical behavior to before this
+    // flag existed; the two defaults are linked by ConfigValidator-style note,
+    // not by build-time wiring, so update both together.
+    float           snrThreshold{12.0f};
 
     // --- Recorder ---
     std::filesystem::path outputDir{"./recordings"};
@@ -40,12 +42,11 @@ struct Config {
     std::uint32_t   maxLengthMs{5000};
 
     std::filesystem::path logDir{"./logs"};
-    // Debug is the default while the false-positive investigation is open so
-    // operators don't have to remember --log-level debug to capture the
-    // detector heartbeats. Roll back to Info (or Off) for shipping units
-    // running unattended for days — debug writes ~half a million lines per
-    // day to ./logs and will eventually fill the SD card.
-    logging::LogLevel     logLevel{logging::LogLevel::Debug};
+    // Off by default: a shipped unit running unattended writes nothing to disk
+    // unless the operator opts in. Application::run treats Off as "don't even
+    // open a log file", so the SD card sees no I/O from the logging subsystem.
+    // For field debugging pass --log-level debug (or info).
+    logging::LogLevel     logLevel{logging::LogLevel::Off};
 };
 
 } // namespace echobox::app

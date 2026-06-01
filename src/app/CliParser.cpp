@@ -1,8 +1,10 @@
 #include "CliParser.hpp"
 
+#include <cerrno>
 #include <charconv>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <string_view>
 
 namespace echobox::app {
@@ -21,6 +23,20 @@ bool parseUInt(std::string_view sv, std::uint32_t& out) {
     long v = 0;
     if (!parseInt(sv, v) || v < 0) return false;
     out = static_cast<std::uint32_t>(v);
+    return true;
+}
+
+bool parseFloat(std::string_view sv, float& out) {
+    if (sv.empty()) return false;
+    // std::from_chars for float is C++17 in spec, missing in libstdc++ before
+    // GCC 11. Use std::strtof and verify the entire token was consumed.
+    std::string s(sv);
+    char* end = nullptr;
+    errno = 0;
+    const float v = std::strtof(s.c_str(), &end);
+    if (errno != 0) return false;
+    if (end == s.c_str() || end != s.c_str() + s.size()) return false;
+    out = v;
     return true;
 }
 
@@ -89,8 +105,10 @@ const char* helpText() {
         "  --hop-size <int>          FFT hop in samples (default: 512)\n"
         "  --freq-lo-hz <int>        Lower edge of detection window (default: 20000)\n"
         "  --freq-hi-hz <int>        Upper edge of detection window (default: 192000, Nyquist)\n"
-        "  --sensitivity <name>      EXPERIMENTAL: coarse sensitivity preset, e.g.\n"
-        "                            quiet | balanced | noisy (algorithm-specific)\n"
+        "  --snr-threshold <float>   SNR ratio above which a frame counts as a\n"
+        "                            detection. Lower = more sensitive (more recall,\n"
+        "                            more false positives); higher = stricter\n"
+        "                            (default: 12.0)\n"
         "\n"
         "Recorder:\n"
         "  --output-dir <path>       WAV output root (default: ./recordings)\n"
@@ -101,7 +119,7 @@ const char* helpText() {
         "\n"
         "Logging:\n"
         "  --log-dir <path>          Log output dir (default: ./logs)\n"
-        "  --log-level off|debug|info|warn|error   (default: debug)\n"
+        "  --log-level off|debug|info|warn|error   (default: off)\n"
         "\n"
         "  -h, --help                Show this help and exit\n"
         "  -V, --version             Print version and exit\n";
@@ -135,7 +153,10 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
             cfg.sampleRate = static_cast<int>(x);
         }
         else if (k == "algorithm")     cfg.algorithm   = std::string(v);
-        else if (k == "sensitivity")   cfg.sensitivity = std::string(v);
+        else if (k == "snr-threshold") {
+            float x; if (!parseFloat(v, x) || !(x > 0.0f)) return err("invalid --snr-threshold (must be > 0)");
+            cfg.snrThreshold = x;
+        }
         else if (k == "fft-size") {
             long x; if (!parseInt(v, x) || x <= 0) return err("invalid --fft-size");
             cfg.fftSize = static_cast<std::size_t>(x);

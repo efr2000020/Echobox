@@ -6,10 +6,12 @@
 #include "recorder/DetectorStateProvider.hpp"
 
 #include <atomic>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -23,9 +25,10 @@ struct DspPipelineConfig {
     float        freqLoHz{20000.0f};
     float        freqHiHz{192000.0f};
     std::string  algorithm{"BandEnergyDetector"};
-    // EXPERIMENTAL: coarse preset name forwarded to ISweepTracker::applyPreset
-    // after configure(). Empty = leave the tracker at compiled defaults.
-    std::string  sensitivity{};
+    // SNR threshold forwarded to the tracker as the `band_snr_threshold`
+    // tunable after configure(). Always applied; the default below must
+    // track Config::snrThreshold and the BandEnergyDetector tunable default.
+    float        snrThreshold{12.0f};
 };
 
 /**
@@ -54,6 +57,12 @@ public:
     void start();
     void stop();
 
+    // Producer-side wake. The audio thread calls this once after it has
+    // pushed a batch of samples into the input ring so the DSP thread can
+    // park between bursts instead of busy-yielding. Cheap when no one is
+    // waiting (notify_one on an unwaited CV is a single atomic).
+    void notifyInput();
+
     // IDetectorStateProvider
     echobox::recorder::DetectorStateSnapshot snapshot() const override;
 
@@ -70,6 +79,12 @@ private:
 
     std::atomic<bool>             m_running{false};
     std::thread                   m_thread;
+
+    // Park / wake the DSP thread when the input ring is empty. ALSA delivers
+    // samples in ~10 ms bursts, so without this the thread spins for the
+    // whole inter-burst gap — a battery killer on a Pi Zero 2 W.
+    std::mutex                    m_wakeMutex;
+    std::condition_variable       m_wakeCv;
 
     // Wait-free state snapshot for the recorder thread.
     std::atomic<bool>             m_active{false};

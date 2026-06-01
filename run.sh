@@ -2,14 +2,16 @@
 #
 # run.sh — launch Echobox from ./deploy for local validation.
 #
-# Defaults to the snd-aloop virtual microphone (see tools/fake-mic/) and
-# maximum logging (--log-level debug). Override the capture device with the
-# ECHOBOX_DEVICE environment variable, and pass any extra Echobox
-# options as arguments — they take precedence over the defaults below.
+# Defaults match the shipped Config: capture from the UltraMic384K, logging
+# off. Override the capture device with the ECHOBOX_DEVICE environment
+# variable, and pass any extra Echobox options as arguments — they go through
+# verbatim, so e.g. `--log-level debug` opts into the per-frame diagnostics
+# when you're debugging locally.
 #
-#   ./run.sh                                  # loopback mic, debug logging
+#   ./run.sh                                              # silent, prod defaults
 #   ECHOBOX_DEVICE=plughw:CARD=UltraMic384K ./run.sh
-#   ./run.sh --output-dir /tmp/rec            # extra options pass through
+#   ./run.sh --log-level debug                            # opt into logging
+#   ./run.sh --output-dir /tmp/rec --log-level info       # any flags pass through
 #
 set -euo pipefail
 
@@ -21,5 +23,5 @@ if [ ! -x "$DEPLOY_EXE" ]; then
     exit 1
 fi
 
-echo "--- Launching Echobox (device=$DEVICE, log-level=debug) ---"
-exec "$DEPLOY_EXE" --device "$DEVICE" --log-level debug "$@"
+echo "--- Launching Echobox (device=$DEVICE) ---"
+exec "$DEPLOY_EXE" --device "$DEVICE" "$@"

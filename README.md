@@ -94,7 +94,7 @@ Run `./Echobox --help` to see the full list.
 | `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `5000`  |
 | `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
 | `--freq-hi-hz <n>`    | Top of the frequency range to listen for                  | `192000`       |
-| `--sensitivity <name>` | **Experimental.** Coarse preset for noisy / quiet sites (see below) | *(off)* |
+| `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `12.0`         |
 
 Lengths above are end-to-end (pre-roll + detected activity + silence-after).
 Echobox refuses to start if `--max-length-ms` is smaller than
@@ -103,46 +103,41 @@ detected call has had a chance to play out.
 
 ---
 
-## Tuning for your site (experimental)
+## Tuning for your site
 
-> **Status:** `--sensitivity` and the presets it accepts are experimental.
-> Names and the values they map to may change between releases as we collect
-> more field data. The fine-grained tunables exposed by each algorithm are
-> the stable interface for advanced users.
+The detector compares signal energy against an adaptive noise floor and only
+calls a frame "hot" when that ratio clears `--snr-threshold`. Lower values
+catch fainter calls but let more false positives through; higher values are
+strict and only loud unambiguous calls survive.
 
-The detector has many internal knobs (SNR threshold, spectral flatness gates,
-debounce, etc.) that interact in non-obvious ways. To keep field deployment
-simple, each algorithm ships a small set of named **sensitivity presets** that
-move several knobs together to suit a kind of site.
-
-The bundled `BandEnergyDetector` ships three:
-
-| Preset      | When to use                                                                  |
+| Setting     | When to use                                                                  |
 | ----------- | ---------------------------------------------------------------------------- |
-| `quiet`     | Low-noise sites (sheltered garden, rural attic). Maximises recall; tolerates more false positives in exchange for catching faint distant calls. |
-| `balanced`  | Default. Suits a typical unattended deployment.                              |
-| `noisy`     | Windy, suburban, near-roadway, or rustling-foliage sites. Strict on every dimension; only loud unambiguous calls survive. Use this if you see lots of false positives. |
+| `8.0`       | Low-noise sites (sheltered garden, rural attic). Maximum recall; tolerates more false positives in exchange for catching faint distant calls. |
+| `12.0`      | Default. Suits a typical unattended deployment.                              |
+| `18.0`      | Windy, suburban, near-roadway, or rustling-foliage sites. Strict; only loud unambiguous calls survive. Use this if you see lots of false positives. |
 
-Pick one with `--sensitivity`:
+Examples:
 
 ```bash
-./run.sh --device plughw:CARD=UltraMic384K --sensitivity noisy
+./run.sh --device plughw:CARD=UltraMic384K --snr-threshold 18.0
+./run.sh --device plughw:CARD=UltraMic384K --snr-threshold 8.0
 ```
 ---
 
 ## Troubleshooting
 
-Echobox ships with **`--log-level debug`** as the current default — every run
-writes a detailed log into `./logs/` so the algorithm's per-frame reasoning
-is captured around each saved WAV. That's useful while we're hunting
-false-positive causes, but it writes several hundred thousand lines per day
-and will eventually fill the SD card on an unattended unit. For long-term
-field deployments, set a quieter level explicitly:
+Logging is **off by default** — a shipped unit writes nothing to `./logs/` so
+the SD card sees no logging I/O at all. Opt in when you're diagnosing
+something:
 
 ```bash
 ./run.sh --device plughw:CARD=UltraMic384K --log-level info
-./run.sh --device plughw:CARD=UltraMic384K --log-level off    # silent
+./run.sh --device plughw:CARD=UltraMic384K --log-level debug   # per-frame detail
 ```
+
+`debug` captures the detector's per-frame reasoning around each saved WAV and
+is the right level when chasing false positives, but it writes several hundred
+thousand lines per day — don't leave a long-running field unit on `debug`.
 
 - **Device errors** — Double-check the `--device` name with `arecord -l`.
 - **No recordings** — Ensure the mic supports 384 kHz and that ultrasonic activity is present.

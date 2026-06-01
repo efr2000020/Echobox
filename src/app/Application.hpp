@@ -7,6 +7,8 @@
 #include "recorder/Recorder.hpp"
 
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <memory>
 #include <thread>
 
@@ -47,6 +49,12 @@ private:
 
     std::atomic<bool> m_running{false};
     std::thread       m_captureThread;
+
+    // Audio thread is best-effort into the DSP ring: never blocks the ALSA
+    // reader. Drops are counted and surfaced via a rate-limited warning so a
+    // sustained DSP stall is visible without flooding the log.
+    std::uint64_t                         m_dspDroppedTotal{0};
+    std::chrono::steady_clock::time_point m_lastDropWarnAt{};
 };
 
 } // namespace echobox::app

@@ -64,30 +64,40 @@ void DspPipeline::start() {
     m_tracker->configure(m_cfg.sampleRate, m_cfg.fftSize,
                          m_cfg.freqLoHz, m_cfg.freqHiHz);
 
-    // EXPERIMENTAL: apply the requested sensitivity preset, if any. We don't
-    // hard-fail on an unrecognised name — log a warning and continue with
-    // compiled defaults, so a typo doesn't take the unit offline overnight.
-    if (!m_cfg.sensitivity.empty()) {
-        if (m_tracker->applyPreset(m_cfg.sensitivity.c_str())) {
-            LS_INFO("dsp", "sensitivity preset '%s' applied", m_cfg.sensitivity.c_str());
-        } else {
-            LS_WARN("dsp", "sensitivity preset '%s' not recognised by '%s'; using defaults",
-                    m_cfg.sensitivity.c_str(), m_cfg.algorithm.c_str());
-        }
+    // Apply the user's SNR threshold. The tunable key is BandEnergyDetector's,
+    // but it's the canonical name a plugin author would pick for the same
+    // concept. If a future plugin doesn't expose it, fall through with a
+    // warning rather than refusing to start — losing a single knob shouldn't
+    // take a field unit offline overnight.
+    if (!m_tracker->setTunable("band_snr_threshold",
+                               static_cast<double>(m_cfg.snrThreshold))) {
+        LS_WARN("dsp", "tracker '%s' does not accept band_snr_threshold; "
+                       "--snr-threshold ignored",
+                m_cfg.algorithm.c_str());
     }
 
-    LS_INFO("dsp", "pipeline start algo=%s sr=%d fft=%zu hop=%zu hpf=%.0fHz",
+    LS_INFO("dsp", "pipeline start algo=%s sr=%d fft=%zu hop=%zu hpf=%.0fHz snr=%.2f",
             m_cfg.algorithm.c_str(), m_cfg.sampleRate,
-            m_cfg.fftSize, m_cfg.hopSize, hpfCutoff);
+            m_cfg.fftSize, m_cfg.hopSize, hpfCutoff, m_cfg.snrThreshold);
 
     m_thread = std::thread(&DspPipeline::loop, this);
 }
 
 void DspPipeline::stop() {
     if (!m_running.exchange(false, std::memory_order_acq_rel)) return;
+    // Wake the DSP thread in case it's parked on the input CV — otherwise
+    // shutdown stalls for up to the wait_for timeout.
+    notifyInput();
     if (m_thread.joinable()) m_thread.join();
     m_tracker.reset();
     m_fft.reset();
+}
+
+void DspPipeline::notifyInput() {
+    {
+        std::lock_guard<std::mutex> lk(m_wakeMutex);
+    }
+    m_wakeCv.notify_one();
 }
 
 void DspPipeline::publish(bool active, float loHz, float hiHz) {
@@ -118,7 +128,15 @@ void DspPipeline::loop() {
 
     while (m_running.load(std::memory_order_acquire)) {
         if (!m_input.pop(sample)) {
-            std::this_thread::yield();
+            // Ring empty — park until the producer notifies. ALSA delivers
+            // ~10 ms bursts, so without this we'd burn CPU for the whole
+            // inter-burst gap. The short timeout bounds shutdown latency in
+            // case a notify is missed between the pop check and the wait.
+            std::unique_lock<std::mutex> lk(m_wakeMutex);
+            m_wakeCv.wait_for(lk, std::chrono::milliseconds(50), [this] {
+                return !m_running.load(std::memory_order_acquire)
+                    || m_input.available_read() > 0;
+            });
             continue;
         }
         sample = m_hpf.process(sample);

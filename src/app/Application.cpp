@@ -110,8 +110,8 @@ int Application::run() {
     dcfg.hopSize    = m_cfg.hopSize;
     dcfg.freqLoHz   = static_cast<float>(m_cfg.freqLoHz);
     dcfg.freqHiHz   = static_cast<float>(m_cfg.freqHiHz);
-    dcfg.algorithm   = m_cfg.algorithm;
-    dcfg.sensitivity = m_cfg.sensitivity;
+    dcfg.algorithm    = m_cfg.algorithm;
+    dcfg.snrThreshold = m_cfg.snrThreshold;
     m_dsp = std::make_unique<dsp::DspPipeline>(dcfg, m_dspRing);
 
     recorder::RecorderConfig rcfg;
@@ -181,17 +181,32 @@ void Application::captureLoop() {
         // 1. Feed the recorder's pre-roll buffer (raw int16, mono).
         m_preRoll.write(std::span<const std::int16_t>(intBuf.data(), n));
 
-        // 2. Convert + push into the DSP ring. Spin briefly on full (the DSP
-        //    thread should drain at the audio rate).
+        // 2. Convert + push into the DSP ring, best-effort. The audio thread
+        //    MUST NOT block on a downstream consumer: a stalled DSP would
+        //    back-pressure into ALSA and cause an xrun. Count overflow and
+        //    surface it via a rate-limited warning instead.
         for (std::size_t i = 0; i < n; ++i) {
             floatBuf[i] = static_cast<float>(intBuf[i]) * kInvScale;
         }
+        std::size_t dropped = 0;
         for (std::size_t i = 0; i < n; ++i) {
-            while (!m_dspRing.push(floatBuf[i])) {
-                if (!m_running.load(std::memory_order_acquire)) return;
-                std::this_thread::yield();
+            if (!m_dspRing.push(floatBuf[i])) ++dropped;
+        }
+        if (dropped > 0) {
+            m_dspDroppedTotal += dropped;
+            const auto now = std::chrono::steady_clock::now();
+            if (now - m_lastDropWarnAt >= std::chrono::seconds(1)) {
+                LS_WARN("app", "DSP ring overflow: dropped %zu samples this chunk (total=%llu)",
+                        dropped,
+                        static_cast<unsigned long long>(m_dspDroppedTotal));
+                m_lastDropWarnAt = now;
             }
         }
+
+        // 3. Wake the DSP thread once per chunk. notify_one on an unwaited
+        //    CV is a single atomic; cheap to call even when the DSP isn't
+        //    parked.
+        m_dsp->notifyInput();
     }
 }
 
