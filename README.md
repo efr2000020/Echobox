@@ -93,7 +93,7 @@ Run `./Echobox --help` to see the full list.
 | `--min-length-ms <n>` | Drop any recording shorter than this (`0` = off)          | `0`            |
 | `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `5000`  |
 | `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
-| `--freq-hi-hz <n>`    | Top of the frequency range to listen for                  | `192000`       |
+| `--freq-hi-hz <n>`    | Top of the frequency range to listen for (capped by the mic's 384 kHz sample rate) | `192000`       |
 | `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `12.0`         |
 
 Lengths above are end-to-end (pre-roll + detected activity + silence-after).
