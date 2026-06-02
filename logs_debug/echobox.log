@@ -1,0 +1,1506 @@
+{"ts":"2026-06-02T00:23:49.561Z","level":"info","subsystem":"app","msg":"Echobox starting (sr=384000 ch=1 alg=BandEnergyDetector window=20000-192000Hz)"}
+{"ts":"2026-06-02T00:23:49.561Z","level":"info","subsystem":"app","msg":"scanning plugins in /home/slim/projects/Echobox/deploy/bin/algorithms"}
+{"ts":"2026-06-02T00:23:49.561Z","level":"info","subsystem":"registry","msg":"loaded algorithm BandEnergyDetector"}
+{"ts":"2026-06-02T00:23:49.562Z","level":"info","subsystem":"audio.alsa","msg":"opened device='plughw:UltraMic384K,1,0' rate=384000 ch=1 period=4096 buffer=16384"}
+{"ts":"2026-06-02T00:23:49.563Z","level":"info","subsystem":"dsp.bed","msg":"configured: sr=384000 fft=4096 res=93.8Hz bands=4 window=20000-192000Hz"}
+{"ts":"2026-06-02T00:23:49.563Z","level":"info","subsystem":"dsp","msg":"pipeline start algo=BandEnergyDetector sr=384000 fft=4096 hop=512 hpf=20000Hz snr=12.00"}
+{"ts":"2026-06-02T00:23:49.563Z","level":"info","subsystem":"recorder","msg":"started preroll=3000ms silence=5000ms min=0ms max=60000ms dir=./recordings_debug"}
+{"ts":"2026-06-02T00:23:49.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:49.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:49.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:50.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:50.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:50.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:50.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:50.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:50.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:50.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.433Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:51.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:52.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:52.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=1999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:52.372Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:52.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:52.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:52.766Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:52.905Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.172Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=2999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:53.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:54.101Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:54.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:54.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:54.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:54.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:54.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:54.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=3999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.433Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:55.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:56.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:56.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=4999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:56.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:56.501Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:56.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:56.766Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:56.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.172Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=5999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:57.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:58.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:58.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:58.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:58.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:58.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:58.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:58.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=6999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.305Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.433Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:23:59.967Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:00.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:00.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=7999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:00.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:00.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:00.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:00.766Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:00.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=8999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:01.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:02.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:02.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:02.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:02.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:02.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:02.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:02.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=9999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.433Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.572Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:03.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:04.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:04.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=10999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:04.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:04.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:04.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:04.766Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:04.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=11999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:05.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:06.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:06.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:06.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:06.505Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:06.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:06.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:06.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=12999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.305Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.573Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:07.968Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:08.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:08.235Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=13999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:08.372Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:08.502Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:08.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:08.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:08.905Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.034Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=14999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.834Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:09.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:10.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:10.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:10.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:10.505Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:10.635Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:10.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:10.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=15999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.038Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.433Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:11.967Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:12.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:12.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=16999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:12.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:12.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:12.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:12.766Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:12.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.302Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=17999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:13.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:14.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:14.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:14.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:14.505Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:24:14.611Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=18777 snr=24.16 band=2 flatness=0.583"}
+{"ts":"2026-06-02T00:24:14.614Z","level":"info","subsystem":"recorder","msg":"RECORDING_OPEN file=20260602_032414614.partial.wav preroll=1152000 samples band=45.0-80.0kHz"}
+{"ts":"2026-06-02T00:24:14.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18799 maxSnr=47.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:14.686Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=18777-18826 20.0-80.0kHz peakSnr=47.19"}
+{"ts":"2026-06-02T00:24:14.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18899 maxSnr=24.21 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:14.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=18999 maxSnr=7.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:15.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19099 maxSnr=6.53 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:15.168Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19199 maxSnr=6.19 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:15.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19299 maxSnr=6.62 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:15.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19399 maxSnr=6.47 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:15.572Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19499 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:15.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19599 maxSnr=8.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:15.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19699 maxSnr=11.92 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:15.967Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19799 maxSnr=7.98 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:16.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19899 maxSnr=7.00 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:16.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=19999 maxSnr=5.99 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:16.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20099 maxSnr=6.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:16.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20199 maxSnr=11.10 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:16.510Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=20203 snr=23.82 band=1 flatness=0.141"}
+{"ts":"2026-06-02T00:24:16.530Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=20203-20207 20.0-45.0kHz peakSnr=29.99"}
+{"ts":"2026-06-02T00:24:16.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20299 maxSnr=29.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:16.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20399 maxSnr=6.25 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:16.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20499 maxSnr=10.89 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:17.034Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20599 maxSnr=28.61 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:17.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20699 maxSnr=7.97 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:17.302Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20799 maxSnr=6.27 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:17.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20899 maxSnr=15.89 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:17.438Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=20898 snr=15.89 band=1 flatness=0.126"}
+{"ts":"2026-06-02T00:24:17.450Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=20898-20902 20.0-45.0kHz peakSnr=16.15"}
+{"ts":"2026-06-02T00:24:17.524Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=20963 snr=14.66 band=1 flatness=0.146"}
+{"ts":"2026-06-02T00:24:17.545Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=20963-20971 20.0-45.0kHz peakSnr=17.40"}
+{"ts":"2026-06-02T00:24:17.568Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=20999 maxSnr=17.40 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:17.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21099 maxSnr=19.79 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:17.834Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21199 maxSnr=9.62 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:17.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21299 maxSnr=6.16 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:18.101Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21399 maxSnr=6.24 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:18.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21499 maxSnr=6.40 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:18.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21599 maxSnr=7.02 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:18.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21699 maxSnr=6.66 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:18.579Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=21751 snr=19.19 band=1 flatness=0.123"}
+{"ts":"2026-06-02T00:24:18.601Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=21751-21765 20.0-45.0kHz peakSnr=19.19"}
+{"ts":"2026-06-02T00:24:18.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21799 maxSnr=26.21 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:18.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21899 maxSnr=41.53 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:18.844Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=21951 snr=12.96 band=1 flatness=0.105"}
+{"ts":"2026-06-02T00:24:18.856Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=21951-21952 20.0-45.0kHz peakSnr=12.96"}
+{"ts":"2026-06-02T00:24:18.902Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=21999 maxSnr=13.58 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:19.038Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22099 maxSnr=87.15 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:19.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22199 maxSnr=78.89 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:19.175Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=22199 snr=329.85 band=3 flatness=0.674"}
+{"ts":"2026-06-02T00:24:19.188Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=22199-22205 80.0-192.0kHz peakSnr=329.85"}
+{"ts":"2026-06-02T00:24:19.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22299 maxSnr=329.85 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:19.435Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22399 maxSnr=6.03 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:19.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22499 maxSnr=6.38 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:19.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22599 maxSnr=110.67 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:19.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22699 maxSnr=13.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:19.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22799 maxSnr=8.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:20.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22899 maxSnr=6.41 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:20.234Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=22999 maxSnr=6.41 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:20.254Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=23008 snr=33.64 band=1 flatness=0.101"}
+{"ts":"2026-06-02T00:24:20.264Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=23008-23009 20.0-45.0kHz peakSnr=33.64"}
+{"ts":"2026-06-02T00:24:20.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23099 maxSnr=55.07 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:20.503Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23199 maxSnr=6.18 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:20.639Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23299 maxSnr=6.12 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:20.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23399 maxSnr=8.69 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:20.905Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23499 maxSnr=6.86 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:21.034Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23599 maxSnr=7.83 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:21.173Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23699 maxSnr=7.88 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:21.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23799 maxSnr=8.75 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:21.439Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23899 maxSnr=6.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:21.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=23999 maxSnr=6.14 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:21.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24099 maxSnr=6.48 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:21.834Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24199 maxSnr=6.40 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:21.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24299 maxSnr=6.11 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:22.101Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24399 maxSnr=6.60 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:22.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24499 maxSnr=6.23 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:22.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24599 maxSnr=6.68 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:22.507Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24699 maxSnr=8.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:22.639Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24799 maxSnr=6.53 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:22.779Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24899 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:22.907Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=24999 maxSnr=8.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:23.039Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25099 maxSnr=11.82 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:23.169Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25199 maxSnr=6.12 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:23.305Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25299 maxSnr=6.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:23.435Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25399 maxSnr=6.55 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:23.572Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25499 maxSnr=6.36 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:23.702Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25599 maxSnr=6.74 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:23.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25699 maxSnr=7.24 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:23.872Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=25724 snr=16.93 band=1 flatness=0.144"}
+{"ts":"2026-06-02T00:24:23.912Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=25724-25744 20.0-45.0kHz peakSnr=23.90"}
+{"ts":"2026-06-02T00:24:23.967Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25799 maxSnr=25.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:24.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25899 maxSnr=6.62 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:24.234Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=25999 maxSnr=9.19 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:24.372Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26099 maxSnr=7.15 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:24.435Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=26144 snr=13.29 band=1 flatness=0.141"}
+{"ts":"2026-06-02T00:24:24.448Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=26144-26149 20.0-45.0kHz peakSnr=13.63"}
+{"ts":"2026-06-02T00:24:24.501Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26199 maxSnr=13.63 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:24.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26299 maxSnr=7.11 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:24.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26399 maxSnr=11.31 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:24.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26499 maxSnr=6.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:25.002Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=26574 snr=12.93 band=1 flatness=0.145"}
+{"ts":"2026-06-02T00:24:25.022Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=26574-26575 20.0-45.0kHz peakSnr=12.93"}
+{"ts":"2026-06-02T00:24:25.034Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26599 maxSnr=12.93 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:25.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26699 maxSnr=11.84 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:25.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26799 maxSnr=12.42 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:25.384Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=26856 snr=13.27 band=1 flatness=0.142"}
+{"ts":"2026-06-02T00:24:25.395Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=26856-26857 20.0-45.0kHz peakSnr=13.27"}
+{"ts":"2026-06-02T00:24:25.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26899 maxSnr=13.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:25.502Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=26949 snr=12.59 band=1 flatness=0.170"}
+{"ts":"2026-06-02T00:24:25.546Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=26949-26971 20.0-45.0kHz peakSnr=15.56"}
+{"ts":"2026-06-02T00:24:25.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=26999 maxSnr=15.56 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:25.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27099 maxSnr=6.38 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:25.726Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=27115 snr=21.46 band=1 flatness=0.147"}
+{"ts":"2026-06-02T00:24:25.759Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=27115-27130 20.0-45.0kHz peakSnr=25.15"}
+{"ts":"2026-06-02T00:24:25.822Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=27186 snr=14.23 band=1 flatness=0.145"}
+{"ts":"2026-06-02T00:24:25.835Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27199 maxSnr=25.15 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:25.844Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=27186-27196 20.0-45.0kHz peakSnr=15.06"}
+{"ts":"2026-06-02T00:24:25.940Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=27273 snr=13.26 band=1 flatness=0.153"}
+{"ts":"2026-06-02T00:24:25.963Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=27273-27286 20.0-45.0kHz peakSnr=20.08"}
+{"ts":"2026-06-02T00:24:25.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27299 maxSnr=20.08 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:26.101Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27399 maxSnr=10.98 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:26.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27499 maxSnr=6.33 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:26.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27599 maxSnr=7.48 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:26.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27699 maxSnr=10.00 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:26.635Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27799 maxSnr=44.29 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:26.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27899 maxSnr=29.76 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:26.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=27999 maxSnr=25.98 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:27.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28099 maxSnr=16.34 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:27.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28199 maxSnr=30.80 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:27.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28299 maxSnr=20.88 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:27.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28399 maxSnr=6.88 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:27.508Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=28453 snr=12.13 band=1 flatness=0.101"}
+{"ts":"2026-06-02T00:24:27.519Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=28453-28454 20.0-45.0kHz peakSnr=12.13"}
+{"ts":"2026-06-02T00:24:27.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28499 maxSnr=43.07 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:27.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28599 maxSnr=10.11 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:27.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28699 maxSnr=6.23 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:27.848Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=28705 snr=21.10 band=1 flatness=0.105"}
+{"ts":"2026-06-02T00:24:27.860Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=28705-28710 20.0-45.0kHz peakSnr=21.10"}
+{"ts":"2026-06-02T00:24:27.945Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=28777 snr=16.29 band=1 flatness=0.119"}
+{"ts":"2026-06-02T00:24:27.966Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=28777-28785 20.0-45.0kHz peakSnr=19.71"}
+{"ts":"2026-06-02T00:24:27.967Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28799 maxSnr=24.80 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:28.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28899 maxSnr=20.13 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:28.234Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=28999 maxSnr=10.47 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:28.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29099 maxSnr=23.20 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:28.404Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=29124 snr=16.85 band=1 flatness=0.108"}
+{"ts":"2026-06-02T00:24:28.426Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=29124-29130 20.0-45.0kHz peakSnr=16.85"}
+{"ts":"2026-06-02T00:24:28.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29199 maxSnr=20.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:28.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29299 maxSnr=24.34 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:28.766Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29399 maxSnr=8.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:28.797Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=29415 snr=15.11 band=1 flatness=0.117"}
+{"ts":"2026-06-02T00:24:28.809Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=29415-29418 20.0-45.0kHz peakSnr=15.11"}
+{"ts":"2026-06-02T00:24:28.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29499 maxSnr=22.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:29.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29599 maxSnr=57.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:29.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29699 maxSnr=6.90 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:29.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29799 maxSnr=9.00 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:29.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29899 maxSnr=41.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:29.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=29999 maxSnr=6.10 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:29.704Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=30097 snr=13.71 band=1 flatness=0.149"}
+{"ts":"2026-06-02T00:24:29.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30099 maxSnr=13.71 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:29.725Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=30097-30106 20.0-45.0kHz peakSnr=20.62"}
+{"ts":"2026-06-02T00:24:29.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30199 maxSnr=38.93 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:29.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30299 maxSnr=7.29 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:30.003Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=30320 snr=14.22 band=1 flatness=0.130"}
+{"ts":"2026-06-02T00:24:30.024Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=30320-30330 20.0-45.0kHz peakSnr=22.02"}
+{"ts":"2026-06-02T00:24:30.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30399 maxSnr=40.48 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:30.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30499 maxSnr=9.56 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:30.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30599 maxSnr=12.07 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:30.441Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=30653 snr=16.99 band=2 flatness=0.127"}
+{"ts":"2026-06-02T00:24:30.461Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=30653-30656 45.0-80.0kHz peakSnr=17.27"}
+{"ts":"2026-06-02T00:24:30.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30699 maxSnr=17.27 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:30.536Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=30722 snr=20.84 band=2 flatness=0.122"}
+{"ts":"2026-06-02T00:24:30.557Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=30722-30730 45.0-80.0kHz peakSnr=20.84"}
+{"ts":"2026-06-02T00:24:30.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30799 maxSnr=20.84 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:30.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30899 maxSnr=33.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:30.804Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=30926 snr=13.60 band=2 flatness=0.113"}
+{"ts":"2026-06-02T00:24:30.826Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=30926-30934 45.0-80.0kHz peakSnr=14.62"}
+{"ts":"2026-06-02T00:24:30.898Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=30991 snr=18.60 band=2 flatness=0.111"}
+{"ts":"2026-06-02T00:24:30.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=30999 maxSnr=20.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:30.911Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=30991-30998 45.0-80.0kHz peakSnr=20.52"}
+{"ts":"2026-06-02T00:24:30.985Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=31060 snr=13.05 band=2 flatness=0.137"}
+{"ts":"2026-06-02T00:24:30.996Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=31060-31061 45.0-80.0kHz peakSnr=13.05"}
+{"ts":"2026-06-02T00:24:31.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31099 maxSnr=13.22 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:31.071Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=31125 snr=12.35 band=2 flatness=0.119"}
+{"ts":"2026-06-02T00:24:31.092Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=31125-31130 45.0-80.0kHz peakSnr=15.63"}
+{"ts":"2026-06-02T00:24:31.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31199 maxSnr=20.48 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:31.198Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=31220 snr=13.68 band=2 flatness=0.123"}
+{"ts":"2026-06-02T00:24:31.209Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=31220-31221 45.0-80.0kHz peakSnr=13.68"}
+{"ts":"2026-06-02T00:24:31.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31299 maxSnr=13.68 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:31.435Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31399 maxSnr=9.54 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:31.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31499 maxSnr=6.29 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:31.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31599 maxSnr=6.17 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:31.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31699 maxSnr=6.36 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:31.967Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31799 maxSnr=6.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:32.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31899 maxSnr=6.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:32.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=31999 maxSnr=8.49 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:32.372Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32099 maxSnr=7.45 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:32.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32199 maxSnr=7.08 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:32.573Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=32250 snr=15.51 band=1 flatness=0.167"}
+{"ts":"2026-06-02T00:24:32.585Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=32250-32252 20.0-45.0kHz peakSnr=15.51"}
+{"ts":"2026-06-02T00:24:32.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32299 maxSnr=15.51 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:32.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32399 maxSnr=6.67 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:32.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32499 maxSnr=7.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:33.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32599 maxSnr=8.92 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:33.140Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=32677 snr=15.96 band=2 flatness=0.120"}
+{"ts":"2026-06-02T00:24:33.160Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=32677-32682 45.0-80.0kHz peakSnr=15.96"}
+{"ts":"2026-06-02T00:24:33.172Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32699 maxSnr=15.96 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:33.246Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=32755 snr=14.31 band=2 flatness=0.107"}
+{"ts":"2026-06-02T00:24:33.257Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=32755-32757 45.0-80.0kHz peakSnr=14.31"}
+{"ts":"2026-06-02T00:24:33.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32799 maxSnr=25.01 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:33.322Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=32813 snr=20.53 band=2 flatness=0.104"}
+{"ts":"2026-06-02T00:24:33.342Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=32813-32819 45.0-80.0kHz peakSnr=20.53"}
+{"ts":"2026-06-02T00:24:33.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32899 maxSnr=27.57 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:33.502Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=32948 snr=17.80 band=2 flatness=0.100"}
+{"ts":"2026-06-02T00:24:33.513Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=32948-32949 45.0-80.0kHz peakSnr=17.80"}
+{"ts":"2026-06-02T00:24:33.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=32999 maxSnr=30.44 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:33.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33099 maxSnr=45.47 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:33.834Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33199 maxSnr=49.33 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:33.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33299 maxSnr=100.14 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:34.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33399 maxSnr=152.29 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:34.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33499 maxSnr=211.50 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:34.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33599 maxSnr=142.99 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:34.397Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=33618 snr=1396.48 band=3 flatness=0.367"}
+{"ts":"2026-06-02T00:24:34.420Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=33618-33626 45.0-192.0kHz peakSnr=1396.48"}
+{"ts":"2026-06-02T00:24:34.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33699 maxSnr=1396.48 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:34.579Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=33753 snr=707.78 band=3 flatness=0.378"}
+{"ts":"2026-06-02T00:24:34.601Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=33753-33761 45.0-192.0kHz peakSnr=707.78"}
+{"ts":"2026-06-02T00:24:34.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33799 maxSnr=707.78 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:34.770Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=33895 snr=916.83 band=3 flatness=0.353"}
+{"ts":"2026-06-02T00:24:34.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33899 maxSnr=916.83 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:34.792Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=33895-33903 45.0-192.0kHz peakSnr=916.83"}
+{"ts":"2026-06-02T00:24:34.845Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=33954 snr=661.46 band=3 flatness=0.352"}
+{"ts":"2026-06-02T00:24:34.867Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=33954-33962 45.0-192.0kHz peakSnr=720.48"}
+{"ts":"2026-06-02T00:24:34.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=33999 maxSnr=720.48 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:35.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34099 maxSnr=216.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:35.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34199 maxSnr=406.47 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:35.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34299 maxSnr=337.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:35.433Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34399 maxSnr=189.04 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:35.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34499 maxSnr=31.73 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:35.581Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=34505 snr=16.47 band=1 flatness=0.171"}
+{"ts":"2026-06-02T00:24:35.593Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=34505-34507 20.0-45.0kHz peakSnr=16.47"}
+{"ts":"2026-06-02T00:24:35.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34599 maxSnr=114.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:35.786Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=34662 snr=15.45 band=2 flatness=0.104"}
+{"ts":"2026-06-02T00:24:35.805Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=34662-34666 45.0-80.0kHz peakSnr=15.45"}
+{"ts":"2026-06-02T00:24:35.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34699 maxSnr=19.18 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:35.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34799 maxSnr=93.81 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.061Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=34866 snr=22.33 band=2 flatness=0.121"}
+{"ts":"2026-06-02T00:24:36.073Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=34866-34869 45.0-80.0kHz peakSnr=22.57"}
+{"ts":"2026-06-02T00:24:36.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34899 maxSnr=22.57 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.234Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=34999 maxSnr=96.07 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35099 maxSnr=69.27 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.502Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35199 maxSnr=51.94 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35299 maxSnr=34.59 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.768Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35399 maxSnr=11.37 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.841Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=35451 snr=20.13 band=2 flatness=0.113"}
+{"ts":"2026-06-02T00:24:36.872Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=35451-35465 45.0-80.0kHz peakSnr=22.32"}
+{"ts":"2026-06-02T00:24:36.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35499 maxSnr=22.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:36.938Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=35526 snr=18.47 band=2 flatness=0.108"}
+{"ts":"2026-06-02T00:24:36.957Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=35526-35529 45.0-80.0kHz peakSnr=18.47"}
+{"ts":"2026-06-02T00:24:37.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35599 maxSnr=18.47 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:37.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35699 maxSnr=52.80 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:37.287Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=35783 snr=24.14 band=2 flatness=0.114"}
+{"ts":"2026-06-02T00:24:37.300Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=35783-35786 45.0-80.0kHz peakSnr=25.83"}
+{"ts":"2026-06-02T00:24:37.302Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35799 maxSnr=25.83 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:37.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35899 maxSnr=12.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:37.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=35999 maxSnr=10.59 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:37.589Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=36010 snr=18.76 band=1 flatness=0.118"}
+{"ts":"2026-06-02T00:24:37.601Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=36010-36013 20.0-45.0kHz peakSnr=18.76"}
+{"ts":"2026-06-02T00:24:37.707Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36099 maxSnr=18.76 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:37.823Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=36185 snr=13.61 band=1 flatness=0.164"}
+{"ts":"2026-06-02T00:24:37.839Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36199 maxSnr=13.61 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:37.844Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=36185-36192 20.0-45.0kHz peakSnr=13.61"}
+{"ts":"2026-06-02T00:24:37.962Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=36290 snr=25.00 band=1 flatness=0.147"}
+{"ts":"2026-06-02T00:24:37.973Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36299 maxSnr=26.34 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:37.983Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=36290-36299 20.0-45.0kHz peakSnr=26.34"}
+{"ts":"2026-06-02T00:24:38.109Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=36396 snr=18.91 band=1 flatness=0.147"}
+{"ts":"2026-06-02T00:24:38.111Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36399 maxSnr=18.91 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:38.125Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=36396-36406 20.0-45.0kHz peakSnr=18.91"}
+{"ts":"2026-06-02T00:24:38.239Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36499 maxSnr=16.08 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:38.272Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=36521 snr=12.71 band=1 flatness=0.165"}
+{"ts":"2026-06-02T00:24:38.282Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=36521-36522 20.0-45.0kHz peakSnr=12.71"}
+{"ts":"2026-06-02T00:24:38.369Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36599 maxSnr=13.11 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:38.506Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36699 maxSnr=10.39 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:38.636Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36799 maxSnr=7.94 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:38.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36899 maxSnr=7.64 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:38.902Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=36999 maxSnr=11.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.038Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37099 maxSnr=10.29 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.125Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=37165 snr=19.80 band=1 flatness=0.137"}
+{"ts":"2026-06-02T00:24:39.144Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=37165-37169 20.0-45.0kHz peakSnr=19.80"}
+{"ts":"2026-06-02T00:24:39.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37199 maxSnr=31.13 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.305Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37299 maxSnr=119.04 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37399 maxSnr=135.90 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.550Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=37483 snr=14.48 band=1 flatness=0.109"}
+{"ts":"2026-06-02T00:24:39.563Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=37483-37486 20.0-45.0kHz peakSnr=14.48"}
+{"ts":"2026-06-02T00:24:39.572Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37499 maxSnr=135.68 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37599 maxSnr=230.48 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37699 maxSnr=142.91 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:39.967Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37799 maxSnr=236.53 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:40.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37899 maxSnr=58.02 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:40.235Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=37999 maxSnr=158.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:40.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38099 maxSnr=59.67 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:40.501Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38199 maxSnr=154.34 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:40.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38299 maxSnr=130.16 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:40.768Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38399 maxSnr=187.44 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:40.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38499 maxSnr=213.50 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38599 maxSnr=121.08 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38699 maxSnr=219.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38799 maxSnr=139.78 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38899 maxSnr=253.94 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=38999 maxSnr=10.50 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39099 maxSnr=106.16 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39199 maxSnr=132.71 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.844Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=39206 snr=20.63 band=1 flatness=0.111"}
+{"ts":"2026-06-02T00:24:41.864Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=39206-39208 20.0-45.0kHz peakSnr=20.63"}
+{"ts":"2026-06-02T00:24:41.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39299 maxSnr=40.37 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:41.993Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=39318 snr=28.27 band=1 flatness=0.115"}
+{"ts":"2026-06-02T00:24:42.014Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=39318-39325 20.0-45.0kHz peakSnr=34.68"}
+{"ts":"2026-06-02T00:24:42.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39399 maxSnr=52.97 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:42.153Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=39434 snr=21.21 band=1 flatness=0.132"}
+{"ts":"2026-06-02T00:24:42.174Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=39434-39442 20.0-45.0kHz peakSnr=30.38"}
+{"ts":"2026-06-02T00:24:42.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39499 maxSnr=30.38 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:42.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39599 maxSnr=9.57 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:42.460Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=39663 snr=22.88 band=1 flatness=0.164"}
+{"ts":"2026-06-02T00:24:42.473Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=39663-39667 20.0-45.0kHz peakSnr=26.90"}
+{"ts":"2026-06-02T00:24:42.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39699 maxSnr=26.90 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:42.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39799 maxSnr=7.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:42.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39899 maxSnr=9.76 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:42.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=39999 maxSnr=6.68 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:43.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40099 maxSnr=8.28 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:43.069Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=40121 snr=15.74 band=1 flatness=0.181"}
+{"ts":"2026-06-02T00:24:43.080Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=40121-40123 20.0-45.0kHz peakSnr=15.74"}
+{"ts":"2026-06-02T00:24:43.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40199 maxSnr=15.74 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:43.305Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40299 maxSnr=6.51 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:43.367Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=40343 snr=15.26 band=1 flatness=0.185"}
+{"ts":"2026-06-02T00:24:43.379Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=40343-40345 20.0-45.0kHz peakSnr=15.26"}
+{"ts":"2026-06-02T00:24:43.433Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40399 maxSnr=15.26 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:43.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40499 maxSnr=6.69 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:43.688Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=40584 snr=27.77 band=1 flatness=0.121"}
+{"ts":"2026-06-02T00:24:43.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40599 maxSnr=44.28 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:43.700Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=40584-40590 20.0-45.0kHz peakSnr=44.28"}
+{"ts":"2026-06-02T00:24:43.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40699 maxSnr=10.63 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:43.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40799 maxSnr=6.26 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:43.977Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=40804 snr=19.42 band=1 flatness=0.165"}
+{"ts":"2026-06-02T00:24:43.997Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=40804-40808 20.0-45.0kHz peakSnr=19.42"}
+{"ts":"2026-06-02T00:24:44.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40899 maxSnr=19.42 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:44.125Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=40911 snr=12.72 band=1 flatness=0.183"}
+{"ts":"2026-06-02T00:24:44.136Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=40911-40912 20.0-45.0kHz peakSnr=12.72"}
+{"ts":"2026-06-02T00:24:44.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=40999 maxSnr=12.76 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:44.275Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=41026 snr=15.62 band=1 flatness=0.177"}
+{"ts":"2026-06-02T00:24:44.287Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=41026-41029 20.0-45.0kHz peakSnr=16.55"}
+{"ts":"2026-06-02T00:24:44.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41099 maxSnr=16.55 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:44.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41199 maxSnr=8.38 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:44.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41299 maxSnr=11.84 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:44.703Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=41348 snr=18.30 band=1 flatness=0.133"}
+{"ts":"2026-06-02T00:24:44.713Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=41348-41350 20.0-45.0kHz peakSnr=18.30"}
+{"ts":"2026-06-02T00:24:44.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41399 maxSnr=18.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:44.862Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=41469 snr=12.44 band=1 flatness=0.192"}
+{"ts":"2026-06-02T00:24:44.873Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=41469-41470 20.0-45.0kHz peakSnr=12.44"}
+{"ts":"2026-06-02T00:24:44.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41499 maxSnr=12.90 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:45.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41599 maxSnr=7.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:45.086Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=41636 snr=24.26 band=1 flatness=0.126"}
+{"ts":"2026-06-02T00:24:45.118Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=41636-41654 20.0-45.0kHz peakSnr=29.06"}
+{"ts":"2026-06-02T00:24:45.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41699 maxSnr=29.06 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:45.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41799 maxSnr=8.50 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:45.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41899 maxSnr=6.47 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:45.568Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=41999 maxSnr=8.51 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:45.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42099 maxSnr=8.01 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:45.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42199 maxSnr=8.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:45.844Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=42206 snr=12.41 band=1 flatness=0.125"}
+{"ts":"2026-06-02T00:24:45.863Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=42206-42207 20.0-45.0kHz peakSnr=12.41"}
+{"ts":"2026-06-02T00:24:45.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42299 maxSnr=13.01 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:46.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42399 maxSnr=8.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:46.174Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=42453 snr=25.60 band=1 flatness=0.125"}
+{"ts":"2026-06-02T00:24:46.196Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=42453-42457 20.0-45.0kHz peakSnr=29.93"}
+{"ts":"2026-06-02T00:24:46.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42499 maxSnr=29.93 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:46.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42599 maxSnr=6.61 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:46.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42699 maxSnr=6.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:46.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42799 maxSnr=6.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:46.771Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42899 maxSnr=6.46 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:46.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=42999 maxSnr=6.95 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:47.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43099 maxSnr=9.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:47.168Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43199 maxSnr=7.17 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:47.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43299 maxSnr=10.47 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:47.435Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43399 maxSnr=6.29 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:47.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43499 maxSnr=10.81 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:47.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43599 maxSnr=6.39 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:47.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43699 maxSnr=6.44 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:47.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43799 maxSnr=6.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:48.104Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43899 maxSnr=8.32 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:48.234Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=43999 maxSnr=9.46 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:48.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44099 maxSnr=7.12 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:48.501Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44199 maxSnr=7.79 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:48.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44299 maxSnr=10.57 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:48.766Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44399 maxSnr=6.97 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:48.905Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44499 maxSnr=6.34 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:49.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44599 maxSnr=6.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:49.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44699 maxSnr=9.04 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:49.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44799 maxSnr=6.49 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:49.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44899 maxSnr=6.33 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:49.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=44999 maxSnr=8.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:49.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45099 maxSnr=10.37 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:49.822Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=45188 snr=13.52 band=1 flatness=0.153"}
+{"ts":"2026-06-02T00:24:49.833Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=45188-45189 20.0-45.0kHz peakSnr=13.52"}
+{"ts":"2026-06-02T00:24:49.833Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45199 maxSnr=13.52 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:49.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45299 maxSnr=5.96 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:50.101Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45399 maxSnr=6.39 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:50.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45499 maxSnr=6.43 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:50.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45599 maxSnr=6.84 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:50.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45699 maxSnr=6.37 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:50.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45799 maxSnr=6.17 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:50.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45899 maxSnr=8.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:50.900Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=45999 maxSnr=6.86 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:51.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46099 maxSnr=6.19 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:51.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46199 maxSnr=6.48 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:51.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46299 maxSnr=6.40 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:51.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46399 maxSnr=6.34 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:51.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46499 maxSnr=6.86 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:51.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46599 maxSnr=6.86 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:51.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46699 maxSnr=7.75 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:51.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46799 maxSnr=6.28 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:52.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46899 maxSnr=6.21 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:52.234Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=46999 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:52.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47099 maxSnr=6.50 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:52.502Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47199 maxSnr=6.52 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:52.639Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47299 maxSnr=6.65 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:52.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47399 maxSnr=7.82 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:52.907Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47499 maxSnr=6.79 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:53.035Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47599 maxSnr=6.38 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:53.172Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47699 maxSnr=8.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:53.303Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47799 maxSnr=6.74 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:53.439Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47899 maxSnr=7.14 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:53.569Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=47999 maxSnr=6.43 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:53.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48099 maxSnr=6.79 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:53.771Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=48148 snr=13.32 band=1 flatness=0.146"}
+{"ts":"2026-06-02T00:24:53.814Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=48148-48174 20.0-45.0kHz peakSnr=13.91"}
+{"ts":"2026-06-02T00:24:53.835Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48199 maxSnr=13.91 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:53.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48299 maxSnr=6.10 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:54.101Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48399 maxSnr=7.07 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:54.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48499 maxSnr=7.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:54.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48599 maxSnr=10.52 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:54.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48699 maxSnr=6.39 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:54.600Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=48769 snr=13.69 band=1 flatness=0.172"}
+{"ts":"2026-06-02T00:24:54.612Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=48769-48770 20.0-45.0kHz peakSnr=13.69"}
+{"ts":"2026-06-02T00:24:54.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48799 maxSnr=13.69 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:54.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48899 maxSnr=13.33 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:54.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=48999 maxSnr=12.26 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:55.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49099 maxSnr=8.73 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:55.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49199 maxSnr=7.53 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:55.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49299 maxSnr=6.27 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:55.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49399 maxSnr=6.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:55.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49499 maxSnr=6.34 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:55.700Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49599 maxSnr=6.19 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:55.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49699 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:55.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49799 maxSnr=6.21 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:56.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49899 maxSnr=6.21 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:56.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=49999 maxSnr=6.27 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:56.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50099 maxSnr=6.65 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:56.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50199 maxSnr=6.81 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:56.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50299 maxSnr=8.72 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:56.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50399 maxSnr=6.47 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:56.905Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50499 maxSnr=6.38 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:56.917Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=50509 snr=20.67 band=1 flatness=0.134"}
+{"ts":"2026-06-02T00:24:56.936Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=50509-50513 20.0-45.0kHz peakSnr=22.25"}
+{"ts":"2026-06-02T00:24:57.034Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50599 maxSnr=22.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:57.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50699 maxSnr=8.15 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:57.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50799 maxSnr=6.36 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:57.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50899 maxSnr=6.49 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:57.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=50999 maxSnr=6.42 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:57.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51099 maxSnr=6.28 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:57.835Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51199 maxSnr=6.41 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:57.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51299 maxSnr=10.54 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:58.102Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51399 maxSnr=6.33 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:58.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51499 maxSnr=6.73 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:58.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51599 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:58.505Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51699 maxSnr=6.55 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:58.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51799 maxSnr=6.79 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:58.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51899 maxSnr=8.13 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:58.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=51999 maxSnr=6.51 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:59.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52099 maxSnr=6.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:59.070Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=52124 snr=14.26 band=1 flatness=0.157"}
+{"ts":"2026-06-02T00:24:59.125Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=52124-52155 20.0-45.0kHz peakSnr=14.26"}
+{"ts":"2026-06-02T00:24:59.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52199 maxSnr=14.26 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:59.304Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52299 maxSnr=6.16 band=79-129kHz"}
+{"ts":"2026-06-02T00:24:59.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52399 maxSnr=6.27 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:59.572Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52499 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:24:59.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52599 maxSnr=7.72 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:59.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52699 maxSnr=6.90 band=19-45kHz"}
+{"ts":"2026-06-02T00:24:59.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52799 maxSnr=6.08 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:00.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52899 maxSnr=6.56 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:00.235Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=52999 maxSnr=6.42 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:00.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53099 maxSnr=6.32 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:00.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53199 maxSnr=6.15 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:00.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53299 maxSnr=6.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:00.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53399 maxSnr=6.33 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:00.905Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53499 maxSnr=7.78 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:01.034Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53599 maxSnr=6.00 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:01.173Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53699 maxSnr=7.03 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:01.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53799 maxSnr=6.75 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:01.437Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53899 maxSnr=6.10 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:01.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=53999 maxSnr=7.14 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:01.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54099 maxSnr=6.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:01.834Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54199 maxSnr=6.05 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:01.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54299 maxSnr=6.43 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:02.101Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54399 maxSnr=6.33 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:02.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54499 maxSnr=6.47 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:02.366Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54599 maxSnr=9.85 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:02.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54699 maxSnr=7.48 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:02.633Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54799 maxSnr=6.20 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:02.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54899 maxSnr=6.39 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:02.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=54999 maxSnr=6.55 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:03.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55099 maxSnr=6.40 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:03.166Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55199 maxSnr=7.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:03.305Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55299 maxSnr=6.58 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:03.435Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55399 maxSnr=6.59 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:03.571Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55499 maxSnr=6.23 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:03.701Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55599 maxSnr=6.26 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:03.837Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55699 maxSnr=7.48 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:03.966Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55799 maxSnr=9.63 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:04.105Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55899 maxSnr=9.06 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:04.126Z","level":"info","subsystem":"recorder","msg":"RECORDING_SAVED file=20260602_032414614.wav frames=20165632 duration=52514ms elapsed=49512ms band=20.0-192.0kHz"}
+{"ts":"2026-06-02T00:25:04.233Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=55999 maxSnr=6.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:04.371Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56099 maxSnr=6.25 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:04.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56199 maxSnr=6.31 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:04.637Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56299 maxSnr=8.72 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:04.767Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56399 maxSnr=6.40 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:04.904Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56499 maxSnr=6.52 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:05.033Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56599 maxSnr=7.03 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:05.171Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56699 maxSnr=9.66 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:05.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56799 maxSnr=6.91 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:05.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56899 maxSnr=6.49 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:05.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=56999 maxSnr=6.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:05.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57099 maxSnr=6.48 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:05.834Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57199 maxSnr=7.22 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:05.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57299 maxSnr=6.18 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:06.036Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=57345 snr=12.26 band=1 flatness=0.170"}
+{"ts":"2026-06-02T00:25:06.040Z","level":"info","subsystem":"recorder","msg":"RECORDING_OPEN file=20260602_032506040.partial.wav preroll=1152000 samples band=20.0-45.0kHz"}
+{"ts":"2026-06-02T00:25:06.045Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=57345-57346 20.0-45.0kHz peakSnr=12.26"}
+{"ts":"2026-06-02T00:25:06.102Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57399 maxSnr=12.79 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:06.238Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57499 maxSnr=6.69 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:06.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57599 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:06.504Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57699 maxSnr=6.22 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:06.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57799 maxSnr=6.22 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:06.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57899 maxSnr=6.52 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:06.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=57999 maxSnr=6.91 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:07.037Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58099 maxSnr=6.21 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:07.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58199 maxSnr=6.40 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:07.305Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58299 maxSnr=7.81 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:07.435Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58399 maxSnr=6.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:07.574Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58499 maxSnr=7.26 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:07.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58599 maxSnr=9.22 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:07.842Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58699 maxSnr=8.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:07.971Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58799 maxSnr=7.95 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:08.106Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58899 maxSnr=6.20 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:08.236Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=58999 maxSnr=6.11 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:08.372Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59099 maxSnr=6.17 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:08.502Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59199 maxSnr=9.22 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:08.638Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59299 maxSnr=8.71 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:08.768Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59399 maxSnr=7.83 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:08.905Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59499 maxSnr=6.25 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:09.034Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59599 maxSnr=6.54 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:09.172Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59699 maxSnr=6.23 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:09.301Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59799 maxSnr=7.07 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:09.438Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59899 maxSnr=6.23 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:09.567Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=59999 maxSnr=6.32 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:09.705Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60099 maxSnr=6.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:09.834Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60199 maxSnr=5.90 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:09.972Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60299 maxSnr=6.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:10.100Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60399 maxSnr=6.78 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:10.237Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60499 maxSnr=6.81 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:10.367Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60599 maxSnr=6.67 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:10.505Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60699 maxSnr=6.13 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:10.634Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60799 maxSnr=6.60 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:10.772Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60899 maxSnr=8.93 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:10.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=60999 maxSnr=6.09 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:11.038Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61099 maxSnr=6.51 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:11.041Z","level":"info","subsystem":"recorder","msg":"RECORDING_SAVED file=20260602_032506040.wav frames=3073024 duration=8002ms elapsed=5000ms band=20.0-45.0kHz"}
+{"ts":"2026-06-02T00:25:11.167Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61199 maxSnr=6.64 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:11.306Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61299 maxSnr=6.08 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:11.434Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61399 maxSnr=6.00 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:11.572Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61499 maxSnr=6.14 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:11.704Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61599 maxSnr=6.26 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:11.838Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61699 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:11.975Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61799 maxSnr=6.12 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:12.040Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=512)"}
+{"ts":"2026-06-02T00:25:12.142Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61899 maxSnr=6.37 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:12.321Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=61999 maxSnr=6.06 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:12.458Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62099 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:12.588Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62199 maxSnr=6.42 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:12.724Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62299 maxSnr=6.76 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:12.856Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62399 maxSnr=6.40 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:12.960Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=62478 snr=21.30 band=1 flatness=0.149"}
+{"ts":"2026-06-02T00:25:12.964Z","level":"info","subsystem":"recorder","msg":"RECORDING_OPEN file=20260602_032512964.partial.wav preroll=1152000 samples band=20.0-45.0kHz"}
+{"ts":"2026-06-02T00:25:12.980Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=62478-62482 20.0-45.0kHz peakSnr=24.87"}
+{"ts":"2026-06-02T00:25:12.992Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62499 maxSnr=24.87 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:13.120Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62599 maxSnr=6.58 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:13.257Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62699 maxSnr=6.49 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:13.386Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62799 maxSnr=6.20 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:13.526Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62899 maxSnr=6.69 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:13.653Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=62999 maxSnr=7.05 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:13.790Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63099 maxSnr=6.63 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:13.919Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63199 maxSnr=6.87 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:14.056Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63299 maxSnr=16.32 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:14.186Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63399 maxSnr=6.33 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:14.325Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63499 maxSnr=12.42 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:14.453Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63599 maxSnr=10.98 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:14.589Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63699 maxSnr=8.77 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:14.718Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63799 maxSnr=6.56 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:14.856Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63899 maxSnr=7.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:14.985Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=63999 maxSnr=6.72 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:15.124Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64099 maxSnr=6.82 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:15.252Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64199 maxSnr=6.43 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:15.389Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64299 maxSnr=7.62 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:15.518Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64399 maxSnr=7.51 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:15.656Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64499 maxSnr=9.48 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:15.785Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64599 maxSnr=7.59 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:15.923Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64699 maxSnr=9.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:16.052Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64799 maxSnr=6.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:16.189Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64899 maxSnr=7.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:16.318Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=64999 maxSnr=6.56 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:16.381Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=65042 snr=13.99 band=1 flatness=0.155"}
+{"ts":"2026-06-02T00:25:16.393Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=65042-65043 20.0-45.0kHz peakSnr=13.99"}
+{"ts":"2026-06-02T00:25:16.456Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65099 maxSnr=13.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:16.586Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65199 maxSnr=10.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:16.724Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65299 maxSnr=8.17 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:16.852Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65399 maxSnr=6.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:16.989Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65499 maxSnr=8.47 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:17.119Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65599 maxSnr=7.10 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:17.256Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65699 maxSnr=6.34 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:17.290Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=65726 snr=31.43 band=1 flatness=0.144"}
+{"ts":"2026-06-02T00:25:17.309Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=65726-65729 20.0-45.0kHz peakSnr=31.43"}
+{"ts":"2026-06-02T00:25:17.385Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65799 maxSnr=31.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:17.524Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65899 maxSnr=6.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:17.652Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=65999 maxSnr=6.28 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:17.791Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66099 maxSnr=6.95 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:17.918Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66199 maxSnr=6.04 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:18.057Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66299 maxSnr=6.21 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:18.186Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66399 maxSnr=7.14 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:18.324Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66499 maxSnr=8.42 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:18.452Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66599 maxSnr=9.50 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:18.589Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66699 maxSnr=6.78 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:18.719Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66799 maxSnr=6.75 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:18.856Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66899 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:18.985Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=66999 maxSnr=6.97 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:19.071Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=67062 snr=14.87 band=1 flatness=0.111"}
+{"ts":"2026-06-02T00:25:19.091Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=67062-67064 20.0-45.0kHz peakSnr=14.87"}
+{"ts":"2026-06-02T00:25:19.123Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67099 maxSnr=14.87 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:19.253Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67199 maxSnr=7.59 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:19.390Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67299 maxSnr=7.64 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:19.518Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67399 maxSnr=7.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:19.549Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=67419 snr=12.81 band=1 flatness=0.111"}
+{"ts":"2026-06-02T00:25:19.561Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=67419-67420 20.0-45.0kHz peakSnr=12.81"}
+{"ts":"2026-06-02T00:25:19.656Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67499 maxSnr=13.41 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:19.785Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67599 maxSnr=8.97 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:19.923Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67699 maxSnr=26.71 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:20.053Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67799 maxSnr=7.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:20.169Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=67886 snr=23.54 band=1 flatness=0.107"}
+{"ts":"2026-06-02T00:25:20.189Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=67886-67889 20.0-45.0kHz peakSnr=23.54"}
+{"ts":"2026-06-02T00:25:20.189Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67899 maxSnr=29.39 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:20.319Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=67999 maxSnr=6.26 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:20.456Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68099 maxSnr=6.48 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:20.586Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68199 maxSnr=6.46 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:20.723Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68299 maxSnr=6.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:20.853Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68399 maxSnr=6.05 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:20.989Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68499 maxSnr=7.41 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:21.118Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68599 maxSnr=7.33 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:21.257Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68699 maxSnr=6.29 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:21.386Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68799 maxSnr=6.80 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:21.523Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68899 maxSnr=6.49 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:21.652Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=68999 maxSnr=6.58 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:21.790Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69099 maxSnr=6.25 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:21.811Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=69115 snr=14.05 band=1 flatness=0.126"}
+{"ts":"2026-06-02T00:25:21.824Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=69115-69119 20.0-45.0kHz peakSnr=16.89"}
+{"ts":"2026-06-02T00:25:21.919Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69199 maxSnr=16.89 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:22.057Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69299 maxSnr=6.34 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:22.186Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69399 maxSnr=6.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:22.323Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69499 maxSnr=6.47 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:22.454Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69599 maxSnr=6.36 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:22.592Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69699 maxSnr=6.18 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:22.738Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69799 maxSnr=6.20 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:22.865Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69899 maxSnr=6.29 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:23.003Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=69999 maxSnr=6.22 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:23.015Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=32768)"}
+{"ts":"2026-06-02T00:25:23.127Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70099 maxSnr=6.21 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:23.263Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70199 maxSnr=6.56 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:23.401Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70299 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:23.532Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70399 maxSnr=6.09 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:23.668Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70499 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:23.798Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70599 maxSnr=6.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:23.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70699 maxSnr=6.47 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:24.063Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70799 maxSnr=6.25 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:24.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70899 maxSnr=6.15 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:24.330Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=70999 maxSnr=6.85 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:24.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71099 maxSnr=6.74 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:24.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71199 maxSnr=6.57 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:24.734Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71299 maxSnr=6.10 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:24.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71399 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:24.936Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=71450 snr=35.79 band=1 flatness=0.129"}
+{"ts":"2026-06-02T00:25:24.949Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=71450-71456 20.0-45.0kHz peakSnr=39.15"}
+{"ts":"2026-06-02T00:25:24.979Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=71483 snr=15.64 band=1 flatness=0.172"}
+{"ts":"2026-06-02T00:25:24.990Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=71483-71485 20.0-45.0kHz peakSnr=15.64"}
+{"ts":"2026-06-02T00:25:25.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71499 maxSnr=39.15 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:25.129Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71599 maxSnr=6.96 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:25.267Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71699 maxSnr=10.20 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:25.397Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71799 maxSnr=6.86 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:25.418Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=71817 snr=29.58 band=1 flatness=0.138"}
+{"ts":"2026-06-02T00:25:25.438Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=71817-71822 20.0-45.0kHz peakSnr=33.63"}
+{"ts":"2026-06-02T00:25:25.502Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=71877 snr=25.46 band=1 flatness=0.157"}
+{"ts":"2026-06-02T00:25:25.523Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=71877-71882 20.0-45.0kHz peakSnr=30.52"}
+{"ts":"2026-06-02T00:25:25.534Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71899 maxSnr=33.63 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:25.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=71999 maxSnr=92.34 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:25.662Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=71998 snr=12.83 band=1 flatness=0.143"}
+{"ts":"2026-06-02T00:25:25.675Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=71998-71999 20.0-45.0kHz peakSnr=12.83"}
+{"ts":"2026-06-02T00:25:25.758Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72071 snr=26.47 band=1 flatness=0.133"}
+{"ts":"2026-06-02T00:25:25.780Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72071-72074 20.0-45.0kHz peakSnr=26.47"}
+{"ts":"2026-06-02T00:25:25.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72099 maxSnr=26.47 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:25.896Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72170 snr=25.91 band=1 flatness=0.154"}
+{"ts":"2026-06-02T00:25:25.908Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72170-72173 20.0-45.0kHz peakSnr=25.91"}
+{"ts":"2026-06-02T00:25:25.927Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72194 snr=16.82 band=1 flatness=0.173"}
+{"ts":"2026-06-02T00:25:25.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72199 maxSnr=25.91 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:25.939Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72194-72196 20.0-45.0kHz peakSnr=16.82"}
+{"ts":"2026-06-02T00:25:25.949Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72213 snr=17.66 band=1 flatness=0.173"}
+{"ts":"2026-06-02T00:25:25.971Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72213-72220 20.0-45.0kHz peakSnr=23.45"}
+{"ts":"2026-06-02T00:25:25.992Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72244 snr=12.72 band=1 flatness=0.114"}
+{"ts":"2026-06-02T00:25:26.004Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72244-72245 20.0-45.0kHz peakSnr=12.72"}
+{"ts":"2026-06-02T00:25:26.057Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72292 snr=13.44 band=1 flatness=0.135"}
+{"ts":"2026-06-02T00:25:26.067Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72299 maxSnr=70.02 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:26.068Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72292-72293 20.0-45.0kHz peakSnr=13.44"}
+{"ts":"2026-06-02T00:25:26.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72399 maxSnr=6.31 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:26.227Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72418 snr=27.19 band=1 flatness=0.158"}
+{"ts":"2026-06-02T00:25:26.247Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72418-72426 20.0-45.0kHz peakSnr=29.29"}
+{"ts":"2026-06-02T00:25:26.332Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72499 maxSnr=29.29 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:26.355Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72514 snr=19.99 band=1 flatness=0.162"}
+{"ts":"2026-06-02T00:25:26.366Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72514-72520 20.0-45.0kHz peakSnr=22.61"}
+{"ts":"2026-06-02T00:25:26.463Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72599 maxSnr=22.61 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:26.599Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72699 maxSnr=6.31 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:26.729Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72799 maxSnr=6.70 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:26.761Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=72824 snr=13.37 band=1 flatness=0.190"}
+{"ts":"2026-06-02T00:25:26.774Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=72824-72825 20.0-45.0kHz peakSnr=13.37"}
+{"ts":"2026-06-02T00:25:26.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72899 maxSnr=13.49 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:26.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=72999 maxSnr=6.67 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:27.134Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73099 maxSnr=6.34 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:27.263Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73199 maxSnr=6.87 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:27.371Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=73279 snr=40.71 band=1 flatness=0.148"}
+{"ts":"2026-06-02T00:25:27.390Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=73279-73285 20.0-45.0kHz peakSnr=49.70"}
+{"ts":"2026-06-02T00:25:27.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73299 maxSnr=49.70 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:27.464Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=73347 snr=20.61 band=1 flatness=0.149"}
+{"ts":"2026-06-02T00:25:27.476Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=73347-73351 20.0-45.0kHz peakSnr=22.82"}
+{"ts":"2026-06-02T00:25:27.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73399 maxSnr=22.82 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:27.667Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73499 maxSnr=6.30 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:27.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73599 maxSnr=6.67 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:27.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73699 maxSnr=9.41 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:28.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73799 maxSnr=6.22 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:28.149Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=73861 snr=15.14 band=1 flatness=0.168"}
+{"ts":"2026-06-02T00:25:28.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73899 maxSnr=26.87 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:28.234Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=73861-73919 20.0-45.0kHz peakSnr=26.87"}
+{"ts":"2026-06-02T00:25:28.243Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=73931 snr=15.26 band=1 flatness=0.117"}
+{"ts":"2026-06-02T00:25:28.254Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=73931-73934 20.0-45.0kHz peakSnr=15.28"}
+{"ts":"2026-06-02T00:25:28.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=73999 maxSnr=18.16 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:28.468Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74099 maxSnr=6.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:28.597Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74199 maxSnr=8.05 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:28.733Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74299 maxSnr=7.75 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:28.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74399 maxSnr=6.15 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:29.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74499 maxSnr=6.36 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:29.129Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74599 maxSnr=7.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:29.266Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74699 maxSnr=6.95 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:29.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74799 maxSnr=7.96 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:29.534Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74899 maxSnr=6.31 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:29.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=74999 maxSnr=6.83 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:29.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75099 maxSnr=6.62 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:29.876Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=75160 snr=24.13 band=1 flatness=0.152"}
+{"ts":"2026-06-02T00:25:29.896Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=75160-75163 20.0-45.0kHz peakSnr=24.13"}
+{"ts":"2026-06-02T00:25:29.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75199 maxSnr=24.13 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:29.950Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=75214 snr=21.84 band=1 flatness=0.157"}
+{"ts":"2026-06-02T00:25:29.962Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=75214-75217 20.0-45.0kHz peakSnr=21.84"}
+{"ts":"2026-06-02T00:25:30.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75299 maxSnr=21.84 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:30.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75399 maxSnr=11.58 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:30.333Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75499 maxSnr=7.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:30.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75599 maxSnr=6.40 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:30.600Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75699 maxSnr=6.07 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:30.729Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75799 maxSnr=6.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:30.868Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75899 maxSnr=6.60 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:30.887Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=75914 snr=18.47 band=2 flatness=0.118"}
+{"ts":"2026-06-02T00:25:30.899Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=75914-75916 45.0-80.0kHz peakSnr=18.47"}
+{"ts":"2026-06-02T00:25:30.997Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=75999 maxSnr=18.47 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:31.060Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=76047 snr=20.22 band=2 flatness=0.107"}
+{"ts":"2026-06-02T00:25:31.081Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=76047-76051 45.0-80.0kHz peakSnr=21.45"}
+{"ts":"2026-06-02T00:25:31.133Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76099 maxSnr=24.33 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:31.164Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=76122 snr=14.41 band=2 flatness=0.150"}
+{"ts":"2026-06-02T00:25:31.176Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=76122-76123 45.0-80.0kHz peakSnr=14.41"}
+{"ts":"2026-06-02T00:25:31.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76199 maxSnr=44.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:31.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76299 maxSnr=47.83 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:31.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76399 maxSnr=68.95 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:31.668Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76499 maxSnr=43.59 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:31.786Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=76592 snr=15.95 band=2 flatness=0.116"}
+{"ts":"2026-06-02T00:25:31.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76599 maxSnr=35.86 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:31.805Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=76592-76594 45.0-80.0kHz peakSnr=15.95"}
+{"ts":"2026-06-02T00:25:31.932Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76699 maxSnr=18.98 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:32.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76799 maxSnr=27.60 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:32.201Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76899 maxSnr=7.00 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:32.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=76999 maxSnr=6.72 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:32.466Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77099 maxSnr=7.66 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:32.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77199 maxSnr=6.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:32.732Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77299 maxSnr=6.53 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:32.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77399 maxSnr=8.86 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:32.999Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77499 maxSnr=7.00 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:33.130Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77599 maxSnr=6.20 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:33.266Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77699 maxSnr=6.37 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:33.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77799 maxSnr=7.12 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:33.532Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77899 maxSnr=6.29 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:33.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=77999 maxSnr=6.20 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:33.800Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78099 maxSnr=6.40 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:33.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78199 maxSnr=6.30 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:34.068Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78299 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:34.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78399 maxSnr=6.31 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:34.333Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78499 maxSnr=6.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:34.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78599 maxSnr=6.36 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:34.599Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78699 maxSnr=6.43 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:34.730Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78799 maxSnr=6.14 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:34.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78899 maxSnr=6.23 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:34.910Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=78932 snr=17.45 band=1 flatness=0.187"}
+{"ts":"2026-06-02T00:25:34.984Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=78932-78979 20.0-45.0kHz peakSnr=20.99"}
+{"ts":"2026-06-02T00:25:34.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=78999 maxSnr=20.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:35.133Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79099 maxSnr=9.46 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:35.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79199 maxSnr=6.79 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:35.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79299 maxSnr=7.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:35.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79399 maxSnr=7.92 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:35.667Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79499 maxSnr=10.84 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:35.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79599 maxSnr=8.94 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:35.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79699 maxSnr=6.17 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:35.997Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=79746 snr=18.82 band=1 flatness=0.135"}
+{"ts":"2026-06-02T00:25:36.008Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=79746-79748 20.0-45.0kHz peakSnr=18.82"}
+{"ts":"2026-06-02T00:25:36.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79799 maxSnr=38.02 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:36.084Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=79814 snr=15.42 band=1 flatness=0.175"}
+{"ts":"2026-06-02T00:25:36.095Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=79814-79817 20.0-45.0kHz peakSnr=15.42"}
+{"ts":"2026-06-02T00:25:36.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79899 maxSnr=15.42 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:36.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=79999 maxSnr=6.60 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:36.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80099 maxSnr=6.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:36.597Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80199 maxSnr=6.46 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:36.606Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=80208 snr=16.89 band=1 flatness=0.138"}
+{"ts":"2026-06-02T00:25:36.627Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=80208-80210 20.0-45.0kHz peakSnr=16.89"}
+{"ts":"2026-06-02T00:25:36.692Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=80270 snr=18.65 band=1 flatness=0.172"}
+{"ts":"2026-06-02T00:25:36.703Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=80270-80273 20.0-45.0kHz peakSnr=18.65"}
+{"ts":"2026-06-02T00:25:36.733Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80299 maxSnr=18.65 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:36.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80399 maxSnr=11.90 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:36.999Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80499 maxSnr=9.01 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:37.085Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=80562 snr=33.15 band=1 flatness=0.118"}
+{"ts":"2026-06-02T00:25:37.098Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=80562-80567 20.0-45.0kHz peakSnr=35.56"}
+{"ts":"2026-06-02T00:25:37.130Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80599 maxSnr=35.56 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:37.267Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80699 maxSnr=9.88 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:37.268Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=80702 snr=15.21 band=1 flatness=0.158"}
+{"ts":"2026-06-02T00:25:37.278Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=80702-80704 20.0-45.0kHz peakSnr=15.21"}
+{"ts":"2026-06-02T00:25:37.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80799 maxSnr=15.21 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:37.534Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80899 maxSnr=9.31 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:37.632Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=80974 snr=26.58 band=1 flatness=0.143"}
+{"ts":"2026-06-02T00:25:37.653Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=80974-80979 20.0-45.0kHz peakSnr=34.54"}
+{"ts":"2026-06-02T00:25:37.665Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=80999 maxSnr=34.54 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:37.803Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81099 maxSnr=6.26 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:37.930Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81199 maxSnr=6.14 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:38.068Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81299 maxSnr=6.74 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:38.197Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81399 maxSnr=7.14 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:38.334Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81499 maxSnr=7.21 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:38.464Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81599 maxSnr=7.91 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:38.601Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81699 maxSnr=6.75 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:38.730Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81799 maxSnr=6.49 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:38.866Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81899 maxSnr=11.81 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:38.877Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=81907 snr=12.46 band=1 flatness=0.139"}
+{"ts":"2026-06-02T00:25:38.888Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=81907-81908 20.0-45.0kHz peakSnr=12.46"}
+{"ts":"2026-06-02T00:25:38.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=81999 maxSnr=12.88 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:39.134Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82099 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:39.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82199 maxSnr=6.20 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:39.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82299 maxSnr=6.45 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:39.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82399 maxSnr=6.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:39.667Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82499 maxSnr=6.39 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:39.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82599 maxSnr=6.54 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:39.932Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82699 maxSnr=6.46 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:40.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82799 maxSnr=6.32 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:40.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82899 maxSnr=6.68 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:40.328Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=82999 maxSnr=6.28 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:40.466Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83099 maxSnr=6.19 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:40.597Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83199 maxSnr=6.22 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:40.733Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83299 maxSnr=6.61 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:40.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83399 maxSnr=6.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:41.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83499 maxSnr=7.39 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:41.129Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83599 maxSnr=7.74 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:41.267Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83699 maxSnr=6.32 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:41.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83799 maxSnr=6.16 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:41.533Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83899 maxSnr=6.80 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:41.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=83999 maxSnr=6.53 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:41.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84099 maxSnr=6.15 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:41.928Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84199 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:42.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84299 maxSnr=6.39 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:42.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84399 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:42.333Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84499 maxSnr=6.38 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:42.463Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84599 maxSnr=6.72 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:42.600Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84699 maxSnr=7.11 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:42.730Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84799 maxSnr=6.90 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:42.866Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84899 maxSnr=7.53 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:42.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=84999 maxSnr=7.56 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:43.133Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85099 maxSnr=6.29 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:43.263Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85199 maxSnr=7.18 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:43.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85299 maxSnr=6.13 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:43.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85399 maxSnr=6.71 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:43.667Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85499 maxSnr=7.41 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:43.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85599 maxSnr=10.43 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:43.889Z","level":"info","subsystem":"recorder","msg":"RECORDING_SAVED file=20260602_032512964.wav frames=13026304 duration=33922ms elapsed=30924ms band=20.0-80.0kHz"}
+{"ts":"2026-06-02T00:25:43.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85699 maxSnr=6.15 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:44.063Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85799 maxSnr=6.53 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:44.138Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=85857 snr=15.26 band=1 flatness=0.137"}
+{"ts":"2026-06-02T00:25:44.143Z","level":"info","subsystem":"recorder","msg":"RECORDING_OPEN file=20260602_032544143.partial.wav preroll=1152000 samples band=20.0-45.0kHz"}
+{"ts":"2026-06-02T00:25:44.158Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=85857-85859 20.0-45.0kHz peakSnr=15.26"}
+{"ts":"2026-06-02T00:25:44.201Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85899 maxSnr=15.26 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:44.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=85999 maxSnr=6.31 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:44.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86099 maxSnr=6.27 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:44.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86199 maxSnr=6.24 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:44.733Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86299 maxSnr=6.13 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:44.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86399 maxSnr=6.64 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:45.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86499 maxSnr=6.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:45.130Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86599 maxSnr=6.33 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:45.268Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86699 maxSnr=6.34 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:45.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86799 maxSnr=6.37 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:45.533Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86899 maxSnr=6.52 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:45.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=86999 maxSnr=7.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:45.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87099 maxSnr=8.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:45.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87199 maxSnr=6.35 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:46.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87299 maxSnr=9.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:46.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87399 maxSnr=9.39 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:46.333Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87499 maxSnr=6.01 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:46.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87599 maxSnr=6.27 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:46.600Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87699 maxSnr=6.65 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:46.729Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87799 maxSnr=8.44 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:46.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87899 maxSnr=6.59 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:46.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=87999 maxSnr=6.39 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:47.132Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88099 maxSnr=6.33 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:47.263Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88199 maxSnr=7.03 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:47.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88299 maxSnr=6.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:47.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88399 maxSnr=10.60 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:47.668Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88499 maxSnr=7.09 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:47.700Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=88525 snr=12.22 band=1 flatness=0.141"}
+{"ts":"2026-06-02T00:25:47.710Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=88525-88526 20.0-45.0kHz peakSnr=12.22"}
+{"ts":"2026-06-02T00:25:47.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88599 maxSnr=13.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:47.827Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=88619 snr=14.01 band=1 flatness=0.139"}
+{"ts":"2026-06-02T00:25:47.838Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=88619-88620 20.0-45.0kHz peakSnr=14.01"}
+{"ts":"2026-06-02T00:25:47.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88699 maxSnr=14.01 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:48.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88799 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:48.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88899 maxSnr=6.14 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:48.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=88999 maxSnr=9.19 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:48.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89099 maxSnr=7.12 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:48.597Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89199 maxSnr=6.68 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:48.732Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89299 maxSnr=6.63 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:48.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89399 maxSnr=6.22 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:48.999Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89499 maxSnr=9.88 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:49.130Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89599 maxSnr=7.55 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:49.266Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89699 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:49.397Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89799 maxSnr=6.19 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:49.532Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89899 maxSnr=6.45 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:49.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=89999 maxSnr=8.60 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:49.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90099 maxSnr=7.80 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:49.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90199 maxSnr=8.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:50.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90299 maxSnr=8.00 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:50.197Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90399 maxSnr=6.15 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:50.333Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90499 maxSnr=6.30 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:50.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90599 maxSnr=6.75 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:50.599Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90699 maxSnr=8.81 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:50.729Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90799 maxSnr=6.14 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:50.866Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90899 maxSnr=6.43 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:50.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=90999 maxSnr=6.67 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:51.132Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91099 maxSnr=6.31 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:51.263Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91199 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:51.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91299 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:51.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91399 maxSnr=6.79 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:51.667Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91499 maxSnr=6.00 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:51.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91599 maxSnr=6.75 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:51.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91699 maxSnr=6.49 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:51.955Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=91717 snr=12.70 band=1 flatness=0.161"}
+{"ts":"2026-06-02T00:25:51.996Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=91717-91738 20.0-45.0kHz peakSnr=16.05"}
+{"ts":"2026-06-02T00:25:52.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91799 maxSnr=16.05 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:52.199Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91899 maxSnr=6.23 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:52.330Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=91999 maxSnr=6.66 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:52.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92099 maxSnr=6.51 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:52.598Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92199 maxSnr=6.17 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:52.733Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92299 maxSnr=11.94 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:52.866Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92399 maxSnr=10.24 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:53.004Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92499 maxSnr=11.57 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:53.136Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92599 maxSnr=10.22 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:53.268Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92699 maxSnr=6.27 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:53.401Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92799 maxSnr=6.71 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:53.534Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92899 maxSnr=6.69 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:53.664Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=92999 maxSnr=6.44 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:53.800Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93099 maxSnr=8.61 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:53.930Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93199 maxSnr=6.91 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:54.068Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93299 maxSnr=6.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:54.197Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93399 maxSnr=9.45 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:54.334Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93499 maxSnr=6.29 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:54.463Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93599 maxSnr=6.34 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:54.483Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=93610 snr=21.64 band=1 flatness=0.151"}
+{"ts":"2026-06-02T00:25:54.495Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=93610-93613 20.0-45.0kHz peakSnr=22.19"}
+{"ts":"2026-06-02T00:25:54.601Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93699 maxSnr=22.19 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:54.730Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93799 maxSnr=6.69 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:54.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93899 maxSnr=11.45 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:54.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=93999 maxSnr=10.88 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:55.133Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94099 maxSnr=8.70 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:55.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94199 maxSnr=6.11 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:55.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94299 maxSnr=6.15 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:55.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94399 maxSnr=6.14 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:55.668Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94499 maxSnr=10.62 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:55.797Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94599 maxSnr=6.33 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:55.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94699 maxSnr=6.27 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:56.063Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94799 maxSnr=6.58 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:56.191Z","level":"info","subsystem":"dsp.bed","msg":"event start frame=94894 snr=14.20 band=1 flatness=0.193"}
+{"ts":"2026-06-02T00:25:56.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94899 maxSnr=14.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:56.201Z","level":"info","subsystem":"dsp.bed","msg":"event end frames=94894-94895 20.0-45.0kHz peakSnr=14.20"}
+{"ts":"2026-06-02T00:25:56.330Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=94999 maxSnr=11.10 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:56.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95099 maxSnr=6.85 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:56.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95199 maxSnr=6.38 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:56.732Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95299 maxSnr=6.28 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:56.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95399 maxSnr=6.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:57.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95499 maxSnr=6.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:57.129Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95599 maxSnr=6.09 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:57.266Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95699 maxSnr=6.05 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:57.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95799 maxSnr=9.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:57.533Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95899 maxSnr=6.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:57.663Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=95999 maxSnr=6.17 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:57.800Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96099 maxSnr=6.23 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:57.928Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96199 maxSnr=6.38 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:58.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96299 maxSnr=6.20 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:58.197Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96399 maxSnr=6.74 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:58.332Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96499 maxSnr=6.36 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:58.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96599 maxSnr=6.29 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:58.600Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96699 maxSnr=5.89 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:58.729Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96799 maxSnr=6.34 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:58.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96899 maxSnr=6.61 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:58.996Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=96999 maxSnr=6.23 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:59.134Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97099 maxSnr=6.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:59.263Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97199 maxSnr=6.24 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:59.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97299 maxSnr=6.78 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:59.530Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97399 maxSnr=6.40 band=45-79kHz"}
+{"ts":"2026-06-02T00:25:59.668Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97499 maxSnr=6.24 band=19-45kHz"}
+{"ts":"2026-06-02T00:25:59.797Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97599 maxSnr=6.08 band=79-129kHz"}
+{"ts":"2026-06-02T00:25:59.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97699 maxSnr=6.59 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:00.063Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97799 maxSnr=6.19 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:00.201Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97899 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:00.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=97999 maxSnr=6.78 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:00.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98099 maxSnr=6.64 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:00.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98199 maxSnr=6.11 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:00.734Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98299 maxSnr=6.48 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:00.863Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98399 maxSnr=6.21 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:00.999Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98499 maxSnr=6.23 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:01.129Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98599 maxSnr=6.55 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:01.203Z","level":"info","subsystem":"recorder","msg":"RECORDING_SAVED file=20260602_032544143.wav frames=7701504 duration=20056ms elapsed=17060ms band=20.0-45.0kHz"}
+{"ts":"2026-06-02T00:26:01.268Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98699 maxSnr=6.12 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:01.397Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98799 maxSnr=6.35 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:01.534Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98899 maxSnr=6.68 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:01.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=98999 maxSnr=6.56 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:01.801Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99099 maxSnr=6.21 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:01.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99199 maxSnr=6.26 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:02.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99299 maxSnr=6.26 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:02.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99399 maxSnr=6.28 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:02.332Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99499 maxSnr=6.62 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:02.463Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99599 maxSnr=6.31 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:02.599Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99699 maxSnr=6.51 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:02.730Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99799 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:02.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99899 maxSnr=6.91 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:02.998Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=99999 maxSnr=6.74 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:03.132Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100099 maxSnr=6.69 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:03.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100199 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:03.400Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100299 maxSnr=5.98 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:03.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100399 maxSnr=6.49 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:03.667Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100499 maxSnr=6.90 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:03.797Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100599 maxSnr=6.24 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:03.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100699 maxSnr=6.22 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:04.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100799 maxSnr=6.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:04.199Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100899 maxSnr=6.32 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:04.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=100999 maxSnr=6.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:04.468Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101099 maxSnr=6.40 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:04.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101199 maxSnr=6.46 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:04.732Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101299 maxSnr=6.10 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:04.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101399 maxSnr=6.59 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:05.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101499 maxSnr=6.54 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:05.129Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101599 maxSnr=6.61 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:05.266Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101699 maxSnr=6.40 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:05.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101799 maxSnr=6.24 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:05.533Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101899 maxSnr=6.21 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:05.662Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=101999 maxSnr=6.71 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:05.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102099 maxSnr=6.53 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:05.930Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102199 maxSnr=6.25 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:06.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102299 maxSnr=6.17 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:06.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102399 maxSnr=6.29 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:06.332Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102499 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:06.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102599 maxSnr=6.08 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:06.600Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102699 maxSnr=6.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:06.728Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102799 maxSnr=6.37 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:06.866Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102899 maxSnr=6.50 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:06.995Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=102999 maxSnr=6.32 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:07.132Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103099 maxSnr=6.66 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:07.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103199 maxSnr=6.50 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:07.399Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103299 maxSnr=6.28 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:07.530Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103399 maxSnr=6.07 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:07.667Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103499 maxSnr=6.49 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:07.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103599 maxSnr=6.53 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:07.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103699 maxSnr=6.25 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:08.064Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103799 maxSnr=6.76 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:08.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103899 maxSnr=6.47 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:08.330Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=103999 maxSnr=6.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:08.468Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104099 maxSnr=6.44 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:08.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104199 maxSnr=6.83 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:08.733Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104299 maxSnr=6.46 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:08.863Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104399 maxSnr=6.36 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:09.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104499 maxSnr=6.28 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:09.130Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104599 maxSnr=6.35 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:09.268Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104699 maxSnr=6.35 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:09.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104799 maxSnr=6.26 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:09.532Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104899 maxSnr=6.24 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:09.663Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=104999 maxSnr=6.34 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:09.801Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105099 maxSnr=6.12 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:09.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105199 maxSnr=6.54 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:10.067Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105299 maxSnr=6.11 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:10.195Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105399 maxSnr=6.25 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:10.332Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105499 maxSnr=6.50 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:10.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105599 maxSnr=6.28 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:10.599Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105699 maxSnr=6.39 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:10.730Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105799 maxSnr=6.60 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:10.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105899 maxSnr=6.36 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:10.997Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=105999 maxSnr=5.94 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:11.134Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106099 maxSnr=6.09 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:11.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106199 maxSnr=6.14 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:11.399Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106299 maxSnr=6.16 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:11.530Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106399 maxSnr=6.50 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:11.666Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106499 maxSnr=6.26 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:11.797Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106599 maxSnr=6.22 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:11.932Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106699 maxSnr=6.27 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:12.061Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106799 maxSnr=5.99 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:12.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106899 maxSnr=6.45 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:12.330Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=106999 maxSnr=6.31 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:12.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107099 maxSnr=6.41 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:12.597Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107199 maxSnr=6.27 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:12.732Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107299 maxSnr=6.30 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:12.863Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107399 maxSnr=6.59 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:13.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107499 maxSnr=6.82 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:13.129Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107599 maxSnr=6.41 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:13.267Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107699 maxSnr=6.59 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:13.396Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107799 maxSnr=6.78 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:13.534Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107899 maxSnr=6.38 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:13.665Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=107999 maxSnr=6.64 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:13.799Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108099 maxSnr=6.16 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:13.929Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108199 maxSnr=6.37 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:14.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108299 maxSnr=6.26 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:14.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108399 maxSnr=6.41 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:14.334Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108499 maxSnr=6.40 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:14.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108599 maxSnr=6.10 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:14.599Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108699 maxSnr=6.48 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:14.729Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108799 maxSnr=6.88 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:14.868Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108899 maxSnr=6.52 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:14.997Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=108999 maxSnr=6.49 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:15.132Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109099 maxSnr=6.46 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:15.262Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109199 maxSnr=6.60 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:15.401Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109299 maxSnr=6.39 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:15.529Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109399 maxSnr=6.28 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:15.668Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109499 maxSnr=6.40 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:15.796Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109599 maxSnr=6.43 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:15.933Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109699 maxSnr=6.35 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:16.062Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109799 maxSnr=6.37 band=79-129kHz"}
+{"ts":"2026-06-02T00:26:16.200Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109899 maxSnr=6.50 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:16.329Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=109999 maxSnr=7.12 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:16.467Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110099 maxSnr=6.99 band=19-45kHz"}
+{"ts":"2026-06-02T00:26:16.596Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110199 maxSnr=6.24 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:16.734Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110299 maxSnr=5.92 band=45-79kHz"}
+{"ts":"2026-06-02T00:26:16.867Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.000Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.135Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.270Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.406Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.544Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.575Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=35840)"}
+{"ts":"2026-06-02T00:26:17.690Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=110999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.841Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:17.991Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:18.139Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:18.291Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:18.444Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:18.578Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=79872)"}
+{"ts":"2026-06-02T00:26:18.597Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:18.750Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:18.901Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:19.048Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:19.196Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=111999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:19.361Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:19.519Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:19.580Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 1024 samples this chunk (total=131584)"}
+{"ts":"2026-06-02T00:26:19.678Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:19.832Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:19.985Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:20.137Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:20.290Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:20.443Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:20.583Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=182784)"}
+{"ts":"2026-06-02T00:26:20.598Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:20.756Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=112999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:20.913Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:21.066Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:21.219Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:21.378Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:21.536Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:21.586Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=240128)"}
+{"ts":"2026-06-02T00:26:21.698Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:21.856Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:22.009Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:22.162Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:22.322Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=113999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:22.481Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:22.588Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 2048 samples this chunk (total=305152)"}
+{"ts":"2026-06-02T00:26:22.692Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:22.983Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:23.224Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:23.442Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:23.591Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 1536 samples this chunk (total=478208)"}
+{"ts":"2026-06-02T00:26:23.652Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:23.844Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:24.020Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:24.187Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:24.352Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=114999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:24.513Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:24.594Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=565760)"}
+{"ts":"2026-06-02T00:26:24.672Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:24.831Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:24.985Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:25.138Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:25.291Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:25.448Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:25.596Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=621056)"}
+{"ts":"2026-06-02T00:26:25.605Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:25.763Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:25.920Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=115999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:26.073Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:26.226Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:26.379Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:26.532Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:26.599Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=673792)"}
+{"ts":"2026-06-02T00:26:26.686Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:26.839Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:26.990Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:27.143Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:27.302Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:27.462Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=116999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:27.602Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=729088)"}
+{"ts":"2026-06-02T00:26:27.622Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:27.782Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:27.939Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:28.092Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:28.245Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:28.406Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:28.588Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:28.604Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 1024 samples this chunk (total=795648)"}
+{"ts":"2026-06-02T00:26:28.759Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:28.924Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:29.086Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=117999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:29.246Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:29.405Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:29.562Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:29.607Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=863232)"}
+{"ts":"2026-06-02T00:26:29.716Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:29.875Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:30.030Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:30.185Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:30.343Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:30.500Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:30.610Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=919040)"}
+{"ts":"2026-06-02T00:26:30.652Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=118999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:30.805Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:30.958Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:31.106Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:31.259Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:31.412Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:31.566Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:31.612Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 1024 samples this chunk (total=968192)"}
+{"ts":"2026-06-02T00:26:31.726Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:31.884Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:32.041Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:32.197Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=119999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:32.358Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:32.519Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:32.615Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 1024 samples this chunk (total=1030656)"}
+{"ts":"2026-06-02T00:26:32.681Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:32.840Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:32.994Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:33.147Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:33.300Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:33.454Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:33.607Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:33.618Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=1083392)"}
+{"ts":"2026-06-02T00:26:33.764Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=120999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:33.919Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:34.073Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:34.230Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:34.385Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:34.544Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:34.620Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 1024 samples this chunk (total=1140736)"}
+{"ts":"2026-06-02T00:26:34.703Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:34.862Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:35.020Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:35.179Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:35.337Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=121999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:35.492Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122099 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:35.623Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=1199104)"}
+{"ts":"2026-06-02T00:26:35.645Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122199 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:35.798Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122299 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:35.950Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122399 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:36.111Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122499 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:36.269Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122599 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:36.430Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122699 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:36.590Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122799 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:36.626Z","level":"warn","subsystem":"app","msg":"DSP ring overflow: dropped 512 samples this chunk (total=1257984)"}
+{"ts":"2026-06-02T00:26:36.750Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122899 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:36.910Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=122999 maxSnr=0.00"}
+{"ts":"2026-06-02T00:26:37.069Z","level":"debug","subsystem":"dsp.bed","msg":"hb frame=123099 maxSnr=0.00"}

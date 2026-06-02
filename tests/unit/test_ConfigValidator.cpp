@@ -39,6 +39,30 @@ TEST_CASE("ConfigValidator: frequency window invariants", "[config]") {
     }
 }
 
+TEST_CASE("ConfigValidator: freqHiHz against Nyquist", "[config]") {
+    Config cfg;
+
+    SECTION("freqHiHz exactly at Nyquist is valid") {
+        cfg.sampleRate = 768000;
+        cfg.freqHiHz   = 384000;
+        CHECK(validateConfig(cfg).empty());
+    }
+
+    SECTION("freqHiHz below Nyquist is valid for non-default mic") {
+        cfg.sampleRate = 768000;
+        cfg.freqHiHz   = 250000;
+        CHECK(validateConfig(cfg).empty());
+    }
+
+    SECTION("freqHiHz above Nyquist is invalid") {
+        cfg.sampleRate = 192000;       // lower-rate mic
+        cfg.freqHiHz   = 192000;       // forgot to lower the default
+        auto errors = validateConfig(cfg);
+        REQUIRE_FALSE(errors.empty());
+        CHECK(errors[0].find("exceeds Nyquist") != std::string::npos);
+    }
+}
+
 TEST_CASE("ConfigValidator: recording length invariants", "[config]") {
     Config cfg;
 

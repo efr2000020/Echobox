@@ -70,13 +70,12 @@ Recordings are saved into a `recordings` folder, organised into a sub-folder per
 
 ## Understanding the recording file names
 
-A saved file looks like this: `20260529_213544842_18ms.wav`
+A saved file looks like this: `20260529_213544842.wav`
 
 | Part         | Meaning                                                        |
 | ------------ | -------------------------------------------------------------- |
 | `20260529`   | Date — 29 May 2026                                             |
 | `213544842`  | Time — 21:35:44.842 (millisecond precision)                    |
-| `18ms`       | How long the recording lasted (18 milliseconds, end to end)    |
 
 ---
 
@@ -93,7 +92,7 @@ Run `./Echobox --help` to see the full list.
 | `--min-length-ms <n>` | Drop any recording shorter than this (`0` = off)          | `0`            |
 | `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `5000`  |
 | `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
-| `--freq-hi-hz <n>`    | Top of the frequency range to listen for (capped by the mic's 384 kHz sample rate) | `192000`       |
+| `--freq-hi-hz <n>`    | Top of the frequency range to listen for (cannot exceed Nyquist of your mic's `--sample-rate`) | `192000`       |
 | `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `12.0`         |
 
 Lengths above are end-to-end (pre-roll + detected activity + silence-after).
@@ -140,7 +139,7 @@ is the right level when chasing false positives, but it writes several hundred
 thousand lines per day — don't leave a long-running field unit on `debug`.
 
 - **Device errors** — Double-check the `--device` name with `arecord -l`.
-- **No recordings** — Ensure the mic supports 384 kHz and that ultrasonic activity is present.
+- **No recordings** — Ensure the mic actually captures the ultrasonic range you've configured (`--sample-rate` set to match, `--freq-hi-hz` no higher than its Nyquist) and that ultrasonic activity is present.
 - **Permission denied** — Add your user to the audio group: `sudo usermod -aG audio $USER`, then log out and back in.
 
 ---

@@ -28,6 +28,21 @@ std::optional<std::string> checkFrequencyWindow(const Config& cfg) {
     return std::nullopt;
 }
 
+// freqHiHz above Nyquist of the configured sampleRate would be silently
+// clamped by the detector; surface it here instead so the user catches a
+// mismatched mic/window combination at startup. Typical trigger: user
+// switches to a higher-rate mic but forgets to raise --freq-hi-hz, or
+// switches to a lower-rate mic without lowering it.
+std::optional<std::string> checkFrequencyAgainstNyquist(const Config& cfg) {
+    const int nyquist = cfg.sampleRate / 2;
+    if (cfg.freqHiHz > nyquist) {
+        return "--freq-hi-hz (" + std::to_string(cfg.freqHiHz)
+             + ") exceeds Nyquist of --sample-rate (" + std::to_string(cfg.sampleRate)
+             + " / 2 = " + std::to_string(nyquist) + ")";
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> checkLengthOrder(const Config& cfg) {
     if (cfg.maxLengthMs > 0 && cfg.minLengthMs > cfg.maxLengthMs) {
         return "--min-length-ms (" + std::to_string(cfg.minLengthMs)
@@ -65,6 +80,7 @@ std::vector<std::string> validateConfig(const Config& cfg) {
     // Add new invariants here. Order is only relevant for the order in which
     // they appear in the error report; every check runs regardless.
     run(checkFrequencyWindow(cfg));
+    run(checkFrequencyAgainstNyquist(cfg));
     run(checkLengthOrder(cfg));
     run(checkRecordingBudget(cfg));
 

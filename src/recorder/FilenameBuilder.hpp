@@ -6,7 +6,6 @@
 /// Canonical recording-filename layout used by the Recorder.
 
 #include <chrono>
-#include <cstdint>
 #include <filesystem>
 
 namespace echobox::recorder {
@@ -16,7 +15,7 @@ namespace echobox::recorder {
  *
  * Layout:
  * @code
- *   <output_dir>/YYYY-MM-DD/YYYYMMDD_HHMMSSsss_<duration_ms>ms.wav
+ *   <output_dir>/YYYY-MM-DD/YYYYMMDD_HHMMSSsss.wav
  * @endcode
  *
  * The time stem is a single fixed-width 9-digit field with millisecond
@@ -39,8 +38,7 @@ public:
     std::filesystem::path tempPath(std::chrono::system_clock::time_point start) const;
 
     /// Final path the recording is renamed to on close.
-    std::filesystem::path finalPath(std::chrono::system_clock::time_point start,
-                                    std::uint32_t durationMs) const;
+    std::filesystem::path finalPath(std::chrono::system_clock::time_point start) const;
 
 private:
     std::filesystem::path m_outputDir{"./recordings"};

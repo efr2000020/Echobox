@@ -34,7 +34,11 @@ struct Config {
     std::size_t     fftSize{4096};
     std::size_t     hopSize{512};
     int             freqLoHz{20000};
-    int             freqHiHz{192000};   // Nyquist of the 384 kHz Ultramic.
+    int             freqHiHz{192000};   // Default suits the 384 kHz Ultramic
+                                        // (=its Nyquist). For other mics, set
+                                        // --sample-rate and --freq-hi-hz
+                                        // together; ConfigValidator enforces
+                                        // freqHiHz <= sampleRate / 2.
     // SNR threshold used by the active detector to decide a frame is "hot".
     // Plumbed through to the tracker as the `band_snr_threshold` tunable. The
     // default below must track BandEnergyDetector's compiled default so a user

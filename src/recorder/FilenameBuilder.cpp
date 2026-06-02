@@ -50,12 +50,9 @@ fs::path FilenameBuilder::tempPath(std::chrono::system_clock::time_point start) 
     return m_outputDir / p.dateDir / name;
 }
 
-fs::path FilenameBuilder::finalPath(std::chrono::system_clock::time_point start,
-                                    std::uint32_t durationMs) const {
+fs::path FilenameBuilder::finalPath(std::chrono::system_clock::time_point start) const {
     Parts p = breakdown(start);
-    char tail[24];
-    std::snprintf(tail, sizeof(tail), "_%ums.wav", durationMs);
-    std::string name = std::string(p.timeStem) + tail;
+    std::string name = std::string(p.timeStem) + ".wav";
     return m_outputDir / p.dateDir / name;
 }
 

@@ -186,7 +186,7 @@ void Recorder::endRecording() {
         return;
     }
 
-    const auto finalPath = m_names.finalPath(m_eventStartWall, durationMs);
+    const auto finalPath = m_names.finalPath(m_eventStartWall);
     m_writer->closeAndRename(finalPath);
     m_writer.reset();
 
