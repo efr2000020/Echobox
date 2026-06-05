@@ -316,6 +316,26 @@ class OfflineModeWidget(QWidget):
         # draggable so the layout adapts to whatever the user values most.
         root = QVBoxLayout(self)
 
+        # Native-lib banner: visible only when libechobox_validator.so isn't
+        # loaded. Detection requires the lib, but the ALSA-loopback mode
+        # doesn't — so we tell the user what's broken AND that the other
+        # tab still works, with a Re-check button for after they build.
+        self.lib_banner = QWidget()
+        banner_layout = QHBoxLayout(self.lib_banner)
+        banner_layout.setContentsMargins(8, 6, 8, 6)
+        self.lib_banner.setStyleSheet(
+            "background-color: #4a2a1a; border: 1px solid #d35400;")
+        self.lib_banner_lbl = QLabel()
+        self.lib_banner_lbl.setWordWrap(True)
+        self.lib_banner_lbl.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        banner_layout.addWidget(self.lib_banner_lbl, stretch=1)
+        self.lib_banner_btn = QPushButton("Re-check")
+        self.lib_banner_btn.clicked.connect(self._on_recheck_lib)
+        banner_layout.addWidget(self.lib_banner_btn)
+        root.addWidget(self.lib_banner)
+        self._refresh_lib_banner()
+
         # Global action row: file picker + run button, always at the top.
         file_row = QHBoxLayout()
         self.btn_open = QPushButton("Open WAV…")
@@ -420,6 +440,29 @@ class OfflineModeWidget(QWidget):
 
         root.addWidget(main_split, stretch=1)
 
+    # -- lib-status banner -------------------------------------------------
+
+    def _refresh_lib_banner(self) -> None:
+        if native.is_available():
+            self.lib_banner.setVisible(False)
+            return
+        err = native.load_error() or "Unknown reason."
+        self.lib_banner_lbl.setText(
+            "<b style='color:#f39c12;'>Tuning unavailable:</b> "
+            "<span style='color:#ecf0f1;'>%s</span><br>"
+            "<span style='color:#bdc3c7;'>The ALSA Loopback (fake-mic) tab "
+            "still works — switch above. After building, click Re-check.</span>"
+            % err.replace("<", "&lt;"))
+        self.lib_banner.setVisible(True)
+
+    def _on_recheck_lib(self) -> None:
+        # User has presumably just run ./build_dev.sh; retry the load and
+        # rebuild the form against the (hopefully) now-available algorithms.
+        native.try_load()
+        self._refresh_lib_banner()
+        self._populate_algorithms()
+        self._refresh_run_button()
+
     # -- algorithm + form wiring ------------------------------------------
 
     def _populate_algorithms(self) -> None:
@@ -435,12 +478,23 @@ class OfflineModeWidget(QWidget):
             self.cmb_algorithm.addItems(algorithms)
             self.cmb_algorithm.setEnabled(len(algorithms) > 1)
         else:
-            self.cmb_algorithm.addItem("<none — run ./build_dev.sh "
-                                       "or set ECHOBOX_ALGORITHMS_DIR>")
+            # Distinguish "no .so" from "lib loaded but no plugins found" —
+            # the banner above already explains the former; this dropdown
+            # entry has to cover both cases concisely.
+            if native.is_available():
+                self.cmb_algorithm.addItem("<none — set ECHOBOX_ALGORITHMS_DIR "
+                                           "or rebuild plugins>")
+            else:
+                self.cmb_algorithm.addItem("<native lib not loaded>")
             self.cmb_algorithm.setEnabled(False)
         self.cmb_algorithm.blockSignals(False)
         if algorithms:
             self._rebuild_tunable_form(algorithms[0])
+        else:
+            # Wipe any stale form rows left over from a previous load attempt.
+            while self.params_form.rowCount() > 0:
+                self.params_form.removeRow(0)
+            self._tunable_widgets.clear()
 
     def _rebuild_tunable_form(self, algorithm: str) -> None:
         # Tear down any existing rows. takeRow removes both label + field.
@@ -660,13 +714,12 @@ class MainWindow(QMainWindow):
         mode_row.addWidget(QLabel("Mode:"))
         self.rb_offline = QRadioButton("Offline detection")
         self.rb_alsa    = QRadioButton("ALSA Loopback (fake-mic)")
-        
-        self.rb_offline.setChecked(True)
+
         grp = QButtonGroup(self)
         grp.addButton(self.rb_offline, 0)
         grp.addButton(self.rb_alsa,    1)
         grp.idClicked.connect(self._switch_mode)
-        
+
         mode_row.addWidget(self.rb_offline)
         mode_row.addWidget(self.rb_alsa)
         mode_row.addStretch(1)
@@ -676,15 +729,32 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.page_offline = OfflineModeWidget()
         self.page_alsa    = LoopbackModeWidget()
-        
+
         self.stack.addWidget(self.page_offline)
         self.stack.addWidget(self.page_alsa)
         root.addWidget(self.stack, stretch=1)
 
+        # Default tab: if the native lib failed to load, the Offline page is
+        # essentially dead — drop the user straight into ALSA Loopback so they
+        # land on something that works. The Offline radio is still clickable;
+        # its page carries its own banner explaining the situation + a
+        # Re-check button.
+        if native.is_available():
+            self.rb_offline.setChecked(True)
+            self.stack.setCurrentIndex(0)
+        else:
+            self.rb_alsa.setChecked(True)
+            self.stack.setCurrentIndex(1)
+
         # Status bar
         sb = QStatusBar()
         self.setStatusBar(sb)
-        sb.showMessage("Ready.")
+        if native.is_available():
+            sb.showMessage("Ready.")
+        else:
+            sb.showMessage(
+                "Tuning lib not loaded; ALSA Loopback still works. "
+                "See the Offline tab for details.")
 
     def _switch_mode(self, index: int) -> None:
         self.stack.setCurrentIndex(index)

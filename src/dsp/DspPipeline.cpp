@@ -7,6 +7,7 @@
 #include "DspPipeline.hpp"
 #include "TrackerRegistry.hpp"
 #include "logging/Logger.hpp"
+#include "recorder/Sidecar.hpp"   // TunableValue
 
 #include <algorithm>
 #include <chrono>
@@ -125,6 +126,34 @@ echobox::recorder::DetectorStateSnapshot DspPipeline::snapshot() const {
     unpackLoHi(p, s.loHz, s.hiHz);
     s.generation = m_generation.load(std::memory_order_acquire);
     return s;
+}
+
+bool DspPipeline::drainSidecarPayload(SidecarPayload& out) {
+    if (!m_tracker) return false;
+    return m_tracker->drainSidecarPayload(out);
+}
+
+bool DspPipeline::currentTunables(
+        std::vector<echobox::recorder::TunableValue>& out) const {
+    if (!m_tracker) return false;
+    out.clear();
+    const auto manifest = m_tracker->listTunables();
+    out.reserve(manifest.size());
+    for (const auto& t : manifest) {
+        if (!t.key) continue;
+        double v = 0.0;
+        if (!m_tracker->getTunable(t.key, &v)) continue;
+        echobox::recorder::TunableValue tv;
+        tv.key    = t.key;
+        tv.value  = v;
+        tv.is_int = (t.type == TunableType::Int);
+        out.push_back(std::move(tv));
+    }
+    return true;
+}
+
+std::string DspPipeline::algorithmName() const {
+    return m_cfg.algorithm;
 }
 
 void DspPipeline::loop() {

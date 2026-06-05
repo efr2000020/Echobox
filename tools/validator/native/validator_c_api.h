@@ -133,6 +133,20 @@ size_t eb_detector_list_presets(EbDetector*, EbPresetInfo* out_infos, size_t max
  * total number registered (may exceed `max`). */
 size_t eb_list_algorithms(const char** out_names, size_t max);
 
+/* --- Sidecar replay support ----------------------------------------------
+ *
+ * Seed the detector's internal noise-floor estimate before replay. The
+ * production binary writes a snapshot of this floor into the sidecar JSON
+ * at trigger time; feeding the same snapshot back through this entry point
+ * lets the offline validator reproduce on-device decisions on short
+ * recordings where the EMA would otherwise be cold-started from frame 0.
+ *
+ * `n_bins` must equal `fft_size/2 + 1` for the detector's configured FFT
+ * size — mismatch returns false rather than a silent partial copy.
+ * Algorithms that don't model a per-bin noise floor return false too.
+ */
+bool eb_detector_set_floor(EbDetector*, const float* floor, size_t n_bins);
+
 #ifdef __cplusplus
 }
 #endif

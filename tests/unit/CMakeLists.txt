@@ -8,6 +8,7 @@ add_executable(unit_tests
     test_BiquadFilter.cpp
     test_PreRollBuffer.cpp
     test_LogQueue.cpp
+    test_Sidecar.cpp
 )
 
 target_link_libraries(unit_tests
@@ -17,6 +18,7 @@ target_link_libraries(unit_tests
         ls_app
         ls_recorder
         ls_logging
+        BandEnergyDetector
 )
 
 include(Catch)

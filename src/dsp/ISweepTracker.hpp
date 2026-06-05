@@ -11,6 +11,7 @@
 #include <span>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 // Stable, pre-existing detection event record. Emitted when a hot region closes.
 #pragma pack(push, 1)
@@ -21,6 +22,43 @@ struct Annotation {
     float low_freq;
 };
 #pragma pack(pop)
+
+// Per-event diagnostic features captured at the moment a hot region opens
+// (trigger_snr / trigger_flatness / band_index) and finalised at close
+// (end_frame / peak_snr / duration_frames). Mirrors the fields the detector
+// already logs via LS_INFO at event start/end, but as structured data that
+// the recorder can serialise into a sidecar without parsing log lines.
+//
+// Plain old data, layout-compatible with the C side (validator_c_api.h).
+struct EventFeatures {
+    uint32_t start_frame;
+    uint32_t end_frame;
+    uint16_t duration_frames;
+    int16_t  band_index;        // 1-based; -1 if not applicable
+    float    trigger_snr;
+    float    trigger_flatness;
+    float    peak_snr;
+    float    lo_hz;
+    float    hi_hz;
+};
+
+// Bundle of state the recorder drains from the tracker when a WAV closes,
+// for emission as a JSON sidecar next to the WAV. The sidecar lets the
+// offline validator reproduce on-device decisions even on very short
+// recordings, where its EMA noise floor would otherwise be cold-started
+// from the first frame.
+//
+// `noise_floor_at_first_event` is a snapshot of the per-bin noise floor
+// taken at the moment of the FIRST event opened since the last drain;
+// it has `fftSize/2 + 1` entries (or is empty if no event fired). The
+// recorder/validator round-trip seeds a fresh detector with this vector
+// before replaying the WAV.
+struct SidecarPayload {
+    std::vector<EventFeatures> events;
+    std::vector<float>         noise_floor_at_first_event;
+    std::uint64_t              events_total_since_boot{0};
+    std::uint64_t              frames_processed_since_boot{0};
+};
 
 // EXPERIMENTAL: presets are a coarse, end-user-facing alternative to the
 // fine-grained tunable manifest. Each algorithm owns the *meaning* of its
@@ -169,6 +207,50 @@ public:
      * contract.
      */
     virtual std::span<const PresetInfo> listPresets() const { return {}; }
+
+    /**
+     * Drain all completed event features + the noise-floor snapshot since
+     * the last call into @p out. Used by the recorder to assemble a sidecar
+     * JSON next to each saved WAV, so the offline validator can reproduce
+     * on-device decisions without depending on the WAV being long enough
+     * for its EMA floor to converge from scratch.
+     *
+     * Semantics:
+     *  - `out.events` is filled with every event whose annotation has been
+     *    emitted since the previous drain (in order).
+     *  - `out.noise_floor_at_first_event` is the per-bin floor snapshotted
+     *    at the moment of the FIRST event since the previous drain. Empty
+     *    if no event fired in that window.
+     *  - `out.events_total_since_boot` / `frames_processed_since_boot` are
+     *    monotonic counters for context.
+     *  - State is cleared after the drain.
+     *
+     * Default impl is a no-op returning false, so non-instrumented plugins
+     * keep compiling and the recorder treats them as "no sidecar data
+     * available" — it will just skip writing one.
+     */
+    virtual bool drainSidecarPayload(SidecarPayload& /*out*/) { return false; }
+
+    /**
+     * Seed the per-bin noise floor estimate. Used by the offline validator
+     * to bypass the EMA's cold-start convergence period on short clips,
+     * by feeding in a snapshot the device captured at trigger time.
+     *
+     * @param floor  Span of `fftSize/2 + 1` float values matching the
+     *               algorithm's configured FFT size. Implementations that
+     *               don't model a noise floor should leave the default
+     *               (return false).
+     * @return true if seeded, false on size mismatch or unsupported.
+     */
+    virtual bool seedNoiseFloor(std::span<const float> /*floor*/) { return false; }
+
+    /**
+     * Read back the algorithm's monotonic event counter (events triggered
+     * since this plugin instance was constructed). Recorder logs this for
+     * sidecar context; validator uses it to spot-check reproducibility.
+     * Default returns 0 for plugins that don't track it.
+     */
+    virtual std::uint64_t totalEventsSinceBoot() const { return 0; }
 };
 
 // --- Plugin entry points (resolved via dlsym by TrackerRegistry) ---

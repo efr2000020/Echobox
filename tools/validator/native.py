@@ -96,53 +96,125 @@ def _default_algorithms_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "deploy" / "bin" / "algorithms"
 
 
-_lib = C.CDLL(str(_find_lib()))
+_lib: Optional[C.CDLL] = None
+_lib_load_error: Optional[str] = None
 
-_lib.eb_init.restype  = C.c_size_t
-_lib.eb_init.argtypes = [C.c_char_p]
-
-_lib.eb_stft.restype  = C.c_size_t
-_lib.eb_stft.argtypes = [C.c_int, C.c_size_t, C.c_size_t, C.c_float,
-                         C.POINTER(C.c_float), C.c_size_t,
-                         C.POINTER(C.c_float), C.c_size_t]
-
-_lib.eb_detector_create.restype  = C.c_void_p
-_lib.eb_detector_create.argtypes = [C.c_char_p, C.c_int, C.c_size_t,
-                                    C.c_float, C.c_float]
-
-_lib.eb_detector_destroy.argtypes = [C.c_void_p]
-
-_lib.eb_detector_process_frame.restype  = C.c_bool
-_lib.eb_detector_process_frame.argtypes = [
-    C.c_void_p, C.POINTER(C.c_float), C.c_size_t, C.c_uint32,
-    C.POINTER(_DetectorState), C.POINTER(_Annotation)]
-
-_lib.eb_detector_set_tunable.restype  = C.c_bool
-_lib.eb_detector_set_tunable.argtypes = [C.c_void_p, C.c_char_p, C.c_double]
-
-_lib.eb_detector_get_tunable.restype  = C.c_bool
-_lib.eb_detector_get_tunable.argtypes = [C.c_void_p, C.c_char_p,
-                                         C.POINTER(C.c_double)]
-
-_lib.eb_detector_list_tunables.restype  = C.c_size_t
-_lib.eb_detector_list_tunables.argtypes = [C.c_void_p,
-                                           C.POINTER(_TunableInfo), C.c_size_t]
-
-_lib.eb_detector_apply_preset.restype  = C.c_bool
-_lib.eb_detector_apply_preset.argtypes = [C.c_void_p, C.c_char_p]
-
-_lib.eb_detector_list_presets.restype  = C.c_size_t
-_lib.eb_detector_list_presets.argtypes = [C.c_void_p,
-                                          C.POINTER(_PresetInfo), C.c_size_t]
-
-_lib.eb_list_algorithms.restype  = C.c_size_t
-_lib.eb_list_algorithms.argtypes = [C.POINTER(C.c_char_p), C.c_size_t]
-
-
-# Scan plugins once at import. eb_init is idempotent, so re-importing or
-# calling list_algorithms() many times is harmless.
+# Resolved at import time but inert until try_load() actually loads the lib.
+# Used by list_algorithms() / status messages even when the .so is missing.
 _ALGORITHMS_DIR = _default_algorithms_dir()
-_lib.eb_init(str(_ALGORITHMS_DIR).encode("utf-8") if _ALGORITHMS_DIR.exists() else None)
+
+
+def _configure_signatures(lib: C.CDLL) -> None:
+    """Apply all ctypes restype/argtypes to a freshly loaded lib handle."""
+    lib.eb_init.restype  = C.c_size_t
+    lib.eb_init.argtypes = [C.c_char_p]
+
+    lib.eb_stft.restype  = C.c_size_t
+    lib.eb_stft.argtypes = [C.c_int, C.c_size_t, C.c_size_t, C.c_float,
+                            C.POINTER(C.c_float), C.c_size_t,
+                            C.POINTER(C.c_float), C.c_size_t]
+
+    lib.eb_detector_create.restype  = C.c_void_p
+    lib.eb_detector_create.argtypes = [C.c_char_p, C.c_int, C.c_size_t,
+                                       C.c_float, C.c_float]
+
+    lib.eb_detector_destroy.argtypes = [C.c_void_p]
+
+    lib.eb_detector_process_frame.restype  = C.c_bool
+    lib.eb_detector_process_frame.argtypes = [
+        C.c_void_p, C.POINTER(C.c_float), C.c_size_t, C.c_uint32,
+        C.POINTER(_DetectorState), C.POINTER(_Annotation)]
+
+    lib.eb_detector_set_tunable.restype  = C.c_bool
+    lib.eb_detector_set_tunable.argtypes = [C.c_void_p, C.c_char_p, C.c_double]
+
+    lib.eb_detector_get_tunable.restype  = C.c_bool
+    lib.eb_detector_get_tunable.argtypes = [C.c_void_p, C.c_char_p,
+                                            C.POINTER(C.c_double)]
+
+    lib.eb_detector_list_tunables.restype  = C.c_size_t
+    lib.eb_detector_list_tunables.argtypes = [C.c_void_p,
+                                              C.POINTER(_TunableInfo), C.c_size_t]
+
+    lib.eb_detector_apply_preset.restype  = C.c_bool
+    lib.eb_detector_apply_preset.argtypes = [C.c_void_p, C.c_char_p]
+
+    lib.eb_detector_list_presets.restype  = C.c_size_t
+    lib.eb_detector_list_presets.argtypes = [C.c_void_p,
+                                             C.POINTER(_PresetInfo), C.c_size_t]
+
+    lib.eb_list_algorithms.restype  = C.c_size_t
+    lib.eb_list_algorithms.argtypes = [C.POINTER(C.c_char_p), C.c_size_t]
+
+    lib.eb_detector_set_floor.restype  = C.c_bool
+    lib.eb_detector_set_floor.argtypes = [C.c_void_p, C.POINTER(C.c_float), C.c_size_t]
+
+
+def try_load() -> bool:
+    """Attempt to load (or re-load) the validator C library.
+
+    Returns True if the lib is now available, False otherwise. Idempotent on
+    success. Stores the failure reason in :func:`load_error` so the GUI can
+    surface it in its "tuning unavailable" banner.
+
+    Made public so a "Re-check" button can retry after the user runs
+    ``./build_dev.sh`` without restarting the validator.
+    """
+    global _lib, _lib_load_error
+    if _lib is not None:
+        return True
+    try:
+        path = _find_lib()
+    except FileNotFoundError as e:
+        _lib_load_error = str(e)
+        return False
+    try:
+        lib = C.CDLL(str(path))
+    except OSError as e:
+        _lib_load_error = "Failed to load %s: %s" % (path, e)
+        return False
+    _configure_signatures(lib)
+    # Scan plugins now that signatures are wired up. eb_init is idempotent.
+    lib.eb_init(str(_ALGORITHMS_DIR).encode("utf-8")
+                if _ALGORITHMS_DIR.exists() else None)
+    _lib = lib
+    _lib_load_error = None
+    return True
+
+
+def is_available() -> bool:
+    """True iff the validator C library is loaded and usable."""
+    return _lib is not None
+
+
+def load_error() -> Optional[str]:
+    """Last load-failure message, or None if the lib is loaded.
+
+    Stays meaningful after a successful retry as well — set back to None on
+    success so callers can use it as a "currently broken?" signal.
+    """
+    return _lib_load_error
+
+
+def _require_lib() -> None:
+    """Raise a clear RuntimeError if anything tries to use the lib unloaded.
+
+    Functions that DON'T need the lib for a useful answer (notably
+    :func:`list_algorithms`, which can trivially return ``[]``) handle the
+    missing-lib case themselves; this helper is for entry points that
+    genuinely cannot proceed without the native side.
+    """
+    if _lib is None:
+        raise RuntimeError(
+            "Echobox validator native library not loaded. "
+            + (_lib_load_error or
+               "Build it with ./build_dev.sh (needs ECHOBOX_DYNAMIC_PLUGINS=ON)."))
+
+
+# Best-effort load at import. Failure is non-fatal so consumers that only
+# need the ALSA-loopback / fake-mic side (which doesn't touch the .so) can
+# still use the validator without first building the native lib.
+try_load()
 
 
 # --- public API -------------------------------------------------------------
@@ -169,6 +241,7 @@ def stft(samples: np.ndarray, sample_rate: int, *,
     len(samples) // hop, matching the production runtime exactly (including
     the implicit zero-padded warmup on early frames).
     """
+    _require_lib()
     samples = np.ascontiguousarray(samples, dtype=np.float32)
     n = len(samples)
     bins = nfft // 2 + 1
@@ -185,7 +258,14 @@ def stft(samples: np.ndarray, sample_rate: int, *,
 
 
 def list_algorithms() -> List[str]:
-    """Names of every algorithm plugin discovered at import time."""
+    """Names of every algorithm plugin discovered at import time.
+
+    Returns an empty list — not an error — when the native lib hasn't loaded,
+    so the GUI can show a clean "no algorithms" state and still expose the
+    ALSA-loopback / fake-mic mode (which doesn't need the lib).
+    """
+    if _lib is None:
+        return []
     cap = 32
     arr = (C.c_char_p * cap)()
     n = _lib.eb_list_algorithms(arr, cap)
@@ -305,6 +385,7 @@ class Detector:
     """
 
     def __init__(self, config: DetectorConfig):
+        _require_lib()
         algorithm = _resolve_algorithm(config.algorithm)
         self.cfg = config if config.algorithm else replace(config, algorithm=algorithm)
         self.algorithm = algorithm
@@ -404,6 +485,24 @@ class Detector:
             if det is not None:
                 out.append(det)
         return out
+
+    def set_noise_floor(self, floor: np.ndarray) -> bool:
+        """Seed the detector's per-bin noise floor before replay.
+
+        The production binary writes a snapshot of this floor into each
+        sidecar JSON at trigger time; feeding it back lets us reproduce
+        on-device decisions on short recordings where the EMA would
+        otherwise be cold-started from frame 0.
+
+        Length must equal fft_size/2 + 1 for the configured FFT size.
+        Returns False on size mismatch or if the algorithm doesn't model
+        a floor.
+        """
+        arr = np.ascontiguousarray(floor, dtype=np.float32)
+        return bool(_lib.eb_detector_set_floor(
+            self._h,
+            arr.ctypes.data_as(C.POINTER(C.c_float)),
+            len(arr)))
 
 
 def list_tunables(algorithm: Optional[str] = None,

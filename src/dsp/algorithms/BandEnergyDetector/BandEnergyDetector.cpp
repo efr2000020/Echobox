@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <mutex>
 
 constexpr float BandEnergyDetector::BAND_EDGES_HZ[];
 
@@ -76,6 +78,17 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     m_maxBandSnrInHeartbeat = 0.0f;
     m_peakBandInHeartbeat   = -1;
 
+    // Reset sidecar diagnostic state — configure() may be called on a fresh
+    // stream, and we don't want stale pending events bleeding through.
+    {
+        std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+        m_pendingEvents.clear();
+        m_floorSnapshotAtFirstEvent.clear();
+        m_inProgressEvent          = EventFeatures{};
+        m_framesProcessedSinceBoot = 0;
+        // m_eventsTotalSinceBoot is a lifetime counter; keep across reconfigures.
+    }
+
     LS_INFO("dsp.bed", "configured: sr=%d fft=%zu res=%.1fHz bands=%zu window=%.0f-%.0fHz",
             sampleRate, fftSize, m_binResolution, m_bands.size(), userLo, userHi);
 }
@@ -86,6 +99,7 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                                       Annotation& outAnnotation) {
     ++m_frameCount;
     ++m_warmupFrames;
+    ++m_framesProcessedSinceBoot;
 
     if (m_noiseFloor.size() != magnitudes.size()) {
         m_noiseFloor.assign(magnitudes.size(), 0.0f);
@@ -199,11 +213,40 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             // to be a false positive — they tell you which gate let it past.
             LS_INFO("dsp.bed", "event start frame=%u snr=%.2f band=%d flatness=%.3f",
                     m_eventStart, bestBandSnr, bestBand + 1, flatness);
+
+            // Stage this event's diagnostics for the recorder/sidecar. If
+            // this is the first event since the last drain, also snapshot
+            // the per-bin noise floor — the offline validator seeds from it
+            // to reproduce on-device decisions on recordings too short for
+            // cold-start convergence.
+            {
+                std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+                m_inProgressEvent = EventFeatures{};
+                m_inProgressEvent.start_frame      = m_eventStart;
+                m_inProgressEvent.band_index       = static_cast<std::int16_t>(bestBand + 1);
+                m_inProgressEvent.trigger_snr      = bestBandSnr;
+                m_inProgressEvent.trigger_flatness = flatness;
+                m_inProgressEvent.peak_snr         = bestBandSnr;
+                m_inProgressEvent.lo_hz            = bandLoHz;
+                m_inProgressEvent.hi_hz            = bandHiHz;
+                if (m_floorSnapshotAtFirstEvent.empty() && m_pendingEvents.empty()) {
+                    m_floorSnapshotAtFirstEvent.assign(
+                        m_noiseFloor.begin(), m_noiseFloor.end());
+                }
+                ++m_eventsTotalSinceBoot;
+            }
         }
         if (m_inEvent) {
             m_eventLoHz    = std::min(m_eventLoHz, bandLoHz);
             m_eventHiHz    = std::max(m_eventHiHz, bandHiHz);
             m_eventPeakSnr = std::max(m_eventPeakSnr, bestBandSnr);
+            // Keep the in-progress event's union span + peak SNR in sync so
+            // an early drain (e.g. recorder closes the WAV before this event
+            // closes) sees consistent intermediate values.
+            std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+            m_inProgressEvent.lo_hz    = std::min(m_inProgressEvent.lo_hz, bandLoHz);
+            m_inProgressEvent.hi_hz    = std::max(m_inProgressEvent.hi_hz, bandHiHz);
+            m_inProgressEvent.peak_snr = std::max(m_inProgressEvent.peak_snr, bestBandSnr);
         }
     } else {
         if (m_inEvent) {
@@ -218,6 +261,21 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                         m_eventStart, outAnnotation.end_frame,
                         m_eventLoHz / 1000.0f, m_eventHiHz / 1000.0f,
                         m_eventPeakSnr);
+
+                // Finalise and stash this event's diagnostics for the next
+                // drainSidecarPayload() call.
+                {
+                    std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+                    m_inProgressEvent.end_frame       = outAnnotation.end_frame;
+                    m_inProgressEvent.duration_frames = static_cast<std::uint16_t>(
+                        std::min<std::uint32_t>(
+                            outAnnotation.end_frame - m_eventStart + 1u,
+                            std::numeric_limits<std::uint16_t>::max()));
+                    m_inProgressEvent.lo_hz    = m_eventLoHz;
+                    m_inProgressEvent.hi_hz    = m_eventHiHz;
+                    m_inProgressEvent.peak_snr = m_eventPeakSnr;
+                    m_pendingEvents.push_back(m_inProgressEvent);
+                }
 
                 m_inEvent          = false;
                 m_activeRun        = 0;
@@ -368,6 +426,46 @@ bool BandEnergyDetector::applyPreset(const char* name) {
 std::span<const PresetInfo> BandEnergyDetector::listPresets() const {
     return std::span<const PresetInfo>(kPresets,
                                        sizeof(kPresets) / sizeof(kPresets[0]));
+}
+
+// --- Sidecar diagnostics --------------------------------------------------
+//
+// drain* / seed* / counter accessors used by the Recorder (and the validator's
+// replay path through the C API). All synchronization happens under one
+// mutex; contention is effectively nil because drain runs at WAV-close cadence
+// and the producer only touches the mutex on event-open / event-end.
+
+bool BandEnergyDetector::drainSidecarPayload(SidecarPayload& out) {
+    std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+    out.events.assign(m_pendingEvents.begin(), m_pendingEvents.end());
+    out.noise_floor_at_first_event.assign(m_floorSnapshotAtFirstEvent.begin(),
+                                          m_floorSnapshotAtFirstEvent.end());
+    out.events_total_since_boot        = m_eventsTotalSinceBoot;
+    out.frames_processed_since_boot    = m_framesProcessedSinceBoot;
+    m_pendingEvents.clear();
+    m_floorSnapshotAtFirstEvent.clear();
+    return true;
+}
+
+bool BandEnergyDetector::seedNoiseFloor(std::span<const float> floor) {
+    if (floor.empty()) return false;
+    // The validator constructs a detector with the same fft_size the device
+    // captured under, so the bin counts must match. Mismatch is a hard error
+    // rather than a silent partial copy — replay results would be wrong.
+    if (m_noiseFloor.size() != floor.size()) return false;
+    for (std::size_t i = 0; i < floor.size(); ++i) {
+        m_noiseFloor[i] = floor[i];
+    }
+    m_floorSeeded = true;
+    // Skip the EMA warmup gate too — the seed is precisely the converged
+    // state we'd otherwise be waiting for.
+    m_warmupFrames = m_warmupFramesLimit;
+    return true;
+}
+
+std::uint64_t BandEnergyDetector::totalEventsSinceBoot() const {
+    std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+    return m_eventsTotalSinceBoot;
 }
 
 // --- Plugin entry points (resolved by TrackerRegistry via dlsym) ---

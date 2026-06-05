@@ -7,6 +7,7 @@
 /// production builds; loadable as a plugin on dev builds.
 
 #include "../../ISweepTracker.hpp"  // src/dsp/algorithms/BandEnergyDetector/ -> src/dsp/
+#include <mutex>
 #include <span>
 #include <cstdint>
 #include <vector>
@@ -52,6 +53,10 @@ public:
     std::span<const TunableInfo> listTunables() const override;
     bool applyPreset(const char* name) override;
     std::span<const PresetInfo>  listPresets()  const override;
+
+    bool          drainSidecarPayload(SidecarPayload& out) override;
+    bool          seedNoiseFloor(std::span<const float> floor) override;
+    std::uint64_t totalEventsSinceBoot() const override;
 
 private:
     int         m_sampleRate;
@@ -123,4 +128,19 @@ private:
     int   m_warmupFramesLimit = 40;
     int   m_minActiveFrames   = 2;
     int   m_hangoverFrames    = 8;
+
+    // --- Sidecar diagnostics (mutex-protected, off the audio hot loop) ---
+    // The mutex is held briefly twice per event (once on open to stage trigger
+    // features + floor snapshot, once on close to push the completed
+    // EventFeatures) and once per WAV at recorder close time. Contention is
+    // effectively zero; lock cost is dwarfed by the per-frame FFT work.
+    mutable std::mutex          m_diagnosticsMutex;
+    EventFeatures               m_inProgressEvent{};
+    std::vector<EventFeatures>  m_pendingEvents;
+    // Snapshot of m_noiseFloor taken at the open of the FIRST event since the
+    // last drain. Empty between drain and the next event-open. The recorder
+    // drains both the events vector and this snapshot atomically.
+    std::vector<float>          m_floorSnapshotAtFirstEvent;
+    std::uint64_t               m_eventsTotalSinceBoot{0};
+    std::uint64_t               m_framesProcessedSinceBoot{0};
 };

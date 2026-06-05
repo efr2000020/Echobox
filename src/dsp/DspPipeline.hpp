@@ -119,6 +119,17 @@ public:
      */
     echobox::recorder::DetectorStateSnapshot snapshot() const override;
 
+    // Sidecar diagnostics. These forward to the loaded tracker; safe to call
+    // off the audio hot loop. drainSidecarPayload() and currentTunables()
+    // take the tracker's internal lock briefly; the rest are pure accessors.
+    bool        drainSidecarPayload(SidecarPayload& out) override;
+    bool        currentTunables(std::vector<echobox::recorder::TunableValue>& out) const override;
+    std::string algorithmName() const override;
+    std::size_t fftSize()  const override { return m_cfg.fftSize; }
+    std::size_t hopSize()  const override { return m_cfg.hopSize; }
+    float       freqLoHz() const override { return m_cfg.freqLoHz; }
+    float       freqHiHz() const override { return m_cfg.freqHiHz; }
+
 private:
     void loop();
     void publish(bool active, float loHz, float hiHz);

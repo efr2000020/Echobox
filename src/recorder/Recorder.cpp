@@ -6,6 +6,7 @@
 /// holds the temporal state machine that drives the open/append/close cycle.
 
 #include "Recorder.hpp"
+#include "Sidecar.hpp"
 #include "WavWriter.hpp"
 #include "logging/Logger.hpp"
 
@@ -13,8 +14,12 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
+#include <ctime>
 #include <limits>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace echobox::recorder {
 
@@ -24,11 +29,34 @@ constexpr std::size_t kDrainChunkSamples = 4096;
 std::uint64_t framesForMs(std::uint32_t ms, int sampleRate) {
     return static_cast<std::uint64_t>(ms) * static_cast<std::uint64_t>(sampleRate) / 1000ULL;
 }
+
+// UTC ISO-8601 with millisecond precision. Matches the log timestamp format
+// so a sidecar's capture_ts and a [dsp.bed] log line can be cross-correlated
+// by exact string match.
+std::string formatIso8601Utc(std::chrono::system_clock::time_point tp) {
+    using namespace std::chrono;
+    const auto secs   = time_point_cast<seconds>(tp);
+    const auto millis = duration_cast<milliseconds>(tp - secs).count();
+    const std::time_t t = system_clock::to_time_t(secs);
+    std::tm utc{};
+#ifdef _WIN32
+    gmtime_s(&utc, &t);
+#else
+    gmtime_r(&t, &utc);
+#endif
+    char buf[40];
+    std::snprintf(buf, sizeof(buf),
+                  "%04d-%02d-%02dT%02d:%02d:%02d.%03lldZ",
+                  utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday,
+                  utc.tm_hour, utc.tm_min, utc.tm_sec,
+                  static_cast<long long>(millis));
+    return buf;
+}
 } // namespace
 
 Recorder::Recorder(RecorderConfig cfg,
                    const PreRollBuffer& preRoll,
-                   const IDetectorStateProvider& detector)
+                   IDetectorStateProvider& detector)
     : m_cfg(std::move(cfg)),
       m_preRoll(preRoll),
       m_detector(detector),
@@ -112,6 +140,15 @@ void Recorder::beginRecording(const DetectorStateSnapshot& s) {
     const std::size_t preRollSamples =
         static_cast<std::size_t>(m_cfg.preRollMs) * m_cfg.sampleRate / 1000u;
     m_cursor = m_preRoll.openCursor(preRollSamples);
+
+    // Discard any sidecar events that accumulated between recordings —
+    // they belong to past WAVs (or none at all, if the detector triggered
+    // briefly without crossing the recorder's gate). The detector will
+    // snapshot a fresh noise floor on the FIRST event of THIS recording.
+    if (m_cfg.writeSidecar) {
+        SidecarPayload stale;
+        m_detector.drainSidecarPayload(stale);
+    }
 
     // Distinctive prefix so an operator can `grep RECORDING_ logs/*` to walk
     // every saved file's lifecycle, and the filename is the obvious anchor.
@@ -200,6 +237,40 @@ void Recorder::endRecording() {
             static_cast<unsigned long long>(frames), durationMs,
             static_cast<long long>(elapsedMs),
             loHz / 1000.0f, hiHz / 1000.0f);
+
+    // Sidecar: per-event diagnostics + noise-floor snapshot, written
+    // alongside the WAV so the offline tuning tools have everything they
+    // need to reproduce the device's decision on a cold-started replay.
+    // Skip if the detector exposes no diagnostics (older plugins) or the
+    // operator turned it off via RecorderConfig.
+    if (m_cfg.writeSidecar) {
+        SidecarPayload payload;
+        if (m_detector.drainSidecarPayload(payload)) {
+            SidecarRecording meta;
+            meta.wav_path        = finalPath.filename().string();
+            meta.sample_rate     = m_cfg.sampleRate;
+            meta.fft_size        = m_detector.fftSize();
+            meta.hop_size        = m_detector.hopSize();
+            meta.freq_lo_hz      = m_detector.freqLoHz();
+            meta.freq_hi_hz      = m_detector.freqHiHz();
+            meta.preroll_ms      = m_cfg.preRollMs;
+            meta.silence_ms      = m_cfg.silenceMs;
+            meta.algorithm       = m_detector.algorithmName();
+            meta.boot_iso8601    = formatIso8601Utc(m_cfg.bootWall);
+            meta.capture_iso8601 = formatIso8601Utc(m_eventStartWall);
+
+            std::vector<TunableValue> tunables;
+            m_detector.currentTunables(tunables);
+
+            if (!writeSidecar(finalPath, meta, tunables, payload)) {
+                // Sidecar write failure is non-fatal: the WAV is already
+                // safely on disk. Log loud so a missing sidecar can be
+                // root-caused without re-running the test.
+                LS_WARN("recorder", "sidecar write failed for %s",
+                        finalPath.filename().string().c_str());
+            }
+        }
+    }
 
     m_state = State::Idle;
 }

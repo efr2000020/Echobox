@@ -6,6 +6,7 @@ add_library(ls_recorder STATIC
     WavWriter.cpp
     FilenameBuilder.cpp
     Recorder.cpp
+    Sidecar.cpp
 )
 target_include_directories(ls_recorder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_include_directories(ls_recorder PRIVATE ${SNDFILE_INCLUDE_DIRS})

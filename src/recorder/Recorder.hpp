@@ -11,6 +11,7 @@
 #include "PreRollBuffer.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -43,6 +44,16 @@ struct RecorderConfig {
     std::uint32_t         maxLengthMs{50};
     /// How often the recorder polls the detector state, in ms.
     std::uint32_t         pollIntervalMs{5};
+    /// Wall-clock instant the device booted. Stamped into every sidecar
+    /// alongside the per-recording capture timestamp; lets the offline
+    /// tuning tools reason about uptime and event-rate windows. Defaults
+    /// to "now" if the caller doesn't override it.
+    std::chrono::system_clock::time_point bootWall{std::chrono::system_clock::now()};
+    /// Emit a JSON sidecar next to each saved WAV. Always-on by default —
+    /// the per-file cost is ~10 KB of disk; the analytical value at the
+    /// next tuning session is large. Set to false to suppress (e.g. tests
+    /// that exercise only the recording path).
+    bool                  writeSidecar{true};
 };
 
 /**
@@ -68,7 +79,7 @@ public:
      */
     Recorder(RecorderConfig cfg,
              const PreRollBuffer& preRoll,
-             const IDetectorStateProvider& detector);
+             IDetectorStateProvider& detector);
     ~Recorder();
 
     Recorder(const Recorder&)            = delete;
@@ -91,7 +102,7 @@ private:
 
     RecorderConfig                m_cfg;
     const PreRollBuffer&          m_preRoll;
-    const IDetectorStateProvider& m_detector;
+    IDetectorStateProvider&       m_detector;
 
     FilenameBuilder               m_names;
     std::atomic<bool>             m_running{false};

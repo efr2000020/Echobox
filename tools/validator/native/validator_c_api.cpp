@@ -164,6 +164,11 @@ extern "C" size_t eb_detector_list_presets(EbDetector* d, EbPresetInfo* out_info
     return src.size();
 }
 
+extern "C" bool eb_detector_set_floor(EbDetector* d, const float* floor, size_t n_bins) {
+    if (!d || !floor || n_bins == 0) return false;
+    return d->tracker->seedNoiseFloor(std::span<const float>(floor, n_bins));
+}
+
 extern "C" size_t eb_list_algorithms(const char** out_names, size_t max) {
     // Stash the names in a process-lifetime cache so the returned pointers
     // stay valid for the caller (vector<string> would dangle on resize).

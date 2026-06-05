@@ -35,6 +35,7 @@ import numpy as np
 from . import alsa_stream
 from . import evaluation as ev
 from . import native
+from . import sidecar as sc
 from .dsp import HOP, NFFT, load_wav_float
 
 
@@ -77,18 +78,67 @@ def _coerce_static(key: str, val: str):
     return val
 
 
-def _detector_from_args(args, sample_rate: int) -> native.Detector:
+def _detector_from_args(args, sample_rate: int,
+                        sidecar_obj: "sc.Sidecar | None" = None) -> native.Detector:
+    """Build a Detector from CLI args, optionally pre-seeded from a sidecar.
+
+    Sidecar precedence: the sidecar provides the algorithm name, tunables,
+    and noise-floor snapshot the device was running under. CLI ``--set``
+    overrides still win on top, so you can use the sidecar as a baseline
+    and then sweep one knob.
+    """
+    base_algorithm = getattr(args, "algorithm", None)
+    base_lo = getattr(args, "freq_lo_hz", None)
+    base_hi = getattr(args, "freq_hi_hz", None)
+    base_tunables: Dict[str, float] = {}
+
+    if sidecar_obj is not None:
+        if not base_algorithm:
+            base_algorithm = sidecar_obj.algorithm or base_algorithm
+        if base_lo is None and sidecar_obj.freq_lo_hz:
+            base_lo = sidecar_obj.freq_lo_hz
+        if base_hi is None and sidecar_obj.freq_hi_hz:
+            base_hi = sidecar_obj.freq_hi_hz
+        base_tunables.update(sidecar_obj.tunables)
+
     cfg = native.DetectorConfig(
-        algorithm=getattr(args, "algorithm", None),
+        algorithm=base_algorithm,
         sample_rate=sample_rate,
-        sensitivity=getattr(args, "sensitivity", None))
-    if getattr(args, "freq_lo_hz", None) is not None:
-        cfg = dataclasses.replace(cfg, freq_lo_hz=float(args.freq_lo_hz))
-    if getattr(args, "freq_hi_hz", None) is not None:
-        cfg = dataclasses.replace(cfg, freq_hi_hz=float(args.freq_hi_hz))
+        sensitivity=getattr(args, "sensitivity", None),
+        tunables=base_tunables)
+    if base_lo is not None:
+        cfg = dataclasses.replace(cfg, freq_lo_hz=float(base_lo))
+    if base_hi is not None:
+        cfg = dataclasses.replace(cfg, freq_hi_hz=float(base_hi))
     if getattr(args, "set", None):
         cfg = _apply_set_overrides(cfg, args.set)
-    return native.Detector(cfg)
+    det = native.Detector(cfg)
+
+    if sidecar_obj is not None and sidecar_obj.noise_floor is not None:
+        if not det.set_noise_floor(sidecar_obj.noise_floor):
+            sys.exit("error: failed to seed noise floor from sidecar "
+                     "(algorithm '%s' may not expose a floor, or fft_size "
+                     "mismatch)." % det.algorithm)
+    return det
+
+
+def _maybe_load_sidecar(args, wav_path: str) -> "sc.Sidecar | None":
+    """Resolve --from-sidecar / --from-sidecars to a single Sidecar for this WAV.
+
+    - --from-sidecar PATH: use PATH literally (one sidecar applies to one WAV).
+    - --from-sidecars: look for <wav_path>.json next to each WAV. Skipped
+      gracefully if the sidecar doesn't exist — useful when running over a
+      mixed corpus where only some WAVs were produced by the instrumented
+      build.
+    """
+    explicit = getattr(args, "from_sidecar", None)
+    if explicit:
+        return sc.load(explicit)
+    if getattr(args, "from_sidecars", False):
+        candidate = Path(wav_path).with_suffix(".json")
+        if candidate.exists():
+            return sc.load(candidate)
+    return None
 
 
 def _load_and_stft(path: str):
@@ -153,7 +203,7 @@ def cmd_describe(args) -> None:
 def cmd_run(args) -> None:
     for path in args.wavs:
         sr, _, mags = _load_and_stft(path)
-        d = _detector_from_args(args, sr)
+        d = _detector_from_args(args, sr, _maybe_load_sidecar(args, path))
         dets = d.run_on_spectrogram(mags)
         secs_per_frame = HOP / sr
         print("=== %s  (sr=%d, %d frames, algorithm=%s) ==="
@@ -183,7 +233,7 @@ def cmd_score(args) -> None:
     totals = [0, 0, 0]
     for path in args.wavs:
         sr, _, mags = _load_and_stft(path)
-        d = _detector_from_args(args, sr)
+        d = _detector_from_args(args, sr, _maybe_load_sidecar(args, path))
         dets = d.run_on_spectrogram(mags)
         gt = ev.label_ground_truth(mags, sr, NFFT)
         rep = ev.score(dets, gt)
@@ -216,7 +266,7 @@ def cmd_overlay(args) -> None:
     fig, axes = plt.subplots(n, 1, figsize=(15, 4.5 * n), squeeze=False)
     for ax, path in zip(axes[:, 0], args.wavs):
         sr, _, mags = _load_and_stft(path)
-        d = _detector_from_args(args, sr)
+        d = _detector_from_args(args, sr, _maybe_load_sidecar(args, path))
         dets = d.run_on_spectrogram(mags)
         Sdb = 20.0 * np.log10(mags.T + 1e-9)
         freqs = np.fft.rfftfreq(NFFT, 1.0 / sr) / 1000.0
@@ -378,6 +428,19 @@ def build_parser() -> argparse.ArgumentParser:
                        metavar="FIELD=VALUE",
                        help="Override a DetectorConfig field or algorithm tunable, "
                             "e.g. --set band_snr_threshold=10")
+        # Sidecar inputs: PATH for a single WAV/sidecar pair, or --from-sidecars
+        # for batch mode where each WAV's sibling <name>.json is loaded auto.
+        g = p.add_mutually_exclusive_group()
+        g.add_argument("--from-sidecar", metavar="PATH",
+                       help="Load tunables + noise-floor snapshot from this "
+                            "sidecar JSON before processing the WAV. Bypasses "
+                            "the EMA cold-start; required for replay on the "
+                            "very short clips run.sh produces. Mutually "
+                            "exclusive with --from-sidecars.")
+        g.add_argument("--from-sidecars", action="store_true",
+                       help="Auto-load <wav>.json next to each input WAV, when "
+                            "present. WAVs without a sidecar fall back to the "
+                            "shipped defaults silently. Use for batch corpora.")
 
     p = sub.add_parser("describe", help="List registered algorithms and their tunables")
     algorithm_arg(p)
