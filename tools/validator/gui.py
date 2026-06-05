@@ -324,8 +324,12 @@ class OfflineModeWidget(QWidget):
         self.lbl_file.setStyleSheet("color: gray")
         self.btn_run = QPushButton("Run Detection")
         self.btn_run.clicked.connect(self._on_run)
+        self.chk_show_annotations = QCheckBox("Show annotations")
+        self.chk_show_annotations.setChecked(True)
+        self.chk_show_annotations.toggled.connect(self._on_show_annotations_toggled)
         file_row.addWidget(self.btn_open)
         file_row.addWidget(self.lbl_file, stretch=1)
+        file_row.addWidget(self.chk_show_annotations)
         file_row.addWidget(self.btn_run)
         root.addLayout(file_row)
 
@@ -516,6 +520,10 @@ class OfflineModeWidget(QWidget):
 
     # -- handlers ----------------------------------------------------------
 
+    def _on_show_annotations_toggled(self, visible: bool) -> None:
+        for box in self._boxes:
+            box.setVisible(visible)
+
     def _refresh_run_button(self) -> None:
         self.btn_run.setEnabled(
             bool(self._wav_path)
@@ -611,6 +619,7 @@ class OfflineModeWidget(QWidget):
         self._boxes.clear()
 
         secs_per_frame = HOP / sr
+        visible = self.chk_show_annotations.isChecked()
         for e in dets:
             x0 = e.start_frame * secs_per_frame
             x1 = max(e.end_frame * secs_per_frame, x0 + secs_per_frame)
@@ -621,6 +630,7 @@ class OfflineModeWidget(QWidget):
                              movable=False, rotatable=False, resizable=False)
             for h in box.getHandles():
                 box.removeHandle(h)
+            box.setVisible(visible)
             self.plot.addItem(box)
             self._boxes.append(box)
 

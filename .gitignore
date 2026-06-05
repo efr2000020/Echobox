@@ -77,3 +77,7 @@ __pycache__/
 
 # Audio Files
 *.wav
+
+# Log files
+*.log
+*.log.*

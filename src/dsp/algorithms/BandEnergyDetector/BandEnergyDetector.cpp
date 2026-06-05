@@ -283,7 +283,7 @@ std::span<const TunableInfo> BandEnergyDetector::listTunables() const {
          "Top-K mean band SNR above which a frame counts as hot."},
         {"min_flatness",       TunableType::Float, 0.10,  0.0,    1.0,
          "Spectral-flatness lower bound (rejects pure tones)."},
-        {"max_flatness",       TunableType::Float, 0.75,  0.0,    1.0,
+        {"max_flatness",       TunableType::Float, 0.65,  0.0,    1.0,
          "Spectral-flatness upper bound (rejects broadband noise)."},
         {"top_k",              TunableType::Int,   8.0,   1.0,    64.0,
          "Number of brightest bins per band averaged for the SNR statistic."},
@@ -328,7 +328,7 @@ constexpr PresetEntry kQuietBundle[] = {
 };
 constexpr PresetEntry kBalancedBundle[] = {
     {"band_snr_threshold", 12.0},
-    {"max_flatness",        0.75},
+    {"max_flatness",        0.65},
     {"min_active_frames",   2.0},
 };
 constexpr PresetEntry kNoisyBundle[] = {

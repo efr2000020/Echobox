@@ -118,7 +118,7 @@ private:
     float m_bandSnrThreshold  = 12.0f;
 
     float m_minFlatness       = 0.10f;
-    float m_maxFlatness       = 0.75f;
+    float m_maxFlatness       = 0.65f;
 
     int   m_warmupFramesLimit = 40;
     int   m_minActiveFrames   = 2;
