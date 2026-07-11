@@ -25,7 +25,10 @@ BandEnergyDetector::BandEnergyDetector()
       m_inEvent(false), m_activeRun(0), m_silenceFrames(0),
       m_eventStart(0), m_eventLoHz(0.0f), m_eventHiHz(0.0f),
       m_eventPeakSnr(0.0f),
-      m_frameCount(0), m_maxBandSnrInHeartbeat(0.0f), m_peakBandInHeartbeat(-1) {}
+      m_frameCount(0), m_maxBandSnrInHeartbeat(0.0f), m_peakBandInHeartbeat(-1),
+      m_domBinRing{}, m_domMagRing{},
+      m_domRingCount(0), m_domRingHead(0),
+      m_dominantFramePeakMag(0.0f) {}
 
 void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
                                    float freqLoHz, float freqHiHz) {
@@ -78,6 +81,23 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     m_maxBandSnrInHeartbeat = 0.0f;
     m_peakBandInHeartbeat   = -1;
 
+    // --- Sweep-shape ring + dominant-frame snapshot ---
+    // Pre-allocate the dominant-frame magnitude snapshot at the configured
+    // FFT bin count. Never resized later — processFrame()'s std::copy into
+    // it is the only writer, and the size is fixed from here on.
+    m_dominantFrameMags.assign(numBins, 0.0f);
+    m_dominantFramePeakMag  = 0.0f;
+    m_domRingCount          = 0;
+    m_domRingHead           = 0;
+    m_gateDecidedThisEvent  = false;
+    m_gateRejected          = false;
+
+    // Reset the cross-event onset ring. The ring intentionally survives an
+    // event close (its whole point is measuring inter-event regularity), so
+    // configure() is the only place it clears.
+    m_onsetCount = 0;
+    m_onsetHead  = 0;
+
     // Reset sidecar diagnostic state — configure() may be called on a fresh
     // stream, and we don't want stale pending events bleeding through.
     {
@@ -115,17 +135,28 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
     }
 
     // 1. Per-band detection statistic: mean SNR of the top-K bins in each band.
-    float bestBandSnr = 0.0f;
-    int   bestBand    = -1;
+    // While we're already walking each band, also remember the loudest *raw
+    // magnitude* bin within it — when this band wins, that bin becomes the
+    // event's per-frame dominant bin (used by the sweep-shape gate).
+    float       bestBandSnr     = 0.0f;
+    int         bestBand        = -1;
+    std::size_t bestPeakBin     = 0;
+    float       bestPeakBinMag  = 0.0f;
 
     for (std::size_t bi = 0; bi < m_bands.size(); ++bi) {
         const std::size_t lo = m_bands[bi].loBin;
         const std::size_t hi = m_bands[bi].hiBin;
 
         const std::size_t count = hi - lo;
+        std::size_t bandPeakBin = lo;
+        float       bandPeakMag = 0.0f;
         for (std::size_t i = lo; i < hi; ++i) {
             const float floor = (m_noiseFloor[i] > m_minAbsFloor) ? m_noiseFloor[i] : m_minAbsFloor;
             m_bandSnrScratch[i] = magnitudes[i] / floor;
+            if (magnitudes[i] > bandPeakMag) {
+                bandPeakMag = magnitudes[i];
+                bandPeakBin = i;
+            }
         }
 
         const int k = static_cast<int>(std::min(static_cast<std::size_t>(m_topK), count));
@@ -139,8 +170,10 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
         const float bandSnr = sum / static_cast<float>(k);
 
         if (bandSnr > bestBandSnr) {
-            bestBandSnr = bandSnr;
-            bestBand    = static_cast<int>(bi);
+            bestBandSnr    = bandSnr;
+            bestBand       = static_cast<int>(bi);
+            bestPeakBin    = bandPeakBin;
+            bestPeakBinMag = bandPeakMag;
         }
     }
 
@@ -208,11 +241,30 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             m_eventLoHz    = bandLoHz;
             m_eventHiHz    = bandHiHz;
             m_eventPeakSnr = bestBandSnr;
-            // Flatness + band index at trigger time are the two things you'd
-            // want to read off a log line when a recording later turns out
-            // to be a false positive — they tell you which gate let it past.
-            LS_INFO("dsp.bed", "event start frame=%u snr=%.2f band=%d flatness=%.3f",
-                    m_eventStart, bestBandSnr, bestBand + 1, flatness);
+            // Fresh sweep-shape ring + per-event gate state. We don't carry
+            // the activeRun-1 pre-debounce frames into the ring; they were
+            // sub-threshold and not part of the call we want to characterise.
+            m_domRingCount         = 0;
+            m_domRingHead          = 0;
+            m_dominantFramePeakMag = 0.0f;
+            m_gateDecidedThisEvent = false;
+            m_gateRejected         = false;
+            // Record the onset in the cross-event ring for the temporal
+            // repetition-rate guard. Circular append — no allocation, no
+            // lock; RT-safe. The ring persists across events (it lives past
+            // event-close) so the guard can measure inter-onset regularity.
+            m_onsetFrames[m_onsetHead] = m_eventStart;
+            m_onsetHead = (m_onsetHead + 1) % ONSET_RING_CAP;
+            if (m_onsetCount < ONSET_RING_CAP) ++m_onsetCount;
+            // Per-event trace: DEBUG so the default operational log doesn't
+            // get one line per detection. Field operators watch the
+            // HEARTBEAT counters + the saved WAVs + their sidecars;
+            // --log-level debug re-enables the per-event trace for offline
+            // diagnosis, where flatness + band index at trigger time are
+            // the two things you'd want to read when a recording turns
+            // out to be a false positive (they tell you which gate let it past).
+            LS_DEBUG("dsp.bed", "event start frame=%u snr=%.2f band=%d flatness=%.3f",
+                     m_eventStart, bestBandSnr, bestBand + 1, flatness);
 
             // Stage this event's diagnostics for the recorder/sidecar. If
             // this is the first event since the last drain, also snapshot
@@ -237,63 +289,389 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             }
         }
         if (m_inEvent) {
+            // m_eventLoHz/Hi/PeakSnr are the lock-free per-event scratch:
+            // the audio thread owns them exclusively and the sidecar
+            // snapshot at event close (below, under m_diagnosticsMutex)
+            // reads them out into m_inProgressEvent in one go. Taking a
+            // mutex per frame just to keep m_inProgressEvent in sync would
+            // be a per-frame RT hazard; callers of drainSidecarPayload()
+            // see the in-progress event only once it closes anyway.
             m_eventLoHz    = std::min(m_eventLoHz, bandLoHz);
             m_eventHiHz    = std::max(m_eventHiHz, bandHiHz);
             m_eventPeakSnr = std::max(m_eventPeakSnr, bestBandSnr);
-            // Keep the in-progress event's union span + peak SNR in sync so
-            // an early drain (e.g. recorder closes the WAV before this event
-            // closes) sees consistent intermediate values.
-            std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
-            m_inProgressEvent.lo_hz    = std::min(m_inProgressEvent.lo_hz, bandLoHz);
-            m_inProgressEvent.hi_hz    = std::max(m_inProgressEvent.hi_hz, bandHiHz);
-            m_inProgressEvent.peak_snr = std::max(m_inProgressEvent.peak_snr, bestBandSnr);
+            // --- Sweep-shape feature tracking ---
+            // Record this frame's dominant in-band bin in the ring, and
+            // snapshot the full magnitude spectrum if this is the loudest
+            // dominant frame we've seen so far (used for the 10-dB bandwidth
+            // walk at gate-decision / event-close time). std::copy of ~2049
+            // floats is ~8 KB and fires only when a new max appears within
+            // an open event; well within the per-frame RT budget.
+            m_domBinRing[m_domRingHead] = bestPeakBin;
+            m_domMagRing[m_domRingHead] = bestPeakBinMag;
+            m_domRingHead = (m_domRingHead + 1) % SWEEP_RING_CAP;
+            if (m_domRingCount < SWEEP_RING_CAP) ++m_domRingCount;
+            if (bestPeakBinMag > m_dominantFramePeakMag) {
+                m_dominantFramePeakMag = bestPeakBinMag;
+                std::copy(magnitudes.begin(), magnitudes.end(),
+                          m_dominantFrameMags.begin());
+            }
         }
     } else {
         if (m_inEvent) {
             ++m_silenceFrames;
             if (m_silenceFrames > m_hangoverFrames) {
-                outAnnotation.start_frame = m_eventStart;
-                outAnnotation.end_frame   = currentFrame - static_cast<std::uint32_t>(m_silenceFrames);
-                outAnnotation.low_freq    = m_eventLoHz;
-                outAnnotation.high_freq   = m_eventHiHz;
+                const std::uint32_t endFrame =
+                    currentFrame - static_cast<std::uint32_t>(m_silenceFrames);
 
-                LS_INFO("dsp.bed", "event end frames=%u-%u %.1f-%.1fkHz peakSnr=%.2f",
-                        m_eventStart, outAnnotation.end_frame,
-                        m_eventLoHz / 1000.0f, m_eventHiHz / 1000.0f,
-                        m_eventPeakSnr);
+                LS_DEBUG("dsp.bed", "event end frames=%u-%u %.1f-%.1fkHz peakSnr=%.2f%s",
+                         m_eventStart, endFrame,
+                         m_eventLoHz / 1000.0f, m_eventHiHz / 1000.0f,
+                         m_eventPeakSnr,
+                         m_gateRejected ? " [gate-rejected]" : "");
+
+                // Finalise sweep-shape features over the whole event ring.
+                // The provisional GATE_DECISION_FRAMES decision runs on
+                // partial data — cricket-pulse onsets can look transiently
+                // broadband before their narrow harmonic character emerges.
+                // We re-evaluate here with the full ring so late-emerging
+                // narrowness still rejects. The provisional decision only
+                // ever *rejects* early (so outState.active drops fast on
+                // the device); a provisional accept can still be
+                // downgraded to reject by the full-event view.
+                const SweepShape shape = computeSweepShape(
+                    m_domBinRing, m_domRingCount,
+                    m_dominantFrameMags.data(), m_dominantFrameMags.size(),
+                    m_dominantFramePeakMag,
+                    m_inBandLo, m_inBandHi,
+                    m_binResolution);
+                if (m_sweepGateEnabled && !m_gateRejected) {
+                    const bool sweepBatLike =
+                        (shape.bandwidth_khz >= m_minBandwidthKhz)
+                        || (shape.drift_khz     >= m_sweepDriftKhz
+                            && shape.path_ratio    <= m_sweepPathRatioMax
+                            && shape.mono_fraction >= m_sweepMonoFracMin);
+
+                    // --- Temporal repetition-rate guard ---
+                    // The sweep-shape features alone can't reliably
+                    // separate broadband crickets from real bats; the
+                    // temporal signature usually can. Cricket trains
+                    // cluster in the middle of the CV(IDI) axis, while
+                    // metronomic bat feeding buzzes sit below and bursty
+                    // passes sit above. This close-time veto only ever
+                    // downgrades an accept to reject — it never
+                    // resurrects a sweep-rejected event. The
+                    // clearBat bypass (below) protects genuine
+                    // wide-band FM bats (e.g. Myotis) or events whose
+                    // own sweep shape is unambiguous, so the timing of
+                    // surrounding events can't false-veto them.
+                    bool metronomic = false;
+                    RepStats rep{0.0f, 0.0f, 0};
+                    if (m_repGuardEnabled && m_hopSizeSamples > 0
+                        && m_sampleRate > 0) {
+                        const float frameRateHz =
+                            static_cast<float>(m_sampleRate)
+                            / static_cast<float>(m_hopSizeSamples);
+                        // Unroll the circular ring into temporal order.
+                        // Before we wrap, the linear array happens to be
+                        // in-order; after wrap, m_onsetFrames[m_onsetHead]
+                        // is the OLDEST entry (about to be overwritten) and
+                        // m_onsetFrames[(m_onsetHead-1)%CAP] is the newest.
+                        // Reading it linearly after wrap trips
+                        // computeRepStats' unsorted-onset safety guard and
+                        // silently returns n=0 (no veto ever fires).
+                        std::uint32_t ordered[ONSET_RING_CAP];
+                        const std::size_t start =
+                            (m_onsetCount < ONSET_RING_CAP) ? 0 : m_onsetHead;
+                        for (std::size_t i = 0; i < m_onsetCount; ++i) {
+                            ordered[i] = m_onsetFrames[
+                                (start + i) % ONSET_RING_CAP];
+                        }
+                        rep = computeRepStats(ordered, m_onsetCount,
+                                              frameRateHz);
+                        metronomic = (rep.n >= static_cast<std::size_t>(m_repMinEvents))
+                                     && (rep.rate_hz >= m_repRateMinHz)
+                                     && (rep.rate_hz <= m_repRateMaxHz)
+                                     && (rep.cv_idi   >= m_repCvMin)
+                                     && (rep.cv_idi   <= m_repCvMax);
+                    }
+                    // Protect any event whose *own* sweep shape marks it as a
+                    // clear bat call — either a wide-band event (bw >= keep
+                    // threshold) or a smooth FM sweep (drift + path + mono
+                    // clause). Without the sweep-shape bypass, mixed
+                    // cricket+bat clips lose real bat events when the
+                    // onset ring is cricket-dominated: the ring looks
+                    // metronomic, so a bat event that happens to close
+                    // during it gets vetoed even though its own signature
+                    // is clearly a sweep.
+                    const bool clearBat =
+                        (shape.bandwidth_khz >= m_repBroadbandKeepKhz)
+                        || (shape.drift_khz     >= m_sweepDriftKhz
+                            && shape.path_ratio    <= m_sweepPathRatioMax
+                            && shape.mono_fraction >= m_sweepMonoFracMin);
+                    const bool batLike = sweepBatLike
+                                         && !(metronomic && !clearBat);
+
+                    if (!batLike) {
+                        m_gateRejected = true;
+                        const char* why = sweepBatLike ? "temporal" : "sweep";
+                        LS_DEBUG("dsp.bed",
+                                 "event rejected by %s gate (close) "
+                                 "bw=%.2fkHz drift=%.1fkHz path=%.2f mono=%.2f "
+                                 "rate=%.2fHz cv=%.2f onsets=%zu",
+                                 why,
+                                 shape.bandwidth_khz, shape.drift_khz,
+                                 shape.path_ratio, shape.mono_fraction,
+                                 rep.rate_hz, rep.cv_idi, rep.n);
+                    }
+                }
 
                 // Finalise and stash this event's diagnostics for the next
-                // drainSidecarPayload() call.
+                // drainSidecarPayload() call. Rejected events are still
+                // recorded here (with gate_rejected=true) so the sidecar
+                // reveals what the gate suppressed — the validator can
+                // then A/B compare without a rebuild.
                 {
                     std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
-                    m_inProgressEvent.end_frame       = outAnnotation.end_frame;
+                    m_inProgressEvent.end_frame       = endFrame;
                     m_inProgressEvent.duration_frames = static_cast<std::uint16_t>(
                         std::min<std::uint32_t>(
-                            outAnnotation.end_frame - m_eventStart + 1u,
+                            endFrame - m_eventStart + 1u,
                             std::numeric_limits<std::uint16_t>::max()));
-                    m_inProgressEvent.lo_hz    = m_eventLoHz;
-                    m_inProgressEvent.hi_hz    = m_eventHiHz;
-                    m_inProgressEvent.peak_snr = m_eventPeakSnr;
+                    m_inProgressEvent.lo_hz         = m_eventLoHz;
+                    m_inProgressEvent.hi_hz         = m_eventHiHz;
+                    m_inProgressEvent.peak_snr      = m_eventPeakSnr;
+                    m_inProgressEvent.bandwidth_khz = shape.bandwidth_khz;
+                    m_inProgressEvent.drift_khz     = shape.drift_khz;
+                    m_inProgressEvent.path_ratio    = shape.path_ratio;
+                    m_inProgressEvent.mono_fraction = shape.mono_fraction;
+                    m_inProgressEvent.gate_rejected = m_gateRejected;
                     m_pendingEvents.push_back(m_inProgressEvent);
+                }
+
+                // --- Publish the per-event verdict to the recorder ---
+                // Exactly one counter increments per closed event. The
+                // recorder observes m_batLikeEventsSinceBoot moving between
+                // beginRecording() and endRecording() to distinguish a
+                // pure-cricket clip (no bat-like event) from a real bat pass.
+                // Kept outside the diagnostics mutex so the recorder never
+                // waits on the audio thread.
+                if (m_gateRejected) {
+                    m_rejectedEventsSinceBoot.fetch_add(1, std::memory_order_relaxed);
+                } else {
+                    m_batLikeEventsSinceBoot.fetch_add(1, std::memory_order_relaxed);
+                }
+
+                // The Annotation return path is downstream of the recorder's
+                // outState.active gate, so we mirror the suppression here
+                // too: if the gate rejected this event, consume it silently
+                // instead of emitting a closed-event annotation. Otherwise
+                // the offline validator (which counts annotations) would
+                // see rejected events and gate-off vs gate-on would look
+                // identical, defeating the point of the gate.
+                if (!m_gateRejected) {
+                    outAnnotation.start_frame = m_eventStart;
+                    outAnnotation.end_frame   = endFrame;
+                    outAnnotation.low_freq    = m_eventLoHz;
+                    outAnnotation.high_freq   = m_eventHiHz;
+                    emittedAnnotation = true;
                 }
 
                 m_inEvent          = false;
                 m_activeRun        = 0;
                 m_silenceFrames    = 0;
                 m_eventPeakSnr     = 0.0f;
-                emittedAnnotation  = true;
+                m_gateDecidedThisEvent = false;
+                m_gateRejected         = false;
             }
         } else {
             m_activeRun = 0;
         }
     }
 
-    // 5. Per-frame state snapshot for the downstream recorder.
-    outState.active = m_inEvent;
-    outState.lo_hz  = m_inEvent ? m_eventLoHz : 0.0f;
-    outState.hi_hz  = m_inEvent ? m_eventHiHz : 0.0f;
+    // 5. Sweep-shape gate — provisional decision.
+    //
+    // First GATE_DECISION_FRAMES inside an event are reported as active so
+    // the recorder gets its leading-edge trigger. Once the ring fills, we
+    // evaluate the bandwidth-OR-sweep test once and cache the result for
+    // the rest of the event. A rejected event keeps m_inEvent=true (so the
+    // event-end machinery still emits the sidecar EventFeatures with
+    // gate_rejected=true) but reports active=false so the recorder treats
+    // it as silence.
+    if (m_sweepGateEnabled && m_inEvent && !m_gateDecidedThisEvent
+        && m_domRingCount >= GATE_DECISION_FRAMES) {
+        const SweepShape s = computeSweepShape(
+            m_domBinRing, m_domRingCount,
+            m_dominantFrameMags.data(), m_dominantFrameMags.size(),
+            m_dominantFramePeakMag,
+            m_inBandLo, m_inBandHi,
+            m_binResolution);
+        const bool batLike =
+            (s.bandwidth_khz >= m_minBandwidthKhz)
+            || (s.drift_khz     >= m_sweepDriftKhz
+                && s.path_ratio    <= m_sweepPathRatioMax
+                && s.mono_fraction >= m_sweepMonoFracMin);
+        m_gateDecidedThisEvent = true;
+        m_gateRejected         = !batLike;
+        if (m_gateRejected) {
+            LS_DEBUG("dsp.bed",
+                     "event rejected by sweep gate bw=%.2fkHz drift=%.1fkHz "
+                     "path=%.2f mono=%.2f",
+                     s.bandwidth_khz, s.drift_khz, s.path_ratio, s.mono_fraction);
+        }
+    }
+
+    // 6. Per-frame state snapshot for the downstream recorder.
+    const bool reportActive = m_inEvent && !m_gateRejected;
+    outState.active = reportActive;
+    outState.lo_hz  = reportActive ? m_eventLoHz : 0.0f;
+    outState.hi_hz  = reportActive ? m_eventHiHz : 0.0f;
 
     return emittedAnnotation;
+}
+
+// --- Pure helper: sweep-shape feature extraction --------------------------
+//
+// All inputs come from the per-event ring + dominant-frame snapshot the hot
+// loop populates. This function has no per-call allocation and no mutable
+// state of its own, so it's directly unit-testable from tests/unit without
+// standing up a detector instance.
+BandEnergyDetector::SweepShape BandEnergyDetector::computeSweepShape(
+        const std::size_t* domBins,
+        std::size_t        count,
+        const float*       dominantFrameMags,
+        std::size_t        numBins,
+        float              dominantFramePeakMag,
+        std::size_t        inBandLo,
+        std::size_t        inBandHi,
+        float              binResolutionHz) {
+    SweepShape out{0.0f, 0.0f, 0.0f, 0.0f};
+    if (count == 0) return out;
+
+    // --- drift: span of the per-frame dominant bin, in kHz ---
+    std::size_t domMin = domBins[0];
+    std::size_t domMax = domBins[0];
+    for (std::size_t i = 1; i < count; ++i) {
+        if (domBins[i] < domMin) domMin = domBins[i];
+        if (domBins[i] > domMax) domMax = domBins[i];
+    }
+    const std::size_t range = domMax - domMin;
+    out.drift_khz = (static_cast<float>(range) * binResolutionHz) / 1000.0f;
+
+    // --- path_ratio + mono_fraction over per-frame steps ---
+    std::size_t pathSum  = 0;
+    std::size_t upSteps  = 0;
+    std::size_t downSteps = 0;
+    for (std::size_t i = 1; i < count; ++i) {
+        if (domBins[i] > domBins[i - 1]) {
+            pathSum += (domBins[i] - domBins[i - 1]);
+            ++upSteps;
+        } else if (domBins[i] < domBins[i - 1]) {
+            pathSum += (domBins[i - 1] - domBins[i]);
+            ++downSteps;
+        }
+    }
+    const std::size_t denom = (range == 0) ? 1u : range;
+    out.path_ratio = static_cast<float>(pathSum) / static_cast<float>(denom);
+
+    const std::size_t totalSteps = upSteps + downSteps;
+    if (totalSteps > 0) {
+        const std::size_t maxDir = (upSteps >= downSteps) ? upSteps : downSteps;
+        out.mono_fraction = static_cast<float>(maxDir)
+                            / static_cast<float>(totalSteps);
+    } else {
+        // No transitions => trivially monotone (single-bin event).
+        out.mono_fraction = 1.0f;
+    }
+
+    // --- 10-dB bandwidth at the dominant frame ---
+    // 10 dB in amplitude = factor of sqrt(10). Walk left/right from the
+    // loudest in-band bin until magnitude drops below peak/sqrt(10), then
+    // report the width in kHz.
+    if (dominantFramePeakMag > 0.0f && numBins > 0 && inBandHi > inBandLo
+        && inBandHi <= numBins) {
+        const float threshold = dominantFramePeakMag / std::sqrt(10.0f);
+        std::size_t peakBin = inBandLo;
+        float       peakMag = 0.0f;
+        for (std::size_t i = inBandLo; i < inBandHi; ++i) {
+            if (dominantFrameMags[i] > peakMag) {
+                peakMag = dominantFrameMags[i];
+                peakBin = i;
+            }
+        }
+        std::size_t leftBin = peakBin;
+        while (leftBin > inBandLo
+               && dominantFrameMags[leftBin - 1] > threshold) {
+            --leftBin;
+        }
+        std::size_t rightBin = peakBin;
+        while (rightBin + 1 < inBandHi
+               && dominantFrameMags[rightBin + 1] > threshold) {
+            ++rightBin;
+        }
+        out.bandwidth_khz = (static_cast<float>(rightBin - leftBin)
+                             * binResolutionHz) / 1000.0f;
+    }
+
+    return out;
+}
+
+// --- Pure helper: temporal repetition-rate statistic ---------------------
+//
+// Cricket pulse trains have a metronomic inter-onset interval (IDI); real
+// bat passes are bursty. This helper computes the two axes the temporal
+// guard reads: pulse rate in Hz and CV(IDI). Pure, unit-testable without
+// a detector instance; the hot loop provides the onset frame indices from
+// its cross-event ring.
+//
+// Numerics: intervals are computed in double so long onset spans don't
+// lose precision to float rounding; the returned floats are safely within
+// the metronomic-guard tunable resolution.
+BandEnergyDetector::RepStats BandEnergyDetector::computeRepStats(
+        const std::uint32_t* onsetFrames,
+        std::size_t          count,
+        float                frameRateHz) {
+    RepStats out{0.0f, 0.0f, 0};
+    // Distinguish "no ring pointer at all" (a caller bug — return n=0 so
+    // the guard treats it as insufficient history and never trusts the
+    // stat) from "ring is valid but too short" (n = count, so the caller
+    // can compare against rep_min_events).
+    if (!onsetFrames) return out;
+    if (count < 2 || frameRateHz <= 0.0f) {
+        out.n = count;
+        return out;
+    }
+
+    const double dt_per_frame = 1.0 / static_cast<double>(frameRateHz);
+    double sum  = 0.0;
+    double sum2 = 0.0;
+    const std::size_t n_ivals = count - 1;
+    for (std::size_t i = 1; i < count; ++i) {
+        // std::uint32_t subtraction wraps on backward jumps; guard against a
+        // caller passing an unsorted or wrapped ring. In that case the whole
+        // stat is untrustworthy — return zeros with n=count so the guard
+        // treats "insufficient history".
+        if (onsetFrames[i] < onsetFrames[i - 1]) {
+            out.n = 0;
+            return out;
+        }
+        const double d = static_cast<double>(onsetFrames[i] - onsetFrames[i - 1])
+                         * dt_per_frame;
+        sum  += d;
+        sum2 += d * d;
+    }
+    const double mean = sum / static_cast<double>(n_ivals);
+    if (sum <= 0.0 || mean <= 0.0) {
+        out.n = count;
+        return out;
+    }
+    const double var = std::max(0.0, (sum2 / static_cast<double>(n_ivals))
+                                     - mean * mean);
+    const double sd  = std::sqrt(var);
+
+    out.n       = count;
+    out.rate_hz = static_cast<float>(1.0 / mean);
+    out.cv_idi  = static_cast<float>(sd / mean);
+    return out;
 }
 
 // Keep setTunable / getTunable / listTunables in lock-step. Every new tunable
@@ -304,31 +682,58 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
 
 bool BandEnergyDetector::setTunable(const char* key, double value) {
     if (!key) return false;
-    if (std::strcmp(key, "alpha_rise")         == 0) { m_alphaRise         = static_cast<float>(value); return true; }
-    if (std::strcmp(key, "alpha_fall")         == 0) { m_alphaFall         = static_cast<float>(value); return true; }
-    if (std::strcmp(key, "min_abs_floor")      == 0) { m_minAbsFloor       = static_cast<float>(value); return true; }
-    if (std::strcmp(key, "band_snr_threshold") == 0) { m_bandSnrThreshold  = static_cast<float>(value); return true; }
-    if (std::strcmp(key, "min_flatness")       == 0) { m_minFlatness       = static_cast<float>(value); return true; }
-    if (std::strcmp(key, "max_flatness")       == 0) { m_maxFlatness       = static_cast<float>(value); return true; }
-    if (std::strcmp(key, "top_k")              == 0) { m_topK              = static_cast<int>(value);   return true; }
-    if (std::strcmp(key, "warmup_frames")      == 0) { m_warmupFramesLimit = static_cast<int>(value);   return true; }
-    if (std::strcmp(key, "min_active_frames")  == 0) { m_minActiveFrames   = static_cast<int>(value);   return true; }
-    if (std::strcmp(key, "hangover_frames")    == 0) { m_hangoverFrames    = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "alpha_rise")           == 0) { m_alphaRise         = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "alpha_fall")           == 0) { m_alphaFall         = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "min_abs_floor")        == 0) { m_minAbsFloor       = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "band_snr_threshold")   == 0) { m_bandSnrThreshold  = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "min_flatness")         == 0) { m_minFlatness       = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "max_flatness")         == 0) { m_maxFlatness       = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "top_k")                == 0) { m_topK              = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "warmup_frames")        == 0) { m_warmupFramesLimit = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "min_active_frames")    == 0) { m_minActiveFrames   = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "hangover_frames")      == 0) { m_hangoverFrames    = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "sweep_gate_enabled")   == 0) { m_sweepGateEnabled  = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "min_bandwidth_khz")    == 0) { m_minBandwidthKhz   = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "sweep_drift_khz")      == 0) { m_sweepDriftKhz     = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "sweep_path_ratio_max") == 0) { m_sweepPathRatioMax = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "sweep_mono_frac_min")  == 0) { m_sweepMonoFracMin  = static_cast<float>(value); return true; }
+    // Temporal repetition-rate guard
+    if (std::strcmp(key, "rep_guard_enabled")     == 0) { m_repGuardEnabled     = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "rep_rate_min_hz")       == 0) { m_repRateMinHz        = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "rep_rate_max_hz")       == 0) { m_repRateMaxHz        = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "rep_cv_min")            == 0) { m_repCvMin            = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "rep_cv_max")            == 0) { m_repCvMax            = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "rep_min_events")        == 0) { m_repMinEvents        = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "rep_broadband_keep_khz")== 0) { m_repBroadbandKeepKhz = static_cast<float>(value); return true; }
+    if (std::strcmp(key, "hop_size_samples")      == 0) { m_hopSizeSamples      = static_cast<int>(value);   return true; }
     return false;
 }
 
 bool BandEnergyDetector::getTunable(const char* key, double* outValue) const {
     if (!key || !outValue) return false;
-    if (std::strcmp(key, "alpha_rise")         == 0) { *outValue = m_alphaRise;         return true; }
-    if (std::strcmp(key, "alpha_fall")         == 0) { *outValue = m_alphaFall;         return true; }
-    if (std::strcmp(key, "min_abs_floor")      == 0) { *outValue = m_minAbsFloor;       return true; }
-    if (std::strcmp(key, "band_snr_threshold") == 0) { *outValue = m_bandSnrThreshold;  return true; }
-    if (std::strcmp(key, "min_flatness")       == 0) { *outValue = m_minFlatness;       return true; }
-    if (std::strcmp(key, "max_flatness")       == 0) { *outValue = m_maxFlatness;       return true; }
-    if (std::strcmp(key, "top_k")              == 0) { *outValue = m_topK;              return true; }
-    if (std::strcmp(key, "warmup_frames")      == 0) { *outValue = m_warmupFramesLimit; return true; }
-    if (std::strcmp(key, "min_active_frames")  == 0) { *outValue = m_minActiveFrames;   return true; }
-    if (std::strcmp(key, "hangover_frames")    == 0) { *outValue = m_hangoverFrames;    return true; }
+    if (std::strcmp(key, "alpha_rise")           == 0) { *outValue = m_alphaRise;         return true; }
+    if (std::strcmp(key, "alpha_fall")           == 0) { *outValue = m_alphaFall;         return true; }
+    if (std::strcmp(key, "min_abs_floor")        == 0) { *outValue = m_minAbsFloor;       return true; }
+    if (std::strcmp(key, "band_snr_threshold")   == 0) { *outValue = m_bandSnrThreshold;  return true; }
+    if (std::strcmp(key, "min_flatness")         == 0) { *outValue = m_minFlatness;       return true; }
+    if (std::strcmp(key, "max_flatness")         == 0) { *outValue = m_maxFlatness;       return true; }
+    if (std::strcmp(key, "top_k")                == 0) { *outValue = m_topK;              return true; }
+    if (std::strcmp(key, "warmup_frames")        == 0) { *outValue = m_warmupFramesLimit; return true; }
+    if (std::strcmp(key, "min_active_frames")    == 0) { *outValue = m_minActiveFrames;   return true; }
+    if (std::strcmp(key, "hangover_frames")      == 0) { *outValue = m_hangoverFrames;    return true; }
+    if (std::strcmp(key, "sweep_gate_enabled")   == 0) { *outValue = m_sweepGateEnabled;  return true; }
+    if (std::strcmp(key, "min_bandwidth_khz")    == 0) { *outValue = m_minBandwidthKhz;   return true; }
+    if (std::strcmp(key, "sweep_drift_khz")      == 0) { *outValue = m_sweepDriftKhz;     return true; }
+    if (std::strcmp(key, "sweep_path_ratio_max") == 0) { *outValue = m_sweepPathRatioMax; return true; }
+    if (std::strcmp(key, "sweep_mono_frac_min")  == 0) { *outValue = m_sweepMonoFracMin;  return true; }
+    if (std::strcmp(key, "rep_guard_enabled")     == 0) { *outValue = m_repGuardEnabled;     return true; }
+    if (std::strcmp(key, "rep_rate_min_hz")       == 0) { *outValue = m_repRateMinHz;        return true; }
+    if (std::strcmp(key, "rep_rate_max_hz")       == 0) { *outValue = m_repRateMaxHz;        return true; }
+    if (std::strcmp(key, "rep_cv_min")            == 0) { *outValue = m_repCvMin;            return true; }
+    if (std::strcmp(key, "rep_cv_max")            == 0) { *outValue = m_repCvMax;            return true; }
+    if (std::strcmp(key, "rep_min_events")        == 0) { *outValue = m_repMinEvents;        return true; }
+    if (std::strcmp(key, "rep_broadband_keep_khz")== 0) { *outValue = m_repBroadbandKeepKhz; return true; }
+    if (std::strcmp(key, "hop_size_samples")      == 0) { *outValue = m_hopSizeSamples;      return true; }
     return false;
 }
 
@@ -337,26 +742,55 @@ std::span<const TunableInfo> BandEnergyDetector::listTunables() const {
     // the validator's C API and Python wrapper pass these strings across the
     // FFI boundary unchanged. Lives in .rodata; zero per-call cost.
     static constexpr TunableInfo kTunables[] = {
-        {"band_snr_threshold", TunableType::Float, 12.0,  0.0,    200.0,
+        {"band_snr_threshold",   TunableType::Float, 12.0,  0.0,    200.0,
          "Top-K mean band SNR above which a frame counts as hot."},
-        {"min_flatness",       TunableType::Float, 0.10,  0.0,    1.0,
+        {"min_flatness",         TunableType::Float, 0.10,  0.0,    1.0,
          "Spectral-flatness lower bound (rejects pure tones)."},
-        {"max_flatness",       TunableType::Float, 0.65,  0.0,    1.0,
+        {"max_flatness",         TunableType::Float, 0.65,  0.0,    1.0,
          "Spectral-flatness upper bound (rejects broadband noise)."},
-        {"top_k",              TunableType::Int,   8.0,   1.0,    64.0,
+        {"top_k",                TunableType::Int,   8.0,   1.0,    64.0,
          "Number of brightest bins per band averaged for the SNR statistic."},
-        {"min_active_frames",  TunableType::Int,   2.0,   1.0,    100.0,
+        {"min_active_frames",    TunableType::Int,   2.0,   1.0,    100.0,
          "Consecutive hot frames required before an event opens (debounce)."},
-        {"hangover_frames",    TunableType::Int,   8.0,   1.0,    200.0,
+        {"hangover_frames",      TunableType::Int,   8.0,   1.0,    200.0,
          "Consecutive quiet frames tolerated inside an event before it closes."},
-        {"warmup_frames",      TunableType::Int,   40.0,  0.0,    1000.0,
+        {"warmup_frames",        TunableType::Int,   40.0,  0.0,    1000.0,
          "Frames discarded after start while the noise-floor EMA seeds."},
-        {"alpha_rise",         TunableType::Float, 0.995, 0.0,    1.0,
+        {"alpha_rise",           TunableType::Float, 0.995, 0.0,    1.0,
          "EMA coefficient when the floor is rising (slow)."},
-        {"alpha_fall",         TunableType::Float, 0.90,  0.0,    1.0,
+        {"alpha_fall",           TunableType::Float, 0.90,  0.0,    1.0,
          "EMA coefficient when the floor is falling (fast)."},
-        {"min_abs_floor",      TunableType::Float, 1e-6,  0.0,    1.0,
+        {"min_abs_floor",        TunableType::Float, 1e-6,  0.0,    1.0,
          "Absolute lower bound on the noise floor (prevents divide-by-zero spikes)."},
+        {"sweep_gate_enabled",   TunableType::Int,   1.0,   0.0,    1.0,
+         "Master switch (0/1) for the cricket sweep-shape gate."},
+        {"min_bandwidth_khz",    TunableType::Float, 0.9,   0.0,    50.0,
+         "Keep events whose 10-dB bandwidth at the dominant frame is at least this wide."},
+        {"sweep_drift_khz",      TunableType::Float, 8.0,   0.0,    200.0,
+         "Min dominant-frequency excursion (kHz) for an event to qualify as a smooth sweep."},
+        {"sweep_path_ratio_max", TunableType::Float, 1.6,   1.0,    10.0,
+         "Max total-travel/net-range ratio for a sweep to count as smooth (>~2 = hopping)."},
+        {"sweep_mono_frac_min",  TunableType::Float, 0.7,   0.0,    1.0,
+         "Min fraction of dominant-bin steps in a single direction for a smooth sweep."},
+        {"rep_guard_enabled",    TunableType::Int,   1.0,   0.0,    1.0,
+         "Master switch (0/1) for the temporal repetition-rate guard."},
+        {"rep_rate_min_hz",      TunableType::Float, 1.0,   0.0,    100.0,
+         "Lower bound of the cricket pulse-rate band (Hz)."},
+        {"rep_rate_max_hz",      TunableType::Float, 20.0,  0.0,    200.0,
+         "Upper bound of the cricket pulse-rate band (Hz)."},
+        {"rep_cv_min",           TunableType::Float, 0.50,  0.0,    2.0,
+         "Min CV(inter-onset interval) for the cricket band. "
+         "Below this looks like a metronomic bat feeding buzz, not a cricket."},
+        {"rep_cv_max",           TunableType::Float, 1.30,  0.0,    2.0,
+         "Max CV(inter-onset interval) for the cricket band. "
+         "Above this looks like a bursty bat pass (e.g. Barbastella)."},
+        {"rep_min_events",       TunableType::Int,   2.0,   2.0,    16.0,
+         "Onsets required before the temporal verdict is trusted."},
+        {"rep_broadband_keep_khz", TunableType::Float, 10.0, 0.0,   50.0,
+         "Bandwidth above which an event is never vetoed on temporal grounds."},
+        {"hop_size_samples",     TunableType::Int,   512.0, 1.0,    65535.0,
+         "FFT hop in samples (set by the pipeline). Used to convert onset "
+         "frame indices into seconds for the temporal-guard rate bounds."},
     };
     return std::span<const TunableInfo>(kTunables, sizeof(kTunables) / sizeof(kTunables[0]));
 }

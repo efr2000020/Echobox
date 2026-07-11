@@ -51,6 +51,13 @@ struct DspPipelineConfig {
     ///       @c BandEnergyDetector tunable default — they are linked by
     ///       intent, not by build-time wiring.
     float        snrThreshold{12.0f};
+    /// Cricket filter: forwarded to the tracker as the
+    /// @c sweep_gate_enabled tunable at start-time. The recorder's
+    /// @c cricketDiscard half of the same filter lives in @c RecorderConfig;
+    /// @c Application::run flips both from one CLI flag. Trackers that
+    /// don't expose the tunable ignore this silently (a plain warn logged
+    /// in start()).
+    bool         cricketFilter{true};
 };
 
 /**
@@ -132,7 +139,8 @@ public:
 
 private:
     void loop();
-    void publish(bool active, float loHz, float hiHz);
+    void publish(bool active, float loHz, float hiHz,
+                 std::uint64_t batLikeEvents);
 
     DspPipelineConfig             m_cfg;
     LockFreeRingBuffer<float>&    m_input;
@@ -156,6 +164,10 @@ private:
     std::atomic<bool>             m_active{false};
     std::atomic<std::uint64_t>    m_loHiBits{0};
     std::atomic<std::uint64_t>    m_generation{0};
+    // Monotonic count of kept (non-gate-rejected) events, re-read each
+    // publish() from the tracker's own wait-free counter. The recorder
+    // snapshots this on begin/end to discard clips with no bat-like event.
+    std::atomic<std::uint64_t>    m_batLikeEvents{0};
 };
 
 } // namespace echobox::dsp

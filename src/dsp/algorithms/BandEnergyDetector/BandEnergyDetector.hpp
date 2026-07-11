@@ -7,6 +7,7 @@
 /// production builds; loadable as a plugin on dev builds.
 
 #include "../../ISweepTracker.hpp"  // src/dsp/algorithms/BandEnergyDetector/ -> src/dsp/
+#include <atomic>
 #include <mutex>
 #include <span>
 #include <cstdint>
@@ -57,6 +58,63 @@ public:
     bool          drainSidecarPayload(SidecarPayload& out) override;
     bool          seedNoiseFloor(std::span<const float> floor) override;
     std::uint64_t totalEventsSinceBoot() const override;
+
+    /**
+     * @brief Wait-free counter of events kept by the sweep gate since boot.
+     *
+     * Read by the DSP pipeline every publish() cycle and propagated to the
+     * recorder through @c DetectorStateSnapshot::batLikeEvents. The recorder
+     * snapshots this value on @c beginRecording and, at @c endRecording,
+     * discards the clip if it hasn't advanced (no bat-like event fired
+     * during the clip window).
+     *
+     * Wait-free by design (single atomic load): safe to call from any thread,
+     * including the recorder's poll loop.
+     */
+    std::uint64_t batLikeEventsSinceBoot() const override {
+        return m_batLikeEventsSinceBoot.load(std::memory_order_relaxed);
+    }
+    /// Counter of events rejected by the sweep gate. Debugging convenience;
+    /// wait-free like @c batLikeEventsSinceBoot().
+    std::uint64_t rejectedEventsSinceBoot() const {
+        return m_rejectedEventsSinceBoot.load(std::memory_order_relaxed);
+    }
+
+    // --- Sweep-shape gate helper ---
+    // Exposed publicly so the unit tests can drive it directly without
+    // standing up the whole detector. Inputs come from the per-event ring
+    // populated inside processFrame(); it is a pure function of its args.
+    struct SweepShape {
+        float bandwidth_khz;     // 10-dB bandwidth at the dominant frame
+        float drift_khz;         // (max-min) dominant bin span, in kHz
+        float path_ratio;        // sum(|Δbin|) / max(1, range)
+        float mono_fraction;     // max(#up,#down) / (#up+#down)
+    };
+    static SweepShape computeSweepShape(const std::size_t* domBins,
+                                        std::size_t        count,
+                                        const float*       dominantFrameMags,
+                                        std::size_t        numBins,
+                                        float              dominantFramePeakMag,
+                                        std::size_t        inBandLo,
+                                        std::size_t        inBandHi,
+                                        float              binResolutionHz);
+
+    // --- Repetition-rate helper (temporal cricket rejection) ---
+    // The sweep-shape features can't reliably separate broadband crickets
+    // from real bats — but the temporal signature usually can. Cricket
+    // trains cluster in the middle of the CV(inter-onset interval) axis
+    // (roughly 0.5-1.3 with rates 1-20 Hz on this detector); metronomic
+    // bat feeding buzzes sit below that band and bursty passes above it.
+    // This helper is pure, unit-testable without a detector instance;
+    // the hot loop just feeds it the onset frames it has already recorded.
+    struct RepStats {
+        float       rate_hz;    // (n-1) / total elapsed
+        float       cv_idi;     // stddev(inter-onset interval) / mean(idi)
+        std::size_t n;          // onset count used
+    };
+    static RepStats computeRepStats(const std::uint32_t* onsetFrames,
+                                    std::size_t          count,
+                                    float                frameRateHz);
 
 private:
     int         m_sampleRate;
@@ -129,11 +187,93 @@ private:
     int   m_minActiveFrames   = 2;
     int   m_hangoverFrames    = 8;
 
+    // --- Sweep-shape gate (cricket false-positive rejection) ---
+    // Master switch: 1 = gate active. When 0, both outState.active and the
+    // closed-event Annotation are byte-identical to what the detector would
+    // emit with no gate at all, so an operator can turn the gate off with
+    // a single tunable if a deployment site produces bat calls the gate
+    // can't characterise.
+    //
+    // Bandwidth threshold at 0.9 kHz preserves 25/25 clean-corpus recall
+    // (including NYCLEI 3/3 and NYCNOC 2/2). The in-band bandwidth walk
+    // is measured on the winning-band's dominant frame; CF/QCF species
+    // (e.g. Nyctalus noctula) sit close to this floor, so raising it
+    // costs recall.
+    int   m_sweepGateEnabled  = 1;
+    float m_minBandwidthKhz   = 0.9f;   // bat-like if 10-dB BW >= this
+    float m_sweepDriftKhz     = 8.0f;   // OR a smooth sweep of this much drift
+    float m_sweepPathRatioMax = 1.6f;   //    that doesn't hop (low travel/range)
+    float m_sweepMonoFracMin  = 0.7f;   //    and runs mostly in one direction
+
+    // Per-event ring of dominant bins + magnitude-frame snapshot, used to
+    // compute sweep-shape features at gate-decision time and at event close.
+    // Fixed capacity (≈ 85 ms at 750 fps); pre-allocated in configure() and
+    // never grown inside processFrame(). Events longer than the cap keep the
+    // most recent N frames — a long event is bat-like under existing heuristics
+    // and is not the gate's primary concern.
+    static constexpr std::size_t SWEEP_RING_CAP        = 64;
+    static constexpr std::size_t GATE_DECISION_FRAMES  = 6; // ~8 ms at 750 fps
+    std::size_t        m_domBinRing[SWEEP_RING_CAP];
+    float              m_domMagRing[SWEEP_RING_CAP];
+    std::size_t        m_domRingCount;       // valid entries (caps at SWEEP_RING_CAP)
+    std::size_t        m_domRingHead;        // next write index (circular)
+    std::vector<float> m_dominantFrameMags;  // spectrum snapshot at loudest dom frame
+    float              m_dominantFramePeakMag;
+
+    // Per-event gate state. A provisional decision fires once the ring
+    // reaches GATE_DECISION_FRAMES; subsequent frames inside the same
+    // event use the cached result. The provisional decision only ever
+    // *rejects* early — a provisional accept can still be downgraded to
+    // reject by the close-time full-event re-evaluation.
+    bool m_gateDecidedThisEvent = false;
+    bool m_gateRejected         = false;
+
+    // --- Temporal repetition-rate guard ---
+    // Cross-event onset ring: the discriminating signature only emerges
+    // over a sequence of events, so this ring persists across event opens
+    // and closes (it is reset only on configure()). Fixed capacity, integer
+    // indices — no allocation, no locks.
+    static constexpr std::size_t ONSET_RING_CAP = 16;
+    std::uint32_t m_onsetFrames[ONSET_RING_CAP]{};
+    std::size_t   m_onsetCount = 0;    // valid entries (caps at ONSET_RING_CAP)
+    std::size_t   m_onsetHead  = 0;    // next write index (circular)
+
+    // Temporal-guard tunables. Defaults calibrated on the shipping-corpus
+    // detector output: crickets cluster in the middle of the CV(IDI) axis
+    // (roughly 0.6-1.2) with rates 2-15 Hz. Metronomic bat feeding buzzes
+    // (e.g. Pipistrellus) sit below that band (CV ~0.2); CF species
+    // (Rhinolophus) are similarly regular. Bursty passes (e.g. Barbastella)
+    // sit above the band. The veto fires on the *middle* of the CV axis,
+    // between rep_cv_min and rep_cv_max — not just "below max".
+    int   m_repGuardEnabled     = 1;
+    float m_repRateMinHz        = 1.0f;
+    float m_repRateMaxHz        = 20.0f;
+    float m_repCvMin            = 0.50f;
+    float m_repCvMax            = 1.30f;
+    // Onsets required before the temporal verdict is trusted. Two
+    // metronomic intervals are enough evidence: on a fresh detector the
+    // ring starts empty, so a stricter minimum lets early events through
+    // and one passing event is enough for the recorder to keep the clip.
+    int   m_repMinEvents        = 2;
+    // Bandwidth above which the temporal veto NEVER fires — protects
+    // wide-band FM bats (e.g. Myotis) that might occasionally occur in
+    // a semi-regular sequence. Genuinely broadband species sweep well
+    // above this floor. Retune if a specific site shows a wide-band bat
+    // recall regression.
+    float m_repBroadbandKeepKhz = 10.0f;
+
+    // Hop size in samples, needed to convert onset frame indices into
+    // seconds for the Hz-domain rate bounds. Not part of configure() (that
+    // would break the ISweepTracker ABI for older plugins), so DspPipeline
+    // sets it as a tunable at start-time. Default matches the shipping
+    // production configuration (512 @ 384 kHz → 750 Hz frame rate); the
+    // pipeline overrides with the actual hop from DspPipelineConfig.
+    int   m_hopSizeSamples      = 512;
+
     // --- Sidecar diagnostics (mutex-protected, off the audio hot loop) ---
-    // The mutex is held briefly twice per event (once on open to stage trigger
-    // features + floor snapshot, once on close to push the completed
-    // EventFeatures) and once per WAV at recorder close time. Contention is
-    // effectively zero; lock cost is dwarfed by the per-frame FFT work.
+    // The mutex is held twice per event (open + close) plus at drain time,
+    // but never per-frame: per-frame span/SNR updates land in the lock-free
+    // scratch below and are copied under the lock only at open/close.
     mutable std::mutex          m_diagnosticsMutex;
     EventFeatures               m_inProgressEvent{};
     std::vector<EventFeatures>  m_pendingEvents;
@@ -143,4 +283,12 @@ private:
     std::vector<float>          m_floorSnapshotAtFirstEvent;
     std::uint64_t               m_eventsTotalSinceBoot{0};
     std::uint64_t               m_framesProcessedSinceBoot{0};
+
+    // --- Per-event verdict counters (wait-free) ---
+    // Incremented exactly once per event at close-time (kept OR rejected).
+    // The recorder reads @c m_batLikeEventsSinceBoot via the DSP snapshot to
+    // decide whether to keep or discard a just-finished clip. Kept off the
+    // diagnostics mutex — the recorder must never wait for the audio thread.
+    std::atomic<std::uint64_t>  m_batLikeEventsSinceBoot{0};
+    std::atomic<std::uint64_t>  m_rejectedEventsSinceBoot{0};
 };

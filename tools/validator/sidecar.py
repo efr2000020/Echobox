@@ -37,6 +37,15 @@ class SidecarEvent:
     peak_snr: float
     lo_hz: float
     hi_hz: float
+    # --- Sweep-shape features (cricket false-positive gate) ---
+    # Default to 0 / False so sidecars written by devices without the
+    # sweep-shape gate still load. Validator code that reads these
+    # should treat all-zero as "not computed".
+    bandwidth_khz: float = 0.0
+    drift_khz: float = 0.0
+    path_ratio: float = 0.0
+    mono_fraction: float = 0.0
+    gate_rejected: bool = False
 
 
 @dataclass

@@ -51,6 +51,32 @@ std::optional<std::string> checkLengthOrder(const Config& cfg) {
     return std::nullopt;
 }
 
+// Ordering invariant for the cricket-filter discard path: the recorder
+// reads the detector's kept-events counter at endRecording after
+// silenceMs of idle. That read must happen AFTER any in-progress event
+// has closed and stamped the counter, or a discard could race an event
+// that fires inside the silence window. The detector closes an event
+// after hangoverFrames × frame_ms idle; with typical defaults (8 frames
+// × 512/384000 ms ≈ 10.7 ms) and silenceMs default 2000 ms the guard is
+// ~200x. Reject a config that undoes this ordering: silenceMs must
+// exceed a generous frame_ms budget. (The detector tunable itself is
+// not accessible here; we clamp the recorder side against the worst
+// realistic hangover instead.)
+std::optional<std::string> checkSilenceExceedsHangover(const Config& cfg) {
+    // Worst-case frame_ms budget: hopSize / sampleRate * 1000. With
+    // hopSize=512, sampleRate=384000 → 1.33 ms/frame. A hangover of 64
+    // frames (8x default) is still ~85 ms — a 200 ms floor covers every
+    // realistic BandEnergyDetector hangover with generous room.
+    constexpr std::uint32_t kMinSilenceMs = 200;
+    if (cfg.silenceMs < kMinSilenceMs) {
+        return "--silence-ms (" + std::to_string(cfg.silenceMs)
+             + ") must be at least " + std::to_string(kMinSilenceMs)
+             + "ms so the cricket-filter counter read at recording close "
+               "cannot race an event that opened during the silence window";
+    }
+    return std::nullopt;
+}
+
 // The cap must leave room for pre-roll *and* the trailing silence window:
 // the recorder writes pre-roll, then the active call, then keeps writing
 // for `silenceMs` of trailing quiet before closing. If max < pre-roll +
@@ -83,6 +109,7 @@ std::vector<std::string> validateConfig(const Config& cfg) {
     run(checkFrequencyAgainstNyquist(cfg));
     run(checkLengthOrder(cfg));
     run(checkRecordingBudget(cfg));
+    run(checkSilenceExceedsHangover(cfg));
 
     return errors;
 }

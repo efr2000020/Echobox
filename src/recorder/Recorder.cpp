@@ -132,6 +132,10 @@ void Recorder::beginRecording(const DetectorStateSnapshot& s) {
     m_lastActiveTime   = m_eventStartSteady;
     m_eventLoHz        = s.loHz > 0.0f ? s.loHz : 0.0f;
     m_eventHiHz        = s.hiHz > 0.0f ? s.hiHz : 0.0f;
+    // Baseline the kept-events counter now. If the same value is still
+    // observed at endRecording(), no bat-like event fired during the clip and
+    // it gets discarded when cricketDiscard is enabled.
+    m_batLikeAtStart   = s.batLikeEvents;
 
     m_currentTempPath = m_names.tempPath(m_eventStartWall);
     m_writer = std::make_unique<WavWriter>(m_currentTempPath,
@@ -150,11 +154,13 @@ void Recorder::beginRecording(const DetectorStateSnapshot& s) {
         m_detector.drainSidecarPayload(stale);
     }
 
-    // Distinctive prefix so an operator can `grep RECORDING_ logs/*` to walk
-    // every saved file's lifecycle, and the filename is the obvious anchor.
-    LS_INFO("recorder", "RECORDING_OPEN file=%s preroll=%zu samples band=%.1f-%.1fkHz",
-            m_currentTempPath.filename().string().c_str(), preRollSamples,
-            m_eventLoHz / 1000.0f, m_eventHiHz / 1000.0f);
+    // Per-recording lifecycle at DEBUG so the default operational log
+    // stays quiet on a busy night. The HEARTBEAT counter + the saved WAV
+    // itself + its sidecar are the operator's summary; --log-level debug
+    // re-enables the per-recording trace for offline diagnosis.
+    LS_DEBUG("recorder", "RECORDING_OPEN file=%s preroll=%zu samples band=%.1f-%.1fkHz",
+             m_currentTempPath.filename().string().c_str(), preRollSamples,
+             m_eventLoHz / 1000.0f, m_eventHiHz / 1000.0f);
 
     m_state = State::Active;
     appendLiveAudio();
@@ -213,30 +219,60 @@ void Recorder::endRecording() {
     // finalized, so the output dir stays free of clip-sized noise events.
     if (m_cfg.minLengthMs > 0
         && frames < framesForMs(m_cfg.minLengthMs, m_cfg.sampleRate)) {
-        LS_INFO("recorder", "RECORDING_DISCARDED file=%s duration=%ums (< minLengthMs=%u) band=%.1f-%.1fkHz",
-                m_currentTempPath.filename().string().c_str(),
-                durationMs, m_cfg.minLengthMs,
-                loHz / 1000.0f, hiHz / 1000.0f);
+        LS_DEBUG("recorder",
+                 "RECORDING_DISCARDED file=%s reason=min-length duration=%ums "
+                 "(< minLengthMs=%u) band=%.1f-%.1fkHz",
+                 m_currentTempPath.filename().string().c_str(),
+                 durationMs, m_cfg.minLengthMs,
+                 loHz / 1000.0f, hiHz / 1000.0f);
         m_writer->abort();
         m_writer.reset();
         m_state = State::Idle;
         return;
     }
 
+    // Cricket-filter gate: discard clips whose window saw no bat-like
+    // event. The detector publishes its kept-events counter through the DSP
+    // snapshot; if it hasn't advanced since beginRecording() then every event
+    // during this clip was rejected by the sweep gate (or no event fired at
+    // all — a spurious trigger). Reading the snapshot AFTER the silence
+    // timeout has elapsed means any event still open at the start of this
+    // call has definitively closed and stamped the counter (guaranteed
+    // because ConfigValidator enforces silenceMs > hangover×frame_ms).
+    if (m_cfg.cricketDiscard) {
+        const auto s = m_detector.snapshot();
+        if (s.batLikeEvents == m_batLikeAtStart) {
+            LS_DEBUG("recorder",
+                     "RECORDING_DISCARDED file=%s reason=cricket-gate "
+                     "(no bat-like event) duration=%ums band=%.1f-%.1fkHz",
+                     m_currentTempPath.filename().string().c_str(),
+                     durationMs, loHz / 1000.0f, hiHz / 1000.0f);
+            m_writer->abort();
+            m_writer.reset();
+            // Discard any staged sidecar events for this clip so they don't
+            // leak into the next recording's payload.
+            if (m_cfg.writeSidecar) {
+                SidecarPayload stale;
+                m_detector.drainSidecarPayload(stale);
+            }
+            m_state = State::Idle;
+            return;
+        }
+    }
+
     const auto finalPath = m_names.finalPath(m_eventStartWall);
     m_writer->closeAndRename(finalPath);
     m_writer.reset();
 
-    // Distinctive prefix + final filename + the steady-clock elapsed since
-    // OPEN, so a false-positive WAV is easy to correlate with the [dsp.bed]
-    // log lines stamped within that same window.
+    // RECORDING_SAVED trace at DEBUG; the operator-facing summary is the
+    // events_kept counter in the HEARTBEAT line + the WAVs on disk.
     const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - m_eventStartSteady).count();
-    LS_INFO("recorder", "RECORDING_SAVED file=%s frames=%llu duration=%ums elapsed=%lldms band=%.1f-%.1fkHz",
-            finalPath.filename().string().c_str(),
-            static_cast<unsigned long long>(frames), durationMs,
-            static_cast<long long>(elapsedMs),
-            loHz / 1000.0f, hiHz / 1000.0f);
+    LS_DEBUG("recorder", "RECORDING_SAVED file=%s frames=%llu duration=%ums elapsed=%lldms band=%.1f-%.1fkHz",
+             finalPath.filename().string().c_str(),
+             static_cast<unsigned long long>(frames), durationMs,
+             static_cast<long long>(elapsedMs),
+             loHz / 1000.0f, hiHz / 1000.0f);
 
     // Sidecar: per-event diagnostics + noise-floor snapshot, written
     // alongside the WAV so the offline tuning tools have everything they

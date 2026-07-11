@@ -80,7 +80,10 @@ void AlsaAudioSource::open() {
         throw std::runtime_error(std::string("alsa: prepare: ") + snd_strerror(err));
     }
 
-    LS_INFO("audio.alsa", "opened device='%s' rate=%d ch=%d period=%lu buffer=%lu",
+    // Grep-friendly MIC_CONNECTED anchor so the field
+    // operator can `grep MIC_ logs/*` to walk a unit's mic history.
+    LS_INFO("audio.alsa",
+            "MIC_CONNECTED device='%s' sr=%d ch=%d period=%lu buffer=%lu",
             m_params.device.c_str(), m_actualRate, m_params.channels,
             static_cast<unsigned long>(period),
             static_cast<unsigned long>(buffer));
@@ -101,15 +104,14 @@ void AlsaAudioSource::close() noexcept {
 
 bool AlsaAudioSource::recoverFromXrun(int err) {
     if (err == -EPIPE) {
-        LS_WARN("audio.alsa", "xrun (overrun)");
         int r = snd_pcm_prepare(m_handle);
         if (r < 0) {
-            LS_ERROR("audio.alsa", "xrun recovery failed: %s", snd_strerror(r));
+            LS_ERROR("audio.alsa", "xrun unrecoverable (%s)", snd_strerror(r));
             return false;
         }
+        LS_WARN("audio.alsa", "xrun recovered");
         return true;
     } else if (err == -ESTRPIPE) {
-        LS_WARN("audio.alsa", "stream suspended; resuming");
         int r;
         while ((r = snd_pcm_resume(m_handle)) == -EAGAIN) {
             // hardware not ready yet; spin briefly
@@ -117,10 +119,12 @@ bool AlsaAudioSource::recoverFromXrun(int err) {
         if (r < 0) {
             r = snd_pcm_prepare(m_handle);
             if (r < 0) {
-                LS_ERROR("audio.alsa", "resume/prepare failed: %s", snd_strerror(r));
+                LS_ERROR("audio.alsa", "xrun unrecoverable (resume/prepare failed: %s)",
+                         snd_strerror(r));
                 return false;
             }
         }
+        LS_WARN("audio.alsa", "xrun recovered (stream resumed)");
         return true;
     }
     return false;

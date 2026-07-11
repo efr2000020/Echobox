@@ -33,6 +33,12 @@ struct DetectorStateSnapshot {
     /// polling consumer detect a complete event that opened and closed
     /// between two polls without seeing @c active flip.
     std::uint64_t generation;
+    /// Monotonic count of *kept* (non-gate-rejected) events since startup.
+    /// The recorder snapshots this on @c beginRecording and compares
+    /// against a fresh snapshot at @c endRecording. Unchanged means no
+    /// bat-like event fired during the clip — a pure-cricket recording
+    /// that the recorder discards instead of finalising.
+    std::uint64_t batLikeEvents;
 };
 
 /**

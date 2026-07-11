@@ -62,11 +62,30 @@ struct Config {
     std::uint32_t   maxLengthMs{5000};
 
     std::filesystem::path logDir{"./logs"};
-    // Off by default: a shipped unit running unattended writes nothing to disk
-    // unless the operator opts in. Application::run treats Off as "don't even
-    // open a log file", so the SD card sees no I/O from the logging subsystem.
-    // For field debugging pass --log-level debug (or info).
+    // Off by default: a shipped unit running unattended writes nothing to
+    // disk unless the operator opts in. Application::run treats Off as
+    // "don't even open a log file", so the SD card sees no I/O from the
+    // logging subsystem. For field debugging pass --log-level info (or
+    // debug). The console sink honours the same level.
     logging::LogLevel     logLevel{logging::LogLevel::Off};
+
+    // Console sink (stderr, human-readable) mirrors the JSON-lines file
+    // sink. Set to false to run headless without a terminal handler
+    // attached.
+    bool                  consoleLog{true};
+    // Emit an "app: HEARTBEAT ..." record every this-many seconds so a
+    // field operator can prove the unit is alive from a log tail. 0
+    // disables.
+    std::uint32_t         heartbeatSec{60};
+
+    // Cricket filter master switch. On (default) enables BOTH halves of
+    // the filter under a single flag:
+    //   * detector's sweep_gate_enabled sweep-shape gate + temporal guard;
+    //   * recorder's cricketDiscard "no bat-like event" post-hoc drop.
+    // Off disables both → recorder behaves as if no filter existed. The
+    // field escape hatch: if a deployment site produces bat calls the
+    // gate can't characterise, one flag turns the whole filter off.
+    bool                  cricketFilter{true};
 };
 
 } // namespace echobox::app

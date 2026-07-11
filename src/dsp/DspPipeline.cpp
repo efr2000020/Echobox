@@ -86,6 +86,27 @@ void DspPipeline::start() {
                 m_cfg.algorithm.c_str());
     }
 
+    // Cricket filter: flip the tracker's sweep-shape gate to match the
+    // operator's --cricket-filter setting. Trackers that don't ship the
+    // knob log a debug notice and continue — that's fine, the recorder's
+    // cricketDiscard half will end up as a no-op too (no bat-like counter
+    // ever increments to compare against, but no discard-on-empty either,
+    // because a plain tracker's @c batLikeEventsSinceBoot default =
+    // totalEventsSinceBoot() ie. always changes when an event closes).
+    if (!m_tracker->setTunable("sweep_gate_enabled",
+                               m_cfg.cricketFilter ? 1.0 : 0.0)) {
+        LS_DEBUG("dsp", "tracker '%s' does not accept sweep_gate_enabled; "
+                        "--cricket-filter has no detector-side effect",
+                 m_cfg.algorithm.c_str());
+    }
+
+    // The temporal repetition-rate guard needs the hop size to convert
+    // onset frame indices into seconds. Pipeline is the authoritative
+    // source (configure() takes sampleRate + fftSize but not hop). Older
+    // trackers ignore the knob silently.
+    m_tracker->setTunable("hop_size_samples",
+                          static_cast<double>(m_cfg.hopSize));
+
     LS_INFO("dsp", "pipeline start algo=%s sr=%d fft=%zu hop=%zu hpf=%.0fHz snr=%.2f",
             m_cfg.algorithm.c_str(), m_cfg.sampleRate,
             m_cfg.fftSize, m_cfg.hopSize, hpfCutoff, m_cfg.snrThreshold);
@@ -110,9 +131,15 @@ void DspPipeline::notifyInput() {
     m_wakeCv.notify_one();
 }
 
-void DspPipeline::publish(bool active, float loHz, float hiHz) {
+void DspPipeline::publish(bool active, float loHz, float hiHz,
+                          std::uint64_t batLikeEvents) {
     const bool wasActive = m_active.load(std::memory_order_relaxed);
     m_loHiBits.store(packLoHi(loHz, hiHz), std::memory_order_release);
+    // Publish batLikeEvents BEFORE flipping active low. The recorder reads
+    // the counter at endRecording() time, which is triggered by observing
+    // active=false — release-order here means the reader that sees the
+    // active flip also sees the counter increment from a just-closed event.
+    m_batLikeEvents.store(batLikeEvents, std::memory_order_release);
     m_active.store(active, std::memory_order_release);
     if (wasActive && !active) {
         m_generation.fetch_add(1, std::memory_order_release);
@@ -124,7 +151,8 @@ echobox::recorder::DetectorStateSnapshot DspPipeline::snapshot() const {
     s.active     = m_active.load(std::memory_order_acquire);
     const auto p = m_loHiBits.load(std::memory_order_acquire);
     unpackLoHi(p, s.loHz, s.hiHz);
-    s.generation = m_generation.load(std::memory_order_acquire);
+    s.generation    = m_generation.load(std::memory_order_acquire);
+    s.batLikeEvents = m_batLikeEvents.load(std::memory_order_acquire);
     return s;
 }
 
@@ -187,7 +215,8 @@ void DspPipeline::loop() {
             Annotation    ann{};
             m_tracker->processFrame(magBuffer, currentFrame, state, ann);
 
-            publish(state.active, state.lo_hz, state.hi_hz);
+            publish(state.active, state.lo_hz, state.hi_hz,
+                    m_tracker->batLikeEventsSinceBoot());
 
             samplesCollected = 0;
             ++currentFrame;

@@ -19,6 +19,7 @@
 namespace echobox::logging {
 
 class JsonLineSink;
+class ConsoleSink;
 
 /// @brief Construction-time configuration for the logger.
 struct LoggerConfig {
@@ -32,6 +33,11 @@ struct LoggerConfig {
     unsigned int          keepFiles{5};
     /// Consumer thread sleep when the queue is empty, in ms.
     unsigned int          pollIntervalMs{20};
+    /// Mirror every record to a human-readable stderr sink alongside
+    /// the JSON-lines file sink. Field operators expect to see startup /
+    /// heartbeat / errors on the console when they SSH in; the file sink
+    /// stays JSON for machine parsing.
+    bool                  console{true};
 };
 
 /**
@@ -83,6 +89,7 @@ private:
     std::atomic<LogLevel> m_minLevel{LogLevel::Info};
     LogQueue              m_queue;
     std::unique_ptr<JsonLineSink> m_sink;
+    std::unique_ptr<ConsoleSink>  m_console;
     std::thread           m_thread;
     unsigned int          m_pollIntervalMs{20};
 };

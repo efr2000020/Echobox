@@ -5,6 +5,7 @@
 /// Logger implementation. See Logger.hpp for the contract.
 
 #include "Logger.hpp"
+#include "ConsoleSink.hpp"
 #include "JsonLineSink.hpp"
 #include <chrono>
 #include <cstdarg>
@@ -34,6 +35,9 @@ void Logger::start(const LoggerConfig& cfg) {
     m_pollIntervalMs = cfg.pollIntervalMs;
     m_sink = std::make_unique<JsonLineSink>(cfg.dir, cfg.baseName,
                                             cfg.maxBytesPerFile, cfg.keepFiles);
+    if (cfg.console) {
+        m_console = std::make_unique<ConsoleSink>();
+    }
     m_thread = std::thread(&Logger::consumerLoop, this);
 }
 
@@ -47,10 +51,18 @@ void Logger::stop() {
         std::vector<LogRecord> records;
         std::size_t dropped = 0;
         m_queue.drain(records, dropped);
-        for (const auto& r : records) m_sink->write(r);
-        if (dropped > 0) m_sink->writeDropped(dropped);
+        for (const auto& r : records) {
+            m_sink->write(r);
+            if (m_console) m_console->write(r);
+        }
+        if (dropped > 0) {
+            m_sink->writeDropped(dropped);
+            if (m_console) m_console->writeDropped(dropped);
+        }
         m_sink->flush();
+        if (m_console) m_console->flush();
         m_sink.reset();
+        m_console.reset();
     }
 }
 
@@ -86,9 +98,16 @@ void Logger::consumerLoop() {
         m_queue.drain(batch, dropped);
 
         if (!batch.empty() || dropped > 0) {
-            for (const auto& r : batch) m_sink->write(r);
-            if (dropped > 0) m_sink->writeDropped(dropped);
+            for (const auto& r : batch) {
+                m_sink->write(r);
+                if (m_console) m_console->write(r);
+            }
+            if (dropped > 0) {
+                m_sink->writeDropped(dropped);
+                if (m_console) m_console->writeDropped(dropped);
+            }
             m_sink->flush();
+            if (m_console) m_console->flush();
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(m_pollIntervalMs));
         }

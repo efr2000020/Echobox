@@ -205,6 +205,11 @@ bool writeSidecar(const std::filesystem::path& wavPath,
            << ", \"peak_snr\": "       << fmtFloat(e.peak_snr)
            << ", \"lo_hz\": "          << fmtFloat(e.lo_hz)
            << ", \"hi_hz\": "          << fmtFloat(e.hi_hz)
+           << ", \"bandwidth_khz\": "  << fmtFloat(e.bandwidth_khz)
+           << ", \"drift_khz\": "      << fmtFloat(e.drift_khz)
+           << ", \"path_ratio\": "     << fmtFloat(e.path_ratio)
+           << ", \"mono_fraction\": "  << fmtFloat(e.mono_fraction)
+           << ", \"gate_rejected\": "  << (e.gate_rejected ? "true" : "false")
            << "}";
     }
     os << (payload.events.empty() ? "" : "\n  ") << "]\n";

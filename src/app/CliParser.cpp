@@ -124,9 +124,21 @@ const char* helpText() {
         "  --min-length-ms <int>     Discard recordings shorter than this (default: 0, off)\n"
         "  --max-length-ms <int>     Close recordings reaching this length (default: 5000, 0 = no cap)\n"
         "\n"
+        "Cricket filter:\n"
+        "  --cricket-filter on|off   Master switch for the cricket-rejection filter.\n"
+        "                            When on (default), the detector's sweep-shape gate\n"
+        "                            AND the recorder's post-hoc no-bat-like-event\n"
+        "                            discard both engage. When off, both halves are\n"
+        "                            disabled — the field escape hatch if a site\n"
+        "                            produces bat calls the gate can't characterise.\n"
+        "                            (default: on)\n"
+        "\n"
         "Logging:\n"
         "  --log-dir <path>          Log output dir (default: ./logs)\n"
         "  --log-level off|debug|info|warn|error   (default: off)\n"
+        "  --console-log on|off      Mirror log records to stderr (default: on)\n"
+        "  --heartbeat-sec <int>     Emit an app:HEARTBEAT line every N seconds\n"
+        "                            (default: 60; 0 disables)\n"
         "\n"
         "  -h, --help                Show this help and exit\n"
         "  -V, --version             Print version and exit\n";
@@ -204,6 +216,20 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
                 return err("invalid --log-level (use debug|info|warn|error)");
             }
             cfg.logLevel = lvl;
+        }
+        else if (k == "cricket-filter") {
+            if      (v == "on"  || v == "1" || v == "true")  cfg.cricketFilter = true;
+            else if (v == "off" || v == "0" || v == "false") cfg.cricketFilter = false;
+            else return err("invalid --cricket-filter (use on|off)");
+        }
+        else if (k == "console-log") {
+            if      (v == "on"  || v == "1" || v == "true")  cfg.consoleLog = true;
+            else if (v == "off" || v == "0" || v == "false") cfg.consoleLog = false;
+            else return err("invalid --console-log (use on|off)");
+        }
+        else if (k == "heartbeat-sec") {
+            std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --heartbeat-sec");
+            cfg.heartbeatSec = u;
         }
         else {
             return err("unknown option --" + std::string(k));

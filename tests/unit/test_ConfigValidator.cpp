@@ -70,7 +70,10 @@ TEST_CASE("ConfigValidator: recording length invariants", "[config]") {
         cfg.minLengthMs = 1000;
         cfg.maxLengthMs = 5000;
         cfg.preRollMs = 100;
-        cfg.silenceMs = 100;
+        // The silence-ms floor is 200 ms (see checkSilenceExceedsHangover)
+        // so the counter read at end-of-clip cannot race a still-open
+        // event. Keep the test above that floor.
+        cfg.silenceMs = 250;
         CHECK(validateConfig(cfg).empty());
     }
 
@@ -113,5 +116,31 @@ TEST_CASE("ConfigValidator: recording budget invariants", "[config]") {
         auto errors = validateConfig(cfg);
         REQUIRE_FALSE(errors.empty());
         CHECK(errors[0].find("must be at least") != std::string::npos);
+    }
+}
+
+TEST_CASE("ConfigValidator: silence exceeds hangover invariant "
+          "(cricket-filter counter-race guard)",
+          "[config]") {
+    Config cfg;
+
+    SECTION("silence at 200 ms floor is valid") {
+        cfg.silenceMs = 200;
+        CHECK(validateConfig(cfg).empty());
+    }
+
+    SECTION("silence below 200 ms floor is rejected") {
+        // The recorder reads the detector's kept-events counter after
+        // silenceMs of idle. If silence < hangover×frame_ms, an event
+        // that opens during that window would race the counter read and
+        // a pure-cricket clip could slip through the discard.
+        cfg.silenceMs = 150;
+        auto errors = validateConfig(cfg);
+        REQUIRE_FALSE(errors.empty());
+        bool found = false;
+        for (const auto& e : errors) {
+            if (e.find("--silence-ms") != std::string::npos) found = true;
+        }
+        CHECK(found);
     }
 }

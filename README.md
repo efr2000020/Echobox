@@ -88,12 +88,13 @@ Run `./Echobox --help` to see the full list.
 | `--device <name>`     | Which microphone to listen to                             | `default`      |
 | `--output-dir <p>`    | Where recordings are saved                                | `./recordings` |
 | `--preroll-ms <n>`    | How much audio to keep from *before* each call (ms)       | `1000`         |
-| `--silence-ms <n>`    | Quiet time after a call before the recording closes (ms)  | `2000`         |
+| `--silence-ms <n>`    | Quiet time after a call before the recording closes (ms; must be ≥ 200) | `2000`         |
 | `--min-length-ms <n>` | Drop any recording shorter than this (`0` = off)          | `0`            |
 | `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `5000`  |
 | `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
 | `--freq-hi-hz <n>`    | Top of the frequency range to listen for (cannot exceed Nyquist of your mic's `--sample-rate`) | `192000`       |
 | `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `12.0`         |
+| `--cricket-filter on\|off` | Reject cricket-like signals before they become WAVs (see [Cricket filter](#cricket-filter) below) | `on` |
 
 Lengths above are end-to-end (pre-roll + detected activity + silence-after).
 Echobox refuses to start if `--max-length-ms` is smaller than
@@ -123,6 +124,36 @@ Examples:
 ```
 ---
 
+## Cricket filter
+
+Sites with active crickets can easily fill an SD card with cricket
+recordings before bats show up. Echobox now recognises the shape of a
+cricket chirp — narrow bandwidth, a metronomic repetition pattern — and
+rejects it in two places:
+
+- The **detector** downgrades cricket-shaped events during frame
+  processing, so they never open a recording in the first place.
+- The **recorder** discards any clip whose window saw no bat-like event,
+  so an isolated event that survives the detector still gets dropped
+  before it becomes a WAV.
+
+The filter is **on by default** and requires no configuration. Bat
+recall on the validation corpora is unchanged (including narrow-band
+species like *Nyctalus leisleri*, *Nyctalus noctula*, and
+*Rhinolophus ferrumequinum*).
+
+If a deployment site produces bat calls the filter can't recognise, turn
+it off — one flag disables both halves:
+
+```bash
+./run.sh --device plughw:CARD=UltraMic384K --cricket-filter off
+```
+
+With `--cricket-filter off` the recorder behaves as if the filter were
+never present.
+
+---
+
 ## Troubleshooting
 
 Logging is **off by default** — a shipped unit writes nothing to `./logs/` so
@@ -137,6 +168,17 @@ something:
 `debug` captures the detector's per-frame reasoning around each saved WAV and
 is the right level when chasing false positives, but it writes several hundred
 thousand lines per day — don't leave a long-running field unit on `debug`.
+
+When logging is on, Echobox also mirrors each record to `stderr` in a
+human-readable form (colourised on a real terminal) and emits an
+`app: HEARTBEAT …` line every 60 s that carries uptime, kept-event
+count, free disk, available memory, and any DSP overflow count. Both
+are useful when SSH'd into a running unit. Adjust or disable with:
+
+| Option                   | What it does                                       | Default |
+| ------------------------ | -------------------------------------------------- | ------- |
+| `--console-log on\|off`  | Mirror log records to `stderr` while logging is on | `on`    |
+| `--heartbeat-sec <n>`    | Seconds between `app: HEARTBEAT` lines (`0` = off) | `60`    |
 
 - **Device errors** — Double-check the `--device` name with `arecord -l`.
 - **No recordings** — Ensure the mic actually captures the ultrasonic range you've configured (`--sample-rate` set to match, `--freq-hi-hz` no higher than its Nyquist) and that ultrasonic activity is present.

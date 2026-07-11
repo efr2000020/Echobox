@@ -54,6 +54,14 @@ struct RecorderConfig {
     /// next tuning session is large. Set to false to suppress (e.g. tests
     /// that exercise only the recording path).
     bool                  writeSidecar{true};
+    /// Discard clips whose window saw no bat-like event (i.e. every
+    /// detector event during the clip was gate-rejected). Together with
+    /// the detector's @c sweep_gate_enabled tunable, this is the recorder
+    /// half of the cricket filter — a pure-cricket recording is written
+    /// to a temp WAV, then aborted at close instead of finalised. Wired
+    /// to the @c --cricket-filter CLI flag; disabling both halves with
+    /// that one switch restores the behaviour of the pre-gate recorder.
+    bool                  cricketDiscard{true};
 };
 
 /**
@@ -118,6 +126,10 @@ private:
     float                                 m_eventLoHz{0.0f};
     float                                 m_eventHiHz{0.0f};
     std::filesystem::path                 m_currentTempPath;
+    // Snapshot of the detector's kept-events counter at beginRecording.
+    // A clip whose counter hasn't advanced at endRecording contained no
+    // bat-like event → discard it if @c cricketDiscard is set.
+    std::uint64_t                         m_batLikeAtStart{0};
 };
 
 } // namespace echobox::recorder

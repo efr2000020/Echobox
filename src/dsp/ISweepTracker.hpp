@@ -29,7 +29,14 @@ struct Annotation {
 // already logs via LS_INFO at event start/end, but as structured data that
 // the recorder can serialise into a sidecar without parsing log lines.
 //
-// Plain old data, layout-compatible with the C side (validator_c_api.h).
+// The trailing sweep-shape block (bandwidth_khz, drift_khz, path_ratio,
+// mono_fraction, gate_rejected) is populated by detectors that implement
+// the cricket false-positive gate; default-zero is meaningful for older
+// detectors that don't (the validator treats all-zero sweep features as
+// "not computed").
+//
+// Plain old data; EventFeatures is NOT mirrored in the validator C API today —
+// it travels device-to-validator via the JSON sidecar, not the C FFI struct.
 struct EventFeatures {
     uint32_t start_frame;
     uint32_t end_frame;
@@ -40,6 +47,12 @@ struct EventFeatures {
     float    peak_snr;
     float    lo_hz;
     float    hi_hz;
+    // --- sweep-shape features (per-frame dominant-bin statistics) ---
+    float    bandwidth_khz;     // 10-dB bandwidth at the dominant frame
+    float    drift_khz;         // dominant-bin frequency excursion over the event
+    float    path_ratio;        // sum(|Δbin|) / max(1, range); ~1 sweep, ~2 hopping
+    float    mono_fraction;     // max(#up,#down) / (#up+#down)
+    bool     gate_rejected;     // reserved for a future in-detector gate; today always false
 };
 
 // Bundle of state the recorder drains from the tracker when a WAV closes,
@@ -251,6 +264,22 @@ public:
      * Default returns 0 for plugins that don't track it.
      */
     virtual std::uint64_t totalEventsSinceBoot() const { return 0; }
+
+    /**
+     * Wait-free count of *kept* (non-gate-rejected) events since this
+     * plugin instance was constructed. The recorder snapshots this on
+     * beginRecording() and again at endRecording(); a clip whose window
+     * saw no bat-like event is discarded on close. Detectors that don't
+     * ship a false-positive gate (or don't want to participate in the
+     * discard) return the same value as totalEventsSinceBoot() so every
+     * clip is kept, matching the pre-gate behaviour.
+     *
+     * Implementations MUST make this wait-free: the recorder polls it at
+     * a few-millisecond cadence and must never wait on the audio thread.
+     */
+    virtual std::uint64_t batLikeEventsSinceBoot() const {
+        return totalEventsSinceBoot();
+    }
 };
 
 // --- Plugin entry points (resolved via dlsym by TrackerRegistry) ---

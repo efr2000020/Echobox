@@ -9,6 +9,10 @@ add_executable(unit_tests
     test_PreRollBuffer.cpp
     test_LogQueue.cpp
     test_Sidecar.cpp
+    test_SweepShape.cpp
+    test_RepStats.cpp
+    test_Recorder.cpp
+    test_ConsoleSink.cpp
 )
 
 target_link_libraries(unit_tests
