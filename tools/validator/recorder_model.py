@@ -46,17 +46,19 @@ class RecorderModelConfig:
     """Frame-domain mirror of the production ``RecorderConfig``.
 
     Defaults match ``src/app/Config.hpp`` so a run with ``RecorderModelConfig()``
-    predicts the shipping unit's behaviour on the same recording.
+    predicts the shipping unit's behaviour on the same recording. R2v3 ships
+    short-clip defaults (one clip per bat call, hard-capped at 200 ms) with
+    the cricket filter on by default; the long-pass profile is available as
+    an explicit override (``preroll_ms=1000, silence_ms=2000, max_length_ms=5000``).
     """
-    preroll_ms:   int  = 1000
-    silence_ms:   int  = 2000
+    preroll_ms:   int  = 50
+    silence_ms:   int  = 50
     min_length_ms: int = 0
-    max_length_ms: int = 5000    # 0 = uncapped
+    max_length_ms: int = 200     # 0 = uncapped
     # Cricket-filter deferred discard: drop clips whose window saw no
-    # bat-like event. Off models the recorder before the cricket filter
-    # was wired up (equivalently, `--cricket-filter off`); on models
-    # the shipping default.
-    cricket_discard: bool = False
+    # bat-like event. Off models `--cricket-filter off` (the field
+    # escape hatch); on models the shipping default.
+    cricket_discard: bool = True
 
 
 @dataclass
@@ -152,15 +154,26 @@ def run_on_spectrogram(mags: np.ndarray,
         if (f - last_active) >= silence_frames:
             _finish(result, begin_frame, last_active, preroll_frames,
                     frame_ms, min_len_frames,
-                    bat_like_in_clip, rcfg.cricket_discard)
+                    bat_like_in_clip, rcfg.cricket_discard,
+                    max_len_active=False)
             state = "idle"
             continue
 
-        # Hit the max-length cap. Recorder saves what it has and returns to idle.
-        if max_len_frames is not None and (f - begin_frame) >= max_len_frames:
-            _finish(result, begin_frame, f, preroll_frames,
+        # Hit the max-length cap. Recorder saves what it has and returns to
+        # idle. The C++ recorder's cap is on TOTAL frames written
+        # (preroll + live), matching what ends up in the WAV; mirror that
+        # here so the model's saved_length_ms actually respects the cap.
+        # §2.3 guard: if the event is still active at the cap, the detector
+        # hasn't stamped the kept-events counter yet so the cricket-discard
+        # must be skipped for this clip.
+        if (max_len_frames is not None
+                and (preroll_frames + (f - begin_frame)) >= max_len_frames):
+            end_frame = max(begin_frame,
+                            begin_frame + (max_len_frames - preroll_frames))
+            _finish(result, begin_frame, end_frame, preroll_frames,
                     frame_ms, min_len_frames,
-                    bat_like_in_clip, rcfg.cricket_discard)
+                    bat_like_in_clip, rcfg.cricket_discard,
+                    max_len_active=bool(st.active))
             state = "idle"
 
     # Flush an in-progress recording at end of stream so the metric matches
@@ -168,7 +181,8 @@ def run_on_spectrogram(mags: np.ndarray,
     if state == "active":
         _finish(result, begin_frame, last_active, preroll_frames,
                 frame_ms, min_len_frames,
-                bat_like_in_clip, rcfg.cricket_discard)
+                bat_like_in_clip, rcfg.cricket_discard,
+                max_len_active=False)
 
     return result
 
@@ -195,7 +209,8 @@ def _finish(result: RecorderModelResult,
             preroll_frames: int, frame_ms: float,
             min_len_frames: int,
             bat_like_in_clip: int,
-            cricket_discard: bool) -> None:
+            cricket_discard: bool,
+            max_len_active: bool = False) -> None:
     saved_len_frames = preroll_frames + (end_frame - begin_frame)
     saved_len_ms     = saved_len_frames * frame_ms
     dur_ms           = (end_frame - begin_frame) * frame_ms
@@ -203,7 +218,10 @@ def _finish(result: RecorderModelResult,
     discard_reason = ""
     if saved_len_frames < min_len_frames:
         discard_reason = "min-length"
-    elif cricket_discard and bat_like_in_clip == 0:
+    elif cricket_discard and bat_like_in_clip == 0 and not max_len_active:
+        # Mirror Recorder::endRecording §2.3: a max-length forced close on
+        # a still-open event cannot fairly cricket-discard because the
+        # detector has not yet stamped the kept-events counter.
         discard_reason = "cricket-gate"
 
     rec = SavedRecording(
