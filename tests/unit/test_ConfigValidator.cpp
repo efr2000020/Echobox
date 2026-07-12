@@ -155,3 +155,39 @@ TEST_CASE("ConfigValidator: silence exceeds hangover invariant "
         CHECK(validateConfig(cfg).empty());
     }
 }
+
+TEST_CASE("ConfigValidator: shipped short-clip defaults validate cleanly",
+          "[config]") {
+    // Regression guard: the defaults in Config.hpp must satisfy every
+    // cross-flag invariant, including the derived silence floor and the
+    // preroll+silence recording budget under the 200 ms cap.
+    Config cfg;
+    CHECK(cfg.preRollMs   == 50u);
+    CHECK(cfg.silenceMs   == 50u);
+    CHECK(cfg.maxLengthMs == 200u);
+    CHECK(validateConfig(cfg).empty());
+}
+
+TEST_CASE("ConfigValidator: preroll+silence budget under short-clip defaults",
+          "[config]") {
+    Config cfg;
+    cfg.preRollMs = 50;
+    cfg.silenceMs = 50;
+
+    SECTION("max=200 leaves exactly preroll+silence room") {
+        cfg.maxLengthMs = 200;
+        CHECK(validateConfig(cfg).empty());
+    }
+
+    SECTION("max=80 undershoots preroll+silence and is rejected") {
+        cfg.maxLengthMs = 80;
+        auto errors = validateConfig(cfg);
+        REQUIRE_FALSE(errors.empty());
+        bool found = false;
+        for (const auto& e : errors) {
+            if (e.find("--max-length-ms") != std::string::npos
+                && e.find("--preroll-ms") != std::string::npos) found = true;
+        }
+        CHECK(found);
+    }
+}

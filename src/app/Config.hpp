@@ -49,8 +49,17 @@ struct Config {
 
     // --- Recorder ---
     std::filesystem::path outputDir{"./recordings"};
-    std::uint32_t   preRollMs{1000};
-    std::uint32_t   silenceMs{2000};
+    // Short-clip defaults (R2v3): downstream classifiers commonly cap ingest
+    // at ~200 ms per file, so the shipped recorder produces one clip per
+    // bat call rather than grouping a pass into one long WAV. preRollMs
+    // covers the ~3 ms trigger latency with headroom while leaving room
+    // under the 200 ms cap; silenceMs sits just above the derived cricket-
+    // filter counter-race floor (see ConfigValidator). Operators who want
+    // R1/R2v2-style grouping should pass the "long-pass profile"
+    // documented in the README: --preroll-ms 1000 --silence-ms 2000
+    // --max-length-ms 5000.
+    std::uint32_t   preRollMs{50};
+    std::uint32_t   silenceMs{50};
     // Min / max length of the saved WAV (pre-roll + active + hangover, end to
     // end). Recordings shorter than min are deleted instead of finalized;
     // recordings reaching max are closed early. maxLengthMs == 0 means "no
@@ -59,7 +68,7 @@ struct Config {
     // leaves room for preRollMs + silenceMs, so the defaults below cannot
     // silently degenerate into "always closes before the call".
     std::uint32_t   minLengthMs{0};
-    std::uint32_t   maxLengthMs{5000};
+    std::uint32_t   maxLengthMs{200};
 
     std::filesystem::path logDir{"./logs"};
     // Off by default: a shipped unit running unattended writes nothing to
