@@ -130,6 +130,11 @@ private:
     // A clip whose counter hasn't advanced at endRecording contained no
     // bat-like event → discard it if @c cricketDiscard is set.
     std::uint64_t                         m_batLikeAtStart{0};
+    // Set by @c appendLiveAudio when the max-length cap forces a close
+    // while an event is still active — the triggering event has not yet
+    // stamped the counter, so @c endRecording must NOT cricket-discard
+    // this clip (the discard decision only applies to closed events).
+    bool                                  m_lastCloseWasMaxLenActive{false};
 };
 
 } // namespace echobox::recorder

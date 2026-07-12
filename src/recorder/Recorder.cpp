@@ -135,7 +135,8 @@ void Recorder::beginRecording(const DetectorStateSnapshot& s) {
     // Baseline the kept-events counter now. If the same value is still
     // observed at endRecording(), no bat-like event fired during the clip and
     // it gets discarded when cricketDiscard is enabled.
-    m_batLikeAtStart   = s.batLikeEvents;
+    m_batLikeAtStart              = s.batLikeEvents;
+    m_lastCloseWasMaxLenActive    = false;
 
     m_currentTempPath = m_names.tempPath(m_eventStartWall);
     m_writer = std::make_unique<WavWriter>(m_currentTempPath,
@@ -178,6 +179,12 @@ void Recorder::appendLiveAudio() {
 
     for (;;) {
         if (m_writer->framesWritten() >= maxFrames) {
+            // A max-length forced close on a still-active event means the
+            // detector hasn't closed the event yet and therefore hasn't
+            // stamped the kept-events counter. Flag the close so
+            // endRecording() keeps the clip instead of cricket-discarding
+            // a mid-flight event.
+            m_lastCloseWasMaxLenActive = m_detector.snapshot().active;
             endRecording();   // close + rename (or discard if under min)
             return;
         }
@@ -196,6 +203,7 @@ void Recorder::appendLiveAudio() {
             std::min<std::uint64_t>(got, remaining));
         m_writer->write(std::span<const std::int16_t>(chunk.data(), toWrite));
         if (toWrite < got) {
+            m_lastCloseWasMaxLenActive = m_detector.snapshot().active;
             endRecording();
             return;
         }
@@ -238,8 +246,12 @@ void Recorder::endRecording() {
     // all — a spurious trigger). Reading the snapshot AFTER the silence
     // timeout has elapsed means any event still open at the start of this
     // call has definitively closed and stamped the counter (guaranteed
-    // because ConfigValidator enforces silenceMs > hangover×frame_ms).
-    if (m_cfg.cricketDiscard) {
+    // because ConfigValidator enforces silenceMs >= hangover×frame_ms +
+    // poll + margin). The one case where that guarantee does NOT hold is a
+    // max-length forced close with the event still active — in that case
+    // the triggering event has not yet stamped the counter, so we cannot
+    // fairly judge it here and must keep the clip.
+    if (m_cfg.cricketDiscard && !m_lastCloseWasMaxLenActive) {
         const auto s = m_detector.snapshot();
         if (s.batLikeEvents == m_batLikeAtStart) {
             LS_DEBUG("recorder",

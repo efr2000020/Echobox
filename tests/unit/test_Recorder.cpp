@@ -174,6 +174,106 @@ TEST_CASE("Recorder keeps a clip whose window saw at least one bat-like event",
 }
 
 
+TEST_CASE("Recorder keeps a max-length forced close with the event still active",
+          "[recorder][cricket-discard][max-length]") {
+    // R2v3 short-clip regression guard: with maxLengthMs low enough that a
+    // long-continuous event trips the cap while it's still open, the
+    // detector has NOT yet stamped the kept-events counter for that event.
+    // A naive discard check would drop the clip; the max-length forced-
+    // close guard in Recorder::endRecording() must keep it.
+    const auto outputDir = makeTempOutputDir("maxlen-active");
+
+    PreRollBuffer pr(48000);
+    feedPreRoll(pr, 4800);              // seed some pre-roll history
+
+    FakeProvider provider;
+
+    RecorderConfig cfg;
+    cfg.outputDir       = outputDir;
+    cfg.sampleRate      = 48000;
+    cfg.channels        = 1;
+    cfg.preRollMs       = 20;
+    cfg.silenceMs       = 60;
+    cfg.minLengthMs     = 0;
+    cfg.maxLengthMs     = 120;         // small cap so the cap fires first
+    cfg.pollIntervalMs  = 5;
+    cfg.writeSidecar    = false;
+    cfg.cricketDiscard  = true;
+
+    Recorder rec(cfg, pr, provider);
+    rec.start();
+
+    // Pump the pre-roll continuously while the event is "active" so the
+    // writer accumulates real frames and can actually trip maxLengthMs
+    // (otherwise the recorder just drains the seed and stalls at
+    // 100 ms of samples).
+    std::atomic<bool> producing{true};
+    std::thread producer([&]() {
+        while (producing.load(std::memory_order_acquire)) {
+            feedPreRoll(pr, 480);       // 10 ms @ 48 kHz per tick
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    });
+
+    // Drive a continuous "active" event that outlasts maxLengthMs. The
+    // counter is NEVER bumped, so a naive check would discard. The guard
+    // must keep the clip because the event is still open at the forced
+    // close.
+    provider.set_active(true);
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    provider.set_active(false);
+    producing.store(false, std::memory_order_release);
+    producer.join();
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    rec.stop();
+
+    CHECK(countWavs(outputDir) >= 1);
+
+    fs::remove_all(outputDir);
+}
+
+
+TEST_CASE("Recorder cricket-discard still works at short silence (50 ms)",
+          "[recorder][cricket-discard][short-clip]") {
+    // R2v3 short-silence defaults must not weaken the cricket filter: a
+    // cricket-only clip (no bat-like events) is still discarded at 50 ms
+    // silence exactly as at 2000 ms.
+    const auto outputDir = makeTempOutputDir("short-silence-discard");
+
+    PreRollBuffer pr(48000);
+    feedPreRoll(pr, 32000);
+
+    FakeProvider provider;
+
+    RecorderConfig cfg;
+    cfg.outputDir       = outputDir;
+    cfg.sampleRate      = 48000;
+    cfg.channels        = 1;
+    cfg.preRollMs       = 50;
+    cfg.silenceMs       = 50;
+    cfg.minLengthMs     = 0;
+    cfg.maxLengthMs     = 0;
+    cfg.pollIntervalMs  = 5;
+    cfg.writeSidecar    = false;
+    cfg.cricketDiscard  = true;
+
+    Recorder rec(cfg, pr, provider);
+    rec.start();
+
+    provider.set_active(true);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    provider.set_active(false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    rec.stop();
+
+    CHECK(countWavs(outputDir) == 0);
+
+    fs::remove_all(outputDir);
+}
+
+
 TEST_CASE("Recorder keeps every clip when cricketDiscard is off",
           "[recorder][cricket-discard]") {
     // Kill-switch behaviour: --cricket-filter off must reproduce R1
