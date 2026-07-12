@@ -70,9 +70,9 @@ TEST_CASE("ConfigValidator: recording length invariants", "[config]") {
         cfg.minLengthMs = 1000;
         cfg.maxLengthMs = 5000;
         cfg.preRollMs = 100;
-        // The silence-ms floor is 200 ms (see checkSilenceExceedsHangover)
-        // so the counter read at end-of-clip cannot race a still-open
-        // event. Keep the test above that floor.
+        // At shipping 384 kHz / hop-512 the silence floor derives to
+        // 40 ms (see checkSilenceExceedsHangover); use a comfortably
+        // larger value here.
         cfg.silenceMs = 250;
         CHECK(validateConfig(cfg).empty());
     }
@@ -123,24 +123,35 @@ TEST_CASE("ConfigValidator: silence exceeds hangover invariant "
           "(cricket-filter counter-race guard)",
           "[config]") {
     Config cfg;
+    // Guarantee we're testing the silence floor in isolation, not the
+    // preroll+silence budget invariant.
+    cfg.preRollMs   = 50;
+    cfg.maxLengthMs = 5000;
 
-    SECTION("silence at 200 ms floor is valid") {
-        cfg.silenceMs = 200;
+    SECTION("filter on, silence at 40 ms floor is valid") {
+        cfg.cricketFilter = true;
+        cfg.silenceMs     = 40;
         CHECK(validateConfig(cfg).empty());
     }
 
-    SECTION("silence below 200 ms floor is rejected") {
-        // The recorder reads the detector's kept-events counter after
-        // silenceMs of idle. If silence < hangover×frame_ms, an event
-        // that opens during that window would race the counter read and
-        // a pure-cricket clip could slip through the discard.
-        cfg.silenceMs = 150;
+    SECTION("filter on, silence one below 40 ms floor is rejected") {
+        cfg.cricketFilter = true;
+        cfg.silenceMs     = 39;
         auto errors = validateConfig(cfg);
         REQUIRE_FALSE(errors.empty());
-        bool found = false;
+        bool foundFlag  = false;
+        bool namesFloor = false;
         for (const auto& e : errors) {
-            if (e.find("--silence-ms") != std::string::npos) found = true;
+            if (e.find("--silence-ms") != std::string::npos) foundFlag  = true;
+            if (e.find("40ms")         != std::string::npos) namesFloor = true;
         }
-        CHECK(found);
+        CHECK(foundFlag);
+        CHECK(namesFloor);
+    }
+
+    SECTION("filter off removes the floor entirely") {
+        cfg.cricketFilter = false;
+        cfg.silenceMs     = 10;   // well below the on-floor
+        CHECK(validateConfig(cfg).empty());
     }
 }

@@ -6,6 +6,8 @@
 
 #include "ConfigValidator.hpp"
 
+#include <cmath>
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -52,27 +54,39 @@ std::optional<std::string> checkLengthOrder(const Config& cfg) {
 }
 
 // Ordering invariant for the cricket-filter discard path: the recorder
-// reads the detector's kept-events counter at endRecording after
+// reads the detector's kept-events counter at endRecording() after
 // silenceMs of idle. That read must happen AFTER any in-progress event
 // has closed and stamped the counter, or a discard could race an event
-// that fires inside the silence window. The detector closes an event
-// after hangoverFrames × frame_ms idle; with typical defaults (8 frames
-// × 512/384000 ms ≈ 10.7 ms) and silenceMs default 2000 ms the guard is
-// ~200x. Reject a config that undoes this ordering: silenceMs must
-// exceed a generous frame_ms budget. (The detector tunable itself is
-// not accessible here; we clamp the recorder side against the worst
-// realistic hangover instead.)
+// that fires inside the silence window. With the filter OFF nothing
+// reads the counter — no race, no floor. With it on we derive the floor
+// from the actual settle budget instead of a flat conservative pad.
 std::optional<std::string> checkSilenceExceedsHangover(const Config& cfg) {
-    // Worst-case frame_ms budget: hopSize / sampleRate * 1000. With
-    // hopSize=512, sampleRate=384000 → 1.33 ms/frame. A hangover of 64
-    // frames (8x default) is still ~85 ms — a 200 ms floor covers every
-    // realistic BandEnergyDetector hangover with generous room.
-    constexpr std::uint32_t kMinSilenceMs = 200;
+    if (!cfg.cricketFilter) return std::nullopt;
+
+    // Settle budget the counter needs before endRecording() reads it:
+    //   detector hangover  (event close stamps the counter)
+    // + recorder poll       (last-active is observed up to one poll late)
+    // + safety margin.
+    // ASSUMED_HANGOVER_FRAMES must track BandEnergyDetector's compiled
+    // hangover_frames default (8). The production app never overrides
+    // that tunable; if a future build exposes --hangover-frames, recompute
+    // this from the configured value instead.
+    constexpr std::uint32_t ASSUMED_HANGOVER_FRAMES = 8;
+    constexpr std::uint32_t RECORDER_POLL_MS        = 5;   // Recorder.hpp default
+    constexpr std::uint32_t SAFETY_MARGIN_MS        = 24;
+    const double frameMs =
+        1000.0 * static_cast<double>(cfg.hopSize) / static_cast<double>(cfg.sampleRate);
+    const std::uint32_t kMinSilenceMs =
+        static_cast<std::uint32_t>(std::ceil(ASSUMED_HANGOVER_FRAMES * frameMs))
+        + RECORDER_POLL_MS + SAFETY_MARGIN_MS;
+    // Evaluates to 40 ms at the shipping 384 kHz / hop-512 defaults.
+
     if (cfg.silenceMs < kMinSilenceMs) {
         return "--silence-ms (" + std::to_string(cfg.silenceMs)
              + ") must be at least " + std::to_string(kMinSilenceMs)
-             + "ms so the cricket-filter counter read at recording close "
-               "cannot race an event that opened during the silence window";
+             + "ms while --cricket-filter is on, so the discard counter read at "
+               "recording close cannot race an event still closing "
+               "(set --cricket-filter off to remove this floor)";
     }
     return std::nullopt;
 }
