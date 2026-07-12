@@ -87,10 +87,10 @@ Run `./Echobox --help` to see the full list.
 | --------------------- | --------------------------------------------------------- | -------------- |
 | `--device <name>`     | Which microphone to listen to                             | `default`      |
 | `--output-dir <p>`    | Where recordings are saved                                | `./recordings` |
-| `--preroll-ms <n>`    | How much audio to keep from *before* each call (ms)       | `1000`         |
-| `--silence-ms <n>`    | Quiet time after a call before the recording closes (ms; must be ≥ 200) | `2000`         |
+| `--preroll-ms <n>`    | How much audio to keep from *before* each call (ms)       | `50`           |
+| `--silence-ms <n>`    | Quiet time after a call before the recording closes (ms). With `--cricket-filter on` it must be ≥ a derived floor (~40 ms at 384 kHz / hop-512); `--cricket-filter off` removes the floor. | `50`           |
 | `--min-length-ms <n>` | Drop any recording shorter than this (`0` = off)          | `0`            |
-| `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `5000`  |
+| `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `200`   |
 | `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
 | `--freq-hi-hz <n>`    | Top of the frequency range to listen for (cannot exceed Nyquist of your mic's `--sample-rate`) | `192000`       |
 | `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `12.0`         |
@@ -100,6 +100,33 @@ Lengths above are end-to-end (pre-roll + detected activity + silence-after).
 Echobox refuses to start if `--max-length-ms` is smaller than
 `--preroll-ms + --silence-ms`, so a recording can never close before the
 detected call has had a chance to play out.
+
+### Short-clip recording (default)
+
+The shipped defaults produce **one clip per bat call, hard-capped at
+200 ms**. Downstream per-clip classifiers commonly cap ingest at that
+length, and the cricket-filter decision still runs on live FFT frames,
+so shorter clips do not weaken it. Two behaviours to be aware of:
+
+1. A multi-call bat pass becomes **several one-call clips** instead of a
+   single grouped WAV — presence is still preserved because the surviving
+   bat-like event yields at least one clip.
+2. `--cricket-filter off` disables the on-device cricket rejection, so
+   expect more files on the SD card / downstream classifier when running
+   with the filter off.
+
+### Long-pass profile (opt-in)
+
+To restore R1/R2v2-style grouping (one WAV per pass, up to 5 s), pass:
+
+```bash
+./run.sh --device plughw:CARD=UltraMic384K \
+         --preroll-ms 1000 --silence-ms 2000 --max-length-ms 5000
+```
+
+Existing deployments upgrading from R1 or R2v2 that rely on the old
+1000/2000/5000 defaults should either adopt the short-clip behaviour or
+pin the long-pass profile explicitly.
 
 ---
 
