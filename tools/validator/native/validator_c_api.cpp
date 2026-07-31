@@ -30,6 +30,8 @@ static_assert(sizeof(EbTunableInfo)   == sizeof(TunableInfo),
               "EbTunableInfo layout must match TunableInfo");
 static_assert(sizeof(EbPresetInfo)    == sizeof(PresetInfo),
               "EbPresetInfo layout must match PresetInfo");
+static_assert(sizeof(EbEventFeatures) == sizeof(EventFeatures),
+              "EbEventFeatures layout must match EventFeatures");
 static_assert(EB_TUNABLE_TYPE_FLOAT == TunableType::Float,
               "EB_TUNABLE_TYPE_FLOAT must equal TunableType::Float");
 static_assert(EB_TUNABLE_TYPE_INT   == TunableType::Int,
@@ -167,6 +169,21 @@ extern "C" size_t eb_detector_list_presets(EbDetector* d, EbPresetInfo* out_info
 extern "C" bool eb_detector_set_floor(EbDetector* d, const float* floor, size_t n_bins) {
     if (!d || !floor || n_bins == 0) return false;
     return d->tracker->seedNoiseFloor(std::span<const float>(floor, n_bins));
+}
+
+extern "C" size_t eb_detector_peek_pending_events(EbDetector* d,
+                                                  EbEventFeatures* out_events,
+                                                  size_t max) {
+    if (!d) return 0;
+    std::vector<EventFeatures> scratch;
+    if (!d->tracker->peekPendingEvents(scratch)) return 0;
+    if (out_events && max > 0) {
+        const size_t n = std::min(scratch.size(), max);
+        // Layout-compatible per the static_assert above, so a bulk memcpy
+        // is safe and preserves every field including the flags.
+        std::memcpy(out_events, scratch.data(), n * sizeof(EbEventFeatures));
+    }
+    return scratch.size();
 }
 
 extern "C" size_t eb_list_algorithms(const char** out_names, size_t max) {

@@ -16,10 +16,25 @@ option(ECHOBOX_BUILD_TESTS "Build unit tests (fetches Catch2 over the network)" 
 option(ECHOBOX_DYNAMIC_PLUGINS
        "Load detectors as hot-swappable .so plugins from ./algorithms (dev). OFF statically links the detector into a single binary (release)."
        OFF)
+# IEEE-strict math for the offline validator harness. See
+# tools/collection/docs/VALIDATION_PROVENANCE.md row 4b. When ON, replaces
+# -ffast-math with -fno-fast-math in Release builds. Recommended for the
+# bench parity workflow (verify_feature_parity.py) so the only remaining
+# harness-vs-device numerical drift is arch-specific SIMD, not
+# fast-math re-associations. Costs a small amount of STFT throughput on
+# the offline machine; the shipping device binary is unaffected because
+# it is normally built with this OFF.
+option(ECHOBOX_STRICT_MATH
+       "Use IEEE-strict math flags (drop -ffast-math). Recommended for parity work."
+       OFF)
 
 # Optimization / debug flags.
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3 -march=native -ffast-math)
+    if(ECHOBOX_STRICT_MATH)
+        add_compile_options(-O3 -march=native -fno-fast-math)
+    else()
+        add_compile_options(-O3 -march=native -ffast-math)
+    endif()
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-g -O0)
 endif()
@@ -68,3 +83,4 @@ message(STATUS "Echobox config:")
 message(STATUS "  build type        : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  dynamic plugins   : ${ECHOBOX_DYNAMIC_PLUGINS}")
 message(STATUS "  tests             : ${ECHOBOX_BUILD_TESTS}")
+message(STATUS "  strict math       : ${ECHOBOX_STRICT_MATH}")

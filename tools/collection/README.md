@@ -57,49 +57,77 @@ GREEN — the only §3 element requiring hardware to close.
 `recorder_model.py` agree with the shipping C++ recorder on real field
 data?" test. Reads decisions from Stream C, runs `recorder_model` on
 Stream A chunk-by-chunk, correlates predictions with real decisions by
-sample-range overlap, and prints a per-clip diff.
+sample-range overlap, and classifies each divergence:
 
-- **Every real decision matches** ⇒ **GREEN**. The model is promoted
-  from YELLOW (Python-only self-consistency) to GREEN (independent
-  agreement with the C++ implementation on real inputs).
-- **Any divergence** ⇒ **RED**. Per the plan's §4.1 rule: "flag it,
-  quantify the disagreement, and correct the model before any further
-  use." This tool exits non-zero on a single mismatch. Do not average.
+- **Every real decision matches** ⇒ **GREEN**. Model promoted from
+  YELLOW to GREEN.
+- **Divergence explained by boundary-proximity numerical drift**
+  (event feature within the parity check's `max_delta` of a gate
+  threshold) ⇒ **YELLOW**. Reported separately, does NOT fail. Fix
+  the numerical drift (see §4.2 / row 4b), not the model logic.
+- **Unexplained divergence** ⇒ **RED**. Real state-machine drift.
+  Fix the model. Per the plan's §4.1 rule: "flag it, quantify the
+  disagreement, and correct the model before any further use." This
+  tool does NOT apply a blanket percentage tolerance.
 
-Unit tests for the correlation logic (mismatch flag, missing-real,
-missing-model) live in `tests/test_verify_recorder_model.py` — those
-run without the native lib. End-to-end (real chunks + real firmware
-decisions) requires the bench-rehearsal path documented in
+This tool reads `<session_root>/parity_report.json` — produced by
+`verify_feature_parity.py` — to size the "boundary-proximity" bound.
+Run parity first; without it, the tool announces a conservative
+fallback and warns.
+
+Unit tests for the correlation + boundary logic
+(`tests/test_verify_recorder_model.py`) run without the native lib.
+End-to-end (real chunks + real firmware decisions) requires the
+bench-rehearsal path documented in
 `private_docs/plans/DATA_COLLECTION_IMPL_VALIDATION_PLAN.md` §5.
 
-## §4.2 harness-vs-plugin — GREEN by construction, with one caveat
+## §4.2 harness-vs-device — YELLOW; measured by `verify_feature_parity.py`
 
-The plan calls for comparing the offline detector harness against the
-production plugin build. Because `tools/validator/native.py` loads the
-**production `libechobox_validator.so`** via `ctypes` (which in turn
-uses the same production STFT/HPF and the same `BandEnergyDetector.so`
-the shipping binary loads), the offline harness IS the plugin — there
-is no shadow port to diff against.
+The plan asks whether the offline detector harness computes the same
+per-frame features as the device. `tools/validator/native.py` loads
+`libechobox_validator.so` via ctypes, so the offline path **shares
+source** with the device (`BandEnergyDetector.cpp` and the STFT + HPF
+code). But sharing source is not the same as producing identical
+outputs:
 
-Provenance ladder:
+- The dev `.so` is built **x86** with `-march=native -ffast-math` (see
+  the top-level `CMakeLists.txt`). The device is **ARM** (Pi Zero 2 W).
+  Different ISAs, different SIMD lanes, non-IEEE-strict math on both
+  sides.
+- Near the gate's hard thresholds — `min_bandwidth_khz = 0.9`,
+  `rep_cv_min = 0.50`, `rep_cv_max = 1.30` — small numerical drift can
+  flip a per-event verdict. If that happens, `verify_recorder_model.py`
+  (§4.1) will report divergences that are numerical, not model-logic
+  bugs.
 
-- **STFT + HPF + detector**: **GREEN by construction**. The ctypes
-  bridge marshals frames into the same `.so` the production binary
-  links against; a bit-flip in the algorithm would show up in both at
-  once.
-- **The remaining risk** is limited to the ctypes marshalling layer
-  (endianness, struct packing, float alignment). That risk is bounded
-  by the `_pack_ = 1` declaration on `_Annotation` in `native.py` and
-  by the fact that the API's core call sites are exercised on every
-  `tools/validator/cli.py` run — a marshalling drift would break the
-  daily validator workflow, not silently corrupt one specific test.
+`verify_feature_parity.py` is the tool that measures this drift so we
+can distinguish "numerical noise near a threshold" from "the model is
+wrong". It:
 
-**No separate cross-check tool ships in this commit.** The equivalent
-test would be running the standalone `Echobox` binary and the ctypes
-harness on the same audio and diffing per-frame features; because they
-share the entire code path (STFT + detector), the diff is guaranteed to
-be empty modulo the marshalling bounds above. `VALIDATION_PROVENANCE.md`
-records this posture explicitly.
+1. Replays each Stream A chunk through the offline detector.
+2. Correlates each harness event with the device's own event record in
+   Stream C by `start_frame` (± a small tolerance).
+3. Emits max + p50/p95/p99 deltas per feature
+   (`bandwidth_khz / drift_khz / path_ratio / mono_fraction / cv_idi`).
+4. Counts **boundary-proximity events** — how many device events fall
+   within `max_delta` of any gate threshold, i.e. how many verdicts
+   could flip under the measured harness↔device drift.
+
+**Promotion rule**:
+
+- **YELLOW** by default. This is the honest starting position.
+- Promoted to **GREEN** only when the parity check runs on real bench
+  data (x86 harness output vs an actual ARM device on the same audio),
+  every per-feature delta is within tolerance, AND the
+  boundary-proximity count is zero.
+- Non-zero boundary-proximity count keeps 4b YELLOW *and* calibrates
+  the tolerance §4.1's tool uses to distinguish boundary drift from
+  model-logic errors.
+
+**Pre-registered falsifier**: any single event with a feature delta
+larger than `--max-delta`, or any boundary-proximity flip that
+`verify_recorder_model.py` cannot explain, is treated as a failure —
+do not average it away.
 
 ## Running the pytest suite
 

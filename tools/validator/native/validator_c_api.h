@@ -36,6 +36,32 @@ typedef struct {
 } EbAnnotation;
 #pragma pack(pop)
 
+/*
+ * Layout-compatible with the C++ EventFeatures struct in
+ * dsp/ISweepTracker.hpp. Exposed for the data-collection overlay's
+ * §4.2 harness-vs-device parity check (tools/collection/
+ * verify_feature_parity.py): the offline harness needs to read the
+ * same per-event bandwidth/drift/path/mono/gate-rejected fields the
+ * device logs in Stream C, so their numerical drift can be measured
+ * near the gate's hard thresholds.
+ */
+typedef struct {
+    uint32_t start_frame;
+    uint32_t end_frame;
+    uint16_t duration_frames;
+    int16_t  band_index;
+    float    trigger_snr;
+    float    trigger_flatness;
+    float    peak_snr;
+    float    lo_hz;
+    float    hi_hz;
+    float    bandwidth_khz;
+    float    drift_khz;
+    float    path_ratio;
+    float    mono_fraction;
+    bool     gate_rejected;
+} EbEventFeatures;
+
 /* Layout-compatible with the C++ TunableInfo struct in dsp/ISweepTracker.hpp.
  * `key` and `doc` are owned by the plugin and remain valid for the process
  * lifetime, so the caller may hold the pointers without copying. */
@@ -146,6 +172,20 @@ size_t eb_list_algorithms(const char** out_names, size_t max);
  * Algorithms that don't model a per-bin noise floor return false too.
  */
 bool eb_detector_set_floor(EbDetector*, const float* floor, size_t n_bins);
+
+/* --- Event peek (non-destructive) ----------------------------------------
+ *
+ * Copies the plugin's currently-pending EventFeatures queue into
+ * `out_events` without draining it. Written for the data-collection
+ * overlay's parity check; the same call the C++ DspPipeline's
+ * peekPendingEvents() forwards through. Safe to call at any cadence off
+ * the audio hot path. Returns the total number of pending events (may
+ * exceed `max`; the extras are not written). Returns 0 if the plugin
+ * doesn't implement the peek (older algorithms with no event queue).
+ */
+size_t eb_detector_peek_pending_events(EbDetector*,
+                                       EbEventFeatures* out_events,
+                                       size_t max);
 
 #ifdef __cplusplus
 }

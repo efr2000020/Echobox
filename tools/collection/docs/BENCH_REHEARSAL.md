@@ -72,15 +72,47 @@ Also exercise the max-duration path with `--collection-max-hours 0.01`
 
 ### 5. Run the verifiers offline
 
-On the analysis machine, from repo root:
+On the analysis machine, from repo root. **Run `verify_feature_parity`
+BEFORE `verify_recorder_model`** — the parity report calibrates the
+recorder-model tool's boundary tolerance, so §4.1 without §4.2 will
+either produce spurious RED (using a too-tight bound) or a loosely
+quantified fall-back.
 
 ```
 PYTHONPATH=. python -m tools.collection.verify_stream_a <session>
 PYTHONPATH=. python -m tools.collection.verify_ab_identity <session>
 PYTHONPATH=. python -m tools.collection.inject_signal verify \
     <session> probe.json --tolerance-ms 50
+PYTHONPATH=. python -m tools.collection.verify_feature_parity <session>
 PYTHONPATH=. python -m tools.collection.verify_recorder_model <session>
 ```
+
+### 5a. Why `verify_feature_parity` must run on the bench, not just in the field
+
+The offline harness is built for **x86** with `-march=native
+-ffast-math` (see the top-level `CMakeLists.txt`); the device runs
+**ARM** (Pi Zero 2 W). Same source, different arch, non-IEEE-strict
+math on both sides — so `libechobox_validator.so`'s per-event feature
+values do NOT exactly match the device's. Near the gate thresholds
+(`min_bandwidth_khz = 0.9`, `rep_cv_min/max = 0.50 / 1.30`) that
+numerical drift can flip individual per-event verdicts and produce
+spurious RED reports in `verify_recorder_model` on the field data.
+
+The bench is where that drift is *measured*, not where it is
+*discovered*. If `verify_feature_parity` reports per-feature deltas
+larger than the tool's `--max-delta` (default 0.05), the field session
+is not authorised until either:
+
+- the drift is understood and the tolerance widened with a written
+  justification (and any consumer of the recorder-model output warned
+  that it now runs YELLOW-with-quantified-drift), or
+- a build variant with tighter numerics is used. **The cheap option is
+  `cmake -DECHOBOX_STRICT_MATH=ON`** (available since this branch),
+  which replaces `-ffast-math` with `-fno-fast-math` in Release builds
+  so both sides use IEEE-strict re-association. If that alone doesn't
+  bring deltas within `--max-delta`, cross-compile the offline `.so`
+  for ARM (via QEMU or a spare Pi) — closes the arch gap entirely.
+  See `VALIDATION_PROVENANCE.md` row 4b for the promotion path.
 
 ## Sign-off gate
 
@@ -91,14 +123,25 @@ Before the field session is authorised (§5 in the plan):
       their Stream A slices.
 - [ ] `inject_signal verify` exits 0. Tone detected at expected offset
       within tolerance.
-- [ ] `verify_recorder_model` exits 0 **or** every divergence has been
-      explained and either the model or the firmware has been fixed.
-      Divergences are not "acceptable at low rate" per plan §4.1.
+- [ ] `verify_feature_parity` exits 0 (per-feature max delta within
+      `--max-delta`). If it reports YELLOW (deltas within tolerance
+      but boundary-proximity flippables > 0), the measured tolerance
+      value is recorded in `parity_report.json` and passed forward to
+      the recorder-model check automatically — a non-zero flippable
+      count does NOT alone block field authorisation, but does keep
+      row 4b YELLOW.
+- [ ] `verify_recorder_model` exits 0. GREEN preferred; YELLOW (all
+      divergences explained as boundary-drift under the parity
+      tolerance) is acceptable **only if the parity tolerance itself
+      is justified**. RED — unexplained divergences — blocks the field
+      session unconditionally per plan §4.1.
 - [ ] Governor exercise passes both max-duration and
       free-space-floor cases.
 - [ ] The bench-rehearsal session directory is archived (rename it to
       `bench_rehearsal_<date>.tar.zst` and keep it alongside the field
-      session).
+      session). The archive must contain `parity_report.json` so a
+      later auditor can reproduce the tolerance the field
+      recorder-model check used.
 
 If any of the above is not met, do not depart for the field. Fix on the
 bench.

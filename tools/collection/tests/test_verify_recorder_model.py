@@ -170,10 +170,125 @@ def test_model_prediction_without_real_decision_flags_red(
     # Need at least one real decision to avoid the "nothing to check" gate.
     # Put a decision that does NOT overlap the model prediction.
     root = _make_session(tmp_path, decisions=[{
-        "clip_start_sample": 100 * 512, "clip_end_sample": 110 * 512,
+        "clip_start_sample": 3 * 512, "clip_end_sample": 5 * 512,
         "bat_like_at_start": 0, "bat_like_at_end": 1,
         "duration_ms": 20, "event_lo_hz": 20000, "event_hi_hz": 45000,
         "saved": True, "reason": "saved",
     }])
     rc = module.verify(root, hop_size=512)
     assert rc == 1
+
+
+def _write_parity_report(root: Path, max_delta: float) -> None:
+    (root / "parity_report.json").write_text(json.dumps({
+        "session_root":      str(root),
+        "matched_events":    1,
+        "unmatched_device":  0,
+        "unmatched_harness": 0,
+        "features": {
+            "bandwidth_khz": {"n": 1, "max": max_delta,
+                              "p50": 0.0, "p95": max_delta, "p99": max_delta},
+            "cv_idi":        {"n": 1, "max": max_delta,
+                              "p50": 0.0, "p95": max_delta, "p99": max_delta},
+        },
+        "boundary_proximity": {},
+    }))
+
+
+def test_boundary_drift_disagreement_returns_yellow(
+        tmp_path: Path, patched_verifier) -> None:
+    """A real↔model mismatch whose clip contains an event with
+    bandwidth_khz within the measured x86↔ARM delta of the 0.9 kHz
+    threshold must be reported as boundary-drift (YELLOW), not RED."""
+    module = patched_verifier([
+        FakeResult(
+            saved=[],
+            discarded=[FakeSavedRecording(10, 20, kept=False,
+                                           reason="cricket-gate")],
+        )
+    ])
+    # One device event with bandwidth 0.95 kHz — within 0.06 of the
+    # 0.9 kHz gate threshold. Real recorder saved the clip; model would
+    # have cricket-discarded it. Under the parity tolerance (0.10), this
+    # divergence is explained by numerical drift.
+    root = _make_session(
+        tmp_path,
+        decisions=[{
+            "clip_start_sample": 10 * 512, "clip_end_sample": 20 * 512,
+            "bat_like_at_start": 0, "bat_like_at_end": 1,
+            "duration_ms": 20, "event_lo_hz": 20000, "event_hi_hz": 45000,
+            "saved": True, "reason": "saved",
+        }],
+        events=[{
+            "start_sample": 15 * 512, "end_sample": 17 * 512,
+            "start_frame": 15, "end_frame": 17,
+            "duration_frames": 2, "band_index": 1,
+            "trigger_snr": 10, "trigger_flatness": 0.5, "peak_snr": 12,
+            "lo_hz": 20000, "hi_hz": 45000,
+            "bandwidth_khz": 0.95, "drift_khz": 1.0, "path_ratio": 1.0,
+            "mono_fraction": 1.0, "gate_rejected": False,
+        }],
+    )
+    _write_parity_report(root, max_delta=0.10)
+    rc = module.verify(root, hop_size=512)
+    # YELLOW is exit code 0 — no unexplained divergences. The stdout
+    # says "boundary-drift" but the tool doesn't fail.
+    assert rc == 0
+
+
+def test_disagreement_far_from_thresholds_stays_red(
+        tmp_path: Path, patched_verifier) -> None:
+    """Same mismatch, but the event's bandwidth is nowhere near any
+    threshold. Cannot be explained by numerical drift → RED."""
+    module = patched_verifier([
+        FakeResult(
+            saved=[],
+            discarded=[FakeSavedRecording(10, 20, kept=False,
+                                           reason="cricket-gate")],
+        )
+    ])
+    root = _make_session(
+        tmp_path,
+        decisions=[{
+            "clip_start_sample": 10 * 512, "clip_end_sample": 20 * 512,
+            "bat_like_at_start": 0, "bat_like_at_end": 1,
+            "duration_ms": 20, "event_lo_hz": 20000, "event_hi_hz": 45000,
+            "saved": True, "reason": "saved",
+        }],
+        events=[{
+            "start_sample": 15 * 512, "end_sample": 17 * 512,
+            "start_frame": 15, "end_frame": 17,
+            "duration_frames": 2, "band_index": 1,
+            "trigger_snr": 10, "trigger_flatness": 0.5, "peak_snr": 12,
+            "lo_hz": 20000, "hi_hz": 45000,
+            # bandwidth 5.0 kHz — way above the 0.9 threshold, nowhere
+            # near flippable under a 0.10 delta.
+            "bandwidth_khz": 5.0, "drift_khz": 1.0, "path_ratio": 1.0,
+            "mono_fraction": 1.0, "gate_rejected": False,
+        }],
+    )
+    _write_parity_report(root, max_delta=0.10)
+    rc = module.verify(root, hop_size=512)
+    assert rc == 1
+
+
+def test_no_parity_report_falls_back_to_conservative_bound(
+        tmp_path: Path, patched_verifier, capsys) -> None:
+    """If parity_report.json is missing, the tool announces the fallback
+    and uses the conservative bound instead of silently trusting the
+    strict-zero-delta path."""
+    module = patched_verifier([
+        FakeResult(
+            saved=[FakeSavedRecording(10, 20, kept=True)], discarded=[],
+        )
+    ])
+    root = _make_session(tmp_path, decisions=[{
+        "clip_start_sample": 10 * 512, "clip_end_sample": 20 * 512,
+        "bat_like_at_start": 0, "bat_like_at_end": 1,
+        "duration_ms": 20, "event_lo_hz": 20000, "event_hi_hz": 45000,
+        "saved": True, "reason": "saved",
+    }])
+    module.verify(root, hop_size=512)
+    out = capsys.readouterr().out
+    assert "no parity_report.json" in out
+    assert "conservative fallback" in out

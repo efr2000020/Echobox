@@ -46,6 +46,26 @@ class _Annotation(C.Structure):
                 ("low_freq",    C.c_float)]
 
 
+# Layout-compatible with the C++ EventFeatures struct (and the C EbEventFeatures
+# in validator_c_api.h). Consumed by peek_pending_events() to feed the
+# harness-vs-device parity check in tools/collection/verify_feature_parity.py.
+class _EventFeatures(C.Structure):
+    _fields_ = [("start_frame",      C.c_uint32),
+                ("end_frame",        C.c_uint32),
+                ("duration_frames",  C.c_uint16),
+                ("band_index",       C.c_int16),
+                ("trigger_snr",      C.c_float),
+                ("trigger_flatness", C.c_float),
+                ("peak_snr",         C.c_float),
+                ("lo_hz",            C.c_float),
+                ("hi_hz",            C.c_float),
+                ("bandwidth_khz",    C.c_float),
+                ("drift_khz",        C.c_float),
+                ("path_ratio",       C.c_float),
+                ("mono_fraction",    C.c_float),
+                ("gate_rejected",    C.c_bool)]
+
+
 class _TunableInfo(C.Structure):
     _fields_ = [("key",           C.c_char_p),
                 ("type",          C.c_int),
@@ -148,6 +168,10 @@ def _configure_signatures(lib: C.CDLL) -> None:
 
     lib.eb_detector_set_floor.restype  = C.c_bool
     lib.eb_detector_set_floor.argtypes = [C.c_void_p, C.POINTER(C.c_float), C.c_size_t]
+
+    lib.eb_detector_peek_pending_events.restype  = C.c_size_t
+    lib.eb_detector_peek_pending_events.argtypes = [
+        C.c_void_p, C.POINTER(_EventFeatures), C.c_size_t]
 
 
 def try_load() -> bool:
@@ -291,6 +315,34 @@ class FrameState:
     active: bool
     lo_hz: float
     hi_hz: float
+
+
+@dataclass
+class EventFeatures:
+    """Per-event sweep-shape features, mirrored from the C++
+    ``EventFeatures`` struct in ``dsp/ISweepTracker.hpp``.
+
+    Returned by ``Detector.peek_pending_events()`` for the collection
+    overlay's parity check. The fields that feed the gate's hard
+    thresholds are ``bandwidth_khz`` (min 0.9), and the CV(IDI)
+    derived at the Python side from a sequence of ``start_frame`` values
+    (min 0.50, max 1.30 by default) — see
+    ``tools/collection/verify_feature_parity.py``.
+    """
+    start_frame:      int
+    end_frame:        int
+    duration_frames:  int
+    band_index:       int
+    trigger_snr:      float
+    trigger_flatness: float
+    peak_snr:         float
+    lo_hz:            float
+    hi_hz:            float
+    bandwidth_khz:    float
+    drift_khz:        float
+    path_ratio:       float
+    mono_fraction:    float
+    gate_rejected:    bool
 
 
 @dataclass
@@ -484,6 +536,49 @@ class Detector:
             _, det = self.process_frame(mags_2d[f], f)
             if det is not None:
                 out.append(det)
+        return out
+
+    def peek_pending_events(self) -> List["EventFeatures"]:
+        """Non-destructive snapshot of the plugin's pending events queue.
+
+        Mirrors the C++ ``ISweepTracker::peekPendingEvents``; the queue
+        is consumed later by ``run_on_spectrogram``-style flows via the
+        recorder's drain. Returns an empty list on plugins that don't
+        implement the peek (older algorithms) or that currently have no
+        events pending.
+
+        Used by ``tools/collection/verify_feature_parity.py`` to feed the
+        §4.2 harness-vs-device parity check: for each recorded event on
+        the device, we peek the harness's own EventFeatures for the same
+        event and diff every field the gate looks at.
+        """
+        # First call with a zero-sized buffer to learn how many entries
+        # are pending, then allocate exactly that many. Same idiom the
+        # existing list_tunables() call site uses; keeps the array
+        # allocation right-sized per call without a fixed hard cap.
+        total = _lib.eb_detector_peek_pending_events(self._h, None, 0)
+        if total == 0:
+            return []
+        buf = (_EventFeatures * total)()
+        got = _lib.eb_detector_peek_pending_events(self._h, buf, total)
+        out = []
+        for i in range(min(got, total)):
+            out.append(EventFeatures(
+                start_frame      = int(buf[i].start_frame),
+                end_frame        = int(buf[i].end_frame),
+                duration_frames  = int(buf[i].duration_frames),
+                band_index       = int(buf[i].band_index),
+                trigger_snr      = float(buf[i].trigger_snr),
+                trigger_flatness = float(buf[i].trigger_flatness),
+                peak_snr         = float(buf[i].peak_snr),
+                lo_hz            = float(buf[i].lo_hz),
+                hi_hz            = float(buf[i].hi_hz),
+                bandwidth_khz    = float(buf[i].bandwidth_khz),
+                drift_khz        = float(buf[i].drift_khz),
+                path_ratio       = float(buf[i].path_ratio),
+                mono_fraction    = float(buf[i].mono_fraction),
+                gate_rejected    = bool(buf[i].gate_rejected),
+            ))
         return out
 
     def set_noise_floor(self, floor: np.ndarray) -> bool:
