@@ -39,6 +39,56 @@ and its per-writer WAV outputs are **GREEN**. Passing check 1 as well
 promotes the front-end (mic + HPF + capture path) from unverified to
 GREEN — the only §3 element requiring hardware to close.
 
+## §4.1 recorder-model cross-check
+
+`verify_recorder_model.py <session_root>` — the "does the Python
+`recorder_model.py` agree with the shipping C++ recorder on real field
+data?" test. Reads decisions from Stream C, runs `recorder_model` on
+Stream A chunk-by-chunk, correlates predictions with real decisions by
+sample-range overlap, and prints a per-clip diff.
+
+- **Every real decision matches** ⇒ **GREEN**. The model is promoted
+  from YELLOW (Python-only self-consistency) to GREEN (independent
+  agreement with the C++ implementation on real inputs).
+- **Any divergence** ⇒ **RED**. Per the plan's §4.1 rule: "flag it,
+  quantify the disagreement, and correct the model before any further
+  use." This tool exits non-zero on a single mismatch. Do not average.
+
+Unit tests for the correlation logic (mismatch flag, missing-real,
+missing-model) live in `tests/test_verify_recorder_model.py` — those
+run without the native lib. End-to-end (real chunks + real firmware
+decisions) requires the bench-rehearsal path documented in
+`private_docs/plans/DATA_COLLECTION_IMPL_VALIDATION_PLAN.md` §5.
+
+## §4.2 harness-vs-plugin — GREEN by construction, with one caveat
+
+The plan calls for comparing the offline detector harness against the
+production plugin build. Because `tools/validator/native.py` loads the
+**production `libechobox_validator.so`** via `ctypes` (which in turn
+uses the same production STFT/HPF and the same `BandEnergyDetector.so`
+the shipping binary loads), the offline harness IS the plugin — there
+is no shadow port to diff against.
+
+Provenance ladder:
+
+- **STFT + HPF + detector**: **GREEN by construction**. The ctypes
+  bridge marshals frames into the same `.so` the production binary
+  links against; a bit-flip in the algorithm would show up in both at
+  once.
+- **The remaining risk** is limited to the ctypes marshalling layer
+  (endianness, struct packing, float alignment). That risk is bounded
+  by the `_pack_ = 1` declaration on `_Annotation` in `native.py` and
+  by the fact that the API's core call sites are exercised on every
+  `tools/validator/cli.py` run — a marshalling drift would break the
+  daily validator workflow, not silently corrupt one specific test.
+
+**No separate cross-check tool ships in this commit.** The equivalent
+test would be running the standalone `Echobox` binary and the ctypes
+harness on the same audio and diffing per-frame features; because they
+share the entire code path (STFT + detector), the diff is guaranteed to
+be empty modulo the marshalling bounds above. `VALIDATION_PROVENANCE.md`
+records this posture explicitly.
+
 ## Running the pytest suite
 
 ```
