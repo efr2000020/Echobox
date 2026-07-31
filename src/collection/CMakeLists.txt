@@ -7,6 +7,9 @@
 add_library(ls_collection STATIC
     Session.cpp
     ContinuousWriter.cpp
+    DecisionLog.cpp
+    EventPoller.cpp
+    EventClipWriter.cpp
 )
 
 target_include_directories(ls_collection
@@ -18,6 +21,9 @@ target_link_libraries(ls_collection
     PUBLIC
         ls_common
         ls_logging
+        ls_recorder
+        ls_dsp_pipeline
+        dsp_interface
     PRIVATE
         ${SNDFILE_LIBRARIES}
         Threads::Threads

@@ -881,6 +881,16 @@ bool BandEnergyDetector::drainSidecarPayload(SidecarPayload& out) {
     return true;
 }
 
+bool BandEnergyDetector::peekPendingEvents(std::vector<EventFeatures>& out) const {
+    std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+    // Copy, don't clear — the recorder's drainSidecarPayload() call later
+    // gets the same events, unchanged. Collection dedupes on the reader
+    // side by EventFeatures::start_frame so a peek that spans a drain
+    // boundary does not double-log.
+    out.assign(m_pendingEvents.begin(), m_pendingEvents.end());
+    return true;
+}
+
 bool BandEnergyDetector::seedNoiseFloor(std::span<const float> floor) {
     if (floor.empty()) return false;
     // The validator constructs a detector with the same fft_size the device

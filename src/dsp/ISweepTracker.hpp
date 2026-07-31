@@ -245,6 +245,30 @@ public:
     virtual bool drainSidecarPayload(SidecarPayload& /*out*/) { return false; }
 
     /**
+     * Non-destructive peek at the same pending events queue that
+     * drainSidecarPayload() would consume. Copies (does NOT clear) the
+     * currently-pending events into @p out.
+     *
+     * Purpose: the data-collection overlay polls this at ~10 Hz to log
+     * EVERY event (including gate-rejected ones) into its decision-log
+     * JSONL, WITHOUT interfering with the recorder's drainSidecarPayload
+     * discipline. Callers dedupe by @c EventFeatures::start_frame so a
+     * peek that spans a drainSidecarPayload boundary doesn't double-log.
+     *
+     * Default no-op keeps older plugins compiling; the collection layer
+     * treats "not implemented" as "no live event stream from this plugin".
+     * Implementations MUST take the same internal lock @c drainSidecarPayload
+     * takes so the collection reader and the recorder drain are mutually
+     * consistent.
+     *
+     * @return true if the plugin implements the peek (even if @p out is
+     *         empty), false if not implemented.
+     */
+    virtual bool peekPendingEvents(std::vector<EventFeatures>& /*out*/) const {
+        return false;
+    }
+
+    /**
      * Seed the per-bin noise floor estimate. Used by the offline validator
      * to bypass the EMA's cold-start convergence period on short clips,
      * by feeding in a snapshot the device captured at trigger time.

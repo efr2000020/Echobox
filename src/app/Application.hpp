@@ -10,6 +10,10 @@
 #include "Config.hpp"
 #include "audio/IAudioSource.hpp"
 #include "collection/ContinuousWriter.hpp"
+#include "collection/DecisionLog.hpp"
+#include "collection/EventClipWriter.hpp"
+#include "collection/EventPoller.hpp"
+#include "collection/RecorderDecisionSink.hpp"
 #include "collection/ReferenceRing.hpp"
 #include "collection/SampleClock.hpp"
 #include "collection/Session.hpp"
@@ -81,6 +85,18 @@ private:
     std::unique_ptr<::echobox::collection::Session>        m_session;
     std::unique_ptr<::echobox::collection::ReferenceRing>  m_referenceRing;
     std::unique_ptr<::echobox::collection::ContinuousWriter> m_continuousWriter;
+    // Stream B: dedicated preroll buffer for event-clip windows. Sized
+    // larger than the recorder's own preroll so pre+post windows fit.
+    std::unique_ptr<recorder::PreRollBuffer>                 m_collectionPreRoll;
+    std::unique_ptr<::echobox::collection::DecisionLog>      m_decisionLog;
+    std::unique_ptr<::echobox::collection::EventPoller>      m_eventPoller;
+    std::unique_ptr<::echobox::collection::EventClipWriter>  m_eventClipWriter;
+    // Sink adapter: forwards Recorder decisions to the decision log as
+    // "decision" JSONL records. Lives here so its lifetime tracks the
+    // Application (not the Recorder — which sees it only through a raw
+    // interface pointer).
+    class RecorderDecisionForwarder;
+    std::unique_ptr<RecorderDecisionForwarder>               m_decisionForwarder;
     // Rate-limited drop warning so a sustained ring-full doesn't flood the
     // op log; the exact drop count is always available on the ReferenceRing.
     std::chrono::steady_clock::time_point m_lastRefDropWarnAt{};

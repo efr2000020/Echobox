@@ -8,6 +8,7 @@
 #include "Recorder.hpp"
 #include "Sidecar.hpp"
 #include "WavWriter.hpp"
+#include "collection/RecorderDecisionSink.hpp"
 #include "logging/Logger.hpp"
 
 #include <algorithm>
@@ -145,6 +146,11 @@ void Recorder::beginRecording(const DetectorStateSnapshot& s) {
     const std::size_t preRollSamples =
         static_cast<std::size_t>(m_cfg.preRollMs) * m_cfg.sampleRate / 1000u;
     m_cursor = m_preRoll.openCursor(preRollSamples);
+    // Snapshot the absolute sample position at the clip's leading edge.
+    // PreRollBuffer.writeCount() and the collection SampleClock advance
+    // together in Application::captureLoop, so this equals the SampleClock
+    // reading at clip start (the anchor used by Stream A / event log).
+    m_clipStartSample = m_cursor.pos;
 
     // Discard any sidecar events that accumulated between recordings —
     // they belong to past WAVs (or none at all, if the detector triggered
@@ -223,6 +229,27 @@ void Recorder::endRecording() {
     const float loHz = m_eventLoHz > 0.0f ? m_eventLoHz : 0.0f;
     const float hiHz = m_eventHiHz > 0.0f ? m_eventHiHz : 0.0f;
 
+    // Helper: publish this clip's verdict to the collection sink (if any).
+    // Kept as a lambda so all early-return paths agree on the payload
+    // shape and the shipping unit with no sink attached pays only a null
+    // check per clip.
+    const std::uint64_t clipEndSample = m_clipStartSample + frames;
+    auto publishDecision = [&](bool saved, const char* reason,
+                               std::uint64_t batLikeEnd) {
+        if (!m_decisionSink) return;
+        collection::RecorderDecision d;
+        d.clip_start_sample = m_clipStartSample;
+        d.clip_end_sample   = clipEndSample;
+        d.bat_like_at_start = m_batLikeAtStart;
+        d.bat_like_at_end   = batLikeEnd;
+        d.duration_ms       = durationMs;
+        d.event_lo_hz       = loHz;
+        d.event_hi_hz       = hiHz;
+        d.saved             = saved;
+        d.reason            = reason;
+        m_decisionSink->onRecorderDecision(d);
+    };
+
     // Min-length gate: anything shorter is dropped on the floor rather than
     // finalized, so the output dir stays free of clip-sized noise events.
     if (m_cfg.minLengthMs > 0
@@ -235,6 +262,8 @@ void Recorder::endRecording() {
                  loHz / 1000.0f, hiHz / 1000.0f);
         m_writer->abort();
         m_writer.reset();
+        publishDecision(/*saved=*/false, "min-length",
+                        m_detector.snapshot().batLikeEvents);
         m_state = State::Idle;
         return;
     }
@@ -267,6 +296,7 @@ void Recorder::endRecording() {
                 SidecarPayload stale;
                 m_detector.drainSidecarPayload(stale);
             }
+            publishDecision(/*saved=*/false, "cricket-gate", s.batLikeEvents);
             m_state = State::Idle;
             return;
         }
@@ -320,6 +350,9 @@ void Recorder::endRecording() {
         }
     }
 
+    publishDecision(/*saved=*/true,
+                    m_lastCloseWasMaxLenActive ? "max-len-active" : "saved",
+                    m_detector.snapshot().batLikeEvents);
     m_state = State::Idle;
 }
 

@@ -56,6 +56,7 @@ public:
     std::span<const PresetInfo>  listPresets()  const override;
 
     bool          drainSidecarPayload(SidecarPayload& out) override;
+    bool          peekPendingEvents(std::vector<EventFeatures>& out) const override;
     bool          seedNoiseFloor(std::span<const float> floor) override;
     std::uint64_t totalEventsSinceBoot() const override;
 

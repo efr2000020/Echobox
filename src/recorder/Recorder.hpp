@@ -18,6 +18,11 @@
 #include <memory>
 #include <thread>
 
+namespace echobox::collection {
+    class IRecorderDecisionSink;   // forward-declare; opaque here so the
+                                   // recorder never depends on collection.
+}
+
 namespace echobox::recorder {
 
 class WavWriter;
@@ -90,6 +95,22 @@ public:
              IDetectorStateProvider& detector);
     ~Recorder();
 
+    /**
+     * @brief Attach a collection-overlay decision sink.
+     *
+     * Null (default) ⇒ no publication happens; the recorder's byte-for-
+     * byte behaviour is unchanged from R2v3. Non-null ⇒ every clip's
+     * save-or-discard decision is published to the sink at
+     * @c endRecording, keyed by absolute sample range. Called before
+     * @c start().
+     *
+     * @note The recorder does NOT own the sink; the collection module's
+     *       lifetime must exceed the recorder's.
+     */
+    void setDecisionSink(collection::IRecorderDecisionSink* sink) {
+        m_decisionSink = sink;
+    }
+
     Recorder(const Recorder&)            = delete;
     Recorder& operator=(const Recorder&) = delete;
 
@@ -135,6 +156,18 @@ private:
     // stamped the counter, so @c endRecording must NOT cricket-discard
     // this clip (the discard decision only applies to closed events).
     bool                                  m_lastCloseWasMaxLenActive{false};
+
+    // Optional collection-overlay hook. Null in the shipping unit; set
+    // by Application only when --collection-mode on. The recorder emits
+    // one RecorderDecision per clip so §4.1's cross-check can diff the
+    // Python recorder_model against real firmware verdicts on real
+    // field data.
+    collection::IRecorderDecisionSink*    m_decisionSink{nullptr};
+    // Absolute sample-clock position of the clip's leading edge, snapshot
+    // at beginRecording from the PreRollBuffer cursor. Written into the
+    // decision record so a downstream tool can align clips against
+    // Stream A / the event-log without wall-clock math.
+    std::uint64_t                         m_clipStartSample{0};
 };
 
 } // namespace echobox::recorder

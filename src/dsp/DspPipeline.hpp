@@ -130,6 +130,12 @@ public:
     // off the audio hot loop. drainSidecarPayload() and currentTunables()
     // take the tracker's internal lock briefly; the rest are pure accessors.
     bool        drainSidecarPayload(SidecarPayload& out) override;
+    /// Non-destructive peek at the loaded tracker's pending events queue.
+    /// Used by the collection-overlay decision-log poller to observe
+    /// EVERY event (accepted + gate-rejected) without stealing them from
+    /// the recorder's drain. Callers must dedupe by @c EventFeatures::
+    /// start_frame. Off-hot-loop; takes the tracker's diagnostics lock.
+    bool        peekPendingEvents(std::vector<EventFeatures>& out) const;
     bool        currentTunables(std::vector<echobox::recorder::TunableValue>& out) const override;
     std::string algorithmName() const override;
     std::size_t fftSize()  const override { return m_cfg.fftSize; }
