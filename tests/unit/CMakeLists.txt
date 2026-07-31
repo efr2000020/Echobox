@@ -13,6 +13,7 @@ add_executable(unit_tests
     test_RepStats.cpp
     test_Recorder.cpp
     test_ConsoleSink.cpp
+    test_Session.cpp
 )
 
 target_link_libraries(unit_tests
@@ -21,6 +22,7 @@ target_link_libraries(unit_tests
         ls_common
         ls_app
         ls_recorder
+        ls_collection
         ls_logging
         BandEnergyDetector
 )

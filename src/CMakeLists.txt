@@ -14,6 +14,7 @@ add_subdirectory(logging)
 add_subdirectory(recorder)
 add_subdirectory(audio)
 add_subdirectory(dsp)
+add_subdirectory(collection)
 add_subdirectory(app)
 # In development mode, build the native validator library for Python interop.
 if(ECHOBOX_DYNAMIC_PLUGINS)
@@ -28,6 +29,7 @@ target_link_libraries(Echobox PRIVATE
     ls_dsp_pipeline
     ls_dsp_core
     ls_recorder
+    ls_collection
     ls_logging
     dsp_interface
     Threads::Threads

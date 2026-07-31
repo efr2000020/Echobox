@@ -168,6 +168,39 @@ TEST_CASE("ConfigValidator: shipped short-clip defaults validate cleanly",
     CHECK(validateConfig(cfg).empty());
 }
 
+TEST_CASE("ConfigValidator: collection dir must differ from output dir when overlay is enabled",
+          "[config][collection]") {
+    Config cfg;
+    // Overlay off: shared paths are fine (validator ignores the field).
+    SECTION("overlay disabled: identical paths pass") {
+        cfg.collection.enabled = false;
+        cfg.outputDir      = "./same-dir";
+        cfg.collection.dir = "./same-dir";
+        CHECK(validateConfig(cfg).empty());
+    }
+
+    SECTION("overlay enabled: identical paths rejected") {
+        cfg.collection.enabled = true;
+        cfg.outputDir      = "./shared";
+        cfg.collection.dir = "./shared";
+        auto errors = validateConfig(cfg);
+        REQUIRE_FALSE(errors.empty());
+        bool namesBothFlags = false;
+        for (const auto& e : errors) {
+            if (e.find("--collection-dir") != std::string::npos
+                && e.find("--output-dir")  != std::string::npos) namesBothFlags = true;
+        }
+        CHECK(namesBothFlags);
+    }
+
+    SECTION("overlay enabled: distinct paths pass") {
+        cfg.collection.enabled = true;
+        cfg.outputDir      = "./recordings";
+        cfg.collection.dir = "./collection";
+        CHECK(validateConfig(cfg).empty());
+    }
+}
+
 TEST_CASE("ConfigValidator: preroll+silence budget under short-clip defaults",
           "[config]") {
     Config cfg;

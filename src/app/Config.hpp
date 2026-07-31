@@ -7,6 +7,7 @@
 /// production binary. Populated by CliParser, validated by ConfigValidator,
 /// then handed to Application which fans the fields out to each subsystem.
 
+#include "collection/CollectionConfig.hpp"
 #include "logging/LogRecord.hpp"
 
 #include <cstdint>
@@ -95,6 +96,14 @@ struct Config {
     // field escape hatch: if a deployment site produces bat calls the
     // gate can't characterise, one flag turns the whole filter off.
     bool                  cricketFilter{true};
+
+    // --- Data-collection overlay (validation firmware) ---
+    // Off by default. When enabled, spawns the collection module (sample
+    // clock, session header/governor, and the four validation streams
+    // wired incrementally over subsequent commits). With enabled=false
+    // the shipping binary is byte-identical to R2v3.
+    // See DATA_COLLECTION_IMPL_VALIDATION_PLAN §2.
+    ::echobox::collection::CollectionConfig collection{};
 };
 
 } // namespace echobox::app

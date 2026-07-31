@@ -146,6 +146,23 @@ const char* helpText() {
         "  --heartbeat-sec <int>     Emit an app:HEARTBEAT line every N seconds\n"
         "                            (default: 60; 0 disables)\n"
         "\n"
+        "Data-collection overlay (validation firmware; off by default):\n"
+        "  --collection-mode on|off  Master switch. off = shipping binary is byte-\n"
+        "                            identical to R2v3. on = spawn the collection\n"
+        "                            module: sample clock, session header/governor,\n"
+        "                            and the four validation streams. (default: off)\n"
+        "  --collection-dir <path>   Root dir for collection artefacts\n"
+        "                            (default: ./collection)\n"
+        "  --collection-max-hours <float>  Governor: stop cleanly after this many\n"
+        "                            hours of capture (default: 0 = uncapped)\n"
+        "  --collection-min-free-mb <int>  Governor: stop cleanly when free MB on\n"
+        "                            the collection dir drops below this floor\n"
+        "                            (default: 100)\n"
+        "  --collection-site-note <text>   Free-form note stamped into the session\n"
+        "                            header for provenance.\n"
+        "  --collection-streams <list>     Which streams to enable, comma-separated\n"
+        "                            from {a,b,c,d} (default: a,b,c,d)\n"
+        "\n"
         "  -h, --help                Show this help and exit\n"
         "  -V, --version             Print version and exit\n";
 }
@@ -236,6 +253,50 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
         else if (k == "heartbeat-sec") {
             std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --heartbeat-sec");
             cfg.heartbeatSec = u;
+        }
+        // --- Data-collection overlay flags. Every switch below is a no-op
+        //     unless --collection-mode on is also passed; see the
+        //     kill-switch discipline in DATA_COLLECTION_IMPL_VALIDATION_PLAN.
+        else if (k == "collection-mode") {
+            if      (v == "on"  || v == "1" || v == "true")  cfg.collection.enabled = true;
+            else if (v == "off" || v == "0" || v == "false") cfg.collection.enabled = false;
+            else return err("invalid --collection-mode (use on|off)");
+        }
+        else if (k == "collection-dir") {
+            cfg.collection.dir = std::string(v);
+        }
+        else if (k == "collection-max-hours") {
+            float x; if (!parseFloat(v, x) || x < 0.0f) return err("invalid --collection-max-hours (must be >= 0)");
+            cfg.collection.governor.maxDurationSec =
+                static_cast<std::uint32_t>(x * 3600.0f);
+        }
+        else if (k == "collection-min-free-mb") {
+            std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --collection-min-free-mb");
+            cfg.collection.governor.minFreeMbFloor = u;
+        }
+        else if (k == "collection-site-note") {
+            cfg.collection.siteNote = std::string(v);
+        }
+        else if (k == "collection-streams") {
+            // Comma-separated toggle list: pass "a,b,c,d" to enable, or
+            // e.g. "b,c" to run with A off (small-card mode).
+            cfg.collection.streams.streamA = false;
+            cfg.collection.streams.streamB = false;
+            cfg.collection.streams.streamC = false;
+            cfg.collection.streams.streamD = false;
+            std::string_view rest(v);
+            while (!rest.empty()) {
+                auto comma = rest.find(',');
+                auto tok   = rest.substr(0, comma);
+                if      (tok == "a" || tok == "A") cfg.collection.streams.streamA = true;
+                else if (tok == "b" || tok == "B") cfg.collection.streams.streamB = true;
+                else if (tok == "c" || tok == "C") cfg.collection.streams.streamC = true;
+                else if (tok == "d" || tok == "D") cfg.collection.streams.streamD = true;
+                else return err("invalid --collection-streams token '"
+                                + std::string(tok) + "' (use a,b,c,d)");
+                if (comma == std::string_view::npos) break;
+                rest = rest.substr(comma + 1);
+            }
         }
         else {
             return err("unknown option --" + std::string(k));

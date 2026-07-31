@@ -9,6 +9,8 @@
 
 #include "Config.hpp"
 #include "audio/IAudioSource.hpp"
+#include "collection/SampleClock.hpp"
+#include "collection/Session.hpp"
 #include "common/LockFreeRingBuffer.hpp"
 #include "dsp/DspPipeline.hpp"
 #include "recorder/PreRollBuffer.hpp"
@@ -66,6 +68,13 @@ private:
     std::unique_ptr<audio::IAudioSource>   m_source;
     std::unique_ptr<dsp::DspPipeline>      m_dsp;
     std::unique_ptr<recorder::Recorder>    m_recorder;
+
+    // Data-collection overlay. m_sampleClock is a tiny atomic uint64 that
+    // is only advanced when m_cfg.collection.enabled is true — the audio
+    // hot loop skips the fetch_add otherwise, so the shipping-off path is
+    // byte-identical to R2v3. m_session is null when the overlay is off.
+    ::echobox::collection::SampleClock       m_sampleClock;
+    std::unique_ptr<::echobox::collection::Session> m_session;
 
     std::atomic<bool> m_running{false};
     std::thread       m_captureThread;

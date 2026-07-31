@@ -19,9 +19,14 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <thread>
+
+#ifndef ECHOBOX_FIRMWARE_SHA
+#define ECHOBOX_FIRMWARE_SHA "unknown"
+#endif
 
 #ifndef ECHOBOX_DYNAMIC_PLUGINS
 // Release builds statically link the detector; its plugin entry points are
@@ -183,6 +188,47 @@ int Application::run() {
     rcfg.cricketDiscard = m_cfg.cricketFilter;
     m_recorder = std::make_unique<recorder::Recorder>(rcfg, m_preRoll, *m_dsp);
 
+    // Data-collection overlay: constructed only when enabled so a shipping
+    // unit with the flag off pays zero cost. Session::start() writes the
+    // pre-flight header + capacity report, spawns the governor thread, and
+    // is the first artefact on the collection card.
+    if (m_cfg.collection.enabled) {
+        m_session = std::make_unique<::echobox::collection::Session>(
+            m_cfg.collection, m_sampleClock, m_cfg.collection.dir);
+        ::echobox::collection::SessionMetadata meta;
+        meta.firmwareSha = ECHOBOX_FIRMWARE_SHA;
+        meta.algorithm   = m_cfg.algorithm;
+        meta.sampleRate  = m_cfg.sampleRate;
+        meta.channels    = m_cfg.channels;
+        meta.micDevice   = m_cfg.device;
+        meta.siteNote    = m_cfg.collection.siteNote;
+        // Small JSON blob of the decision-relevant knobs, so a header alone
+        // reproduces the shipping recorder's behaviour on this run.
+        std::ostringstream cfgBlob;
+        cfgBlob << "{"
+                << "\"preroll_ms\":"     << m_cfg.preRollMs      << ","
+                << "\"silence_ms\":"     << m_cfg.silenceMs      << ","
+                << "\"min_length_ms\":"  << m_cfg.minLengthMs    << ","
+                << "\"max_length_ms\":"  << m_cfg.maxLengthMs    << ","
+                << "\"snr_threshold\":"  << m_cfg.snrThreshold   << ","
+                << "\"fft_size\":"       << m_cfg.fftSize        << ","
+                << "\"hop_size\":"       << m_cfg.hopSize        << ","
+                << "\"freq_lo_hz\":"     << m_cfg.freqLoHz       << ","
+                << "\"freq_hi_hz\":"     << m_cfg.freqHiHz       << ","
+                << "\"cricket_filter\":" << (m_cfg.cricketFilter ? "true" : "false")
+                << "}";
+        meta.configJsonBlob = cfgBlob.str();
+        if (!m_session->start(meta)) {
+            LS_ERROR("collection",
+                     "collection overlay failed to start; aborting so a partial "
+                     "session is never mistaken for a good one");
+            m_recorder.reset();
+            m_source->close();
+            logging::Logger::instance().stop();
+            return 4;
+        }
+    }
+
     try {
         m_dsp->start();
     } catch (const std::exception& e) {
@@ -237,6 +283,14 @@ int Application::run() {
     const auto startedAt = std::chrono::steady_clock::now();
     auto lastHeartbeat  = startedAt;
     while (!common::SignalHandler::shouldExit()) {
+        // Governor coordinates through the same clean-shutdown path as
+        // SIGINT: no separate "governor-tore-this-down" code branch.
+        if (m_session && m_session->stopRequested()) {
+            LS_INFO("app", "shutdown requested (governor: %s)",
+                    m_session->stopReason().c_str());
+            common::SignalHandler::requestExit();
+            break;
+        }
         std::this_thread::sleep_for(pollInterval);
         if (heartbeatInterval.count() > 0) {
             const auto now = std::chrono::steady_clock::now();
@@ -277,6 +331,7 @@ int Application::run() {
     m_recorder->stop();
     m_dsp->stop();
     m_source->close();
+    if (m_session) m_session->stop();
 
     LS_INFO("app", "stopped");
     logging::Logger::instance().stop();
@@ -313,6 +368,15 @@ void Application::captureLoop() {
 
         // 1. Feed the recorder's pre-roll buffer (raw int16, mono).
         m_preRoll.write(std::span<const std::int16_t>(intBuf.data(), n));
+
+        // 1b. Advance the global collection sample clock. Gated on the
+        //     enabled flag so a shipping unit with the overlay off pays
+        //     literally zero cost here (no atomic RMW, no memory barrier
+        //     beyond what preRoll.write already emits). Kill-switch
+        //     discipline: byte-identical to R2v3 when disabled.
+        if (m_cfg.collection.enabled) {
+            m_sampleClock.advance(static_cast<std::uint64_t>(n));
+        }
 
         // 2. Convert + push into the DSP ring, best-effort. The audio thread
         //    MUST NOT block on a downstream consumer: a stalled DSP would
