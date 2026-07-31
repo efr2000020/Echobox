@@ -6,15 +6,19 @@
 
 add_library(ls_collection STATIC
     Session.cpp
+    ContinuousWriter.cpp
 )
 
 target_include_directories(ls_collection
     PUBLIC ${CMAKE_SOURCE_DIR}/src
+    PRIVATE ${SNDFILE_INCLUDE_DIRS}
 )
 
 target_link_libraries(ls_collection
     PUBLIC
+        ls_common
         ls_logging
     PRIVATE
+        ${SNDFILE_LIBRARIES}
         Threads::Threads
 )

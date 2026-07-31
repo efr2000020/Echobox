@@ -193,6 +193,24 @@ int Application::run() {
     // pre-flight header + capacity report, spawns the governor thread, and
     // is the first artefact on the collection card.
     if (m_cfg.collection.enabled) {
+        // Stream A ring: sized for ~8 s at the configured sample rate.
+        // Comfortable headroom for SD-card fsync stalls without inviting
+        // drops. Only allocated when the overlay is enabled AND Stream A
+        // is selected — a small-card deployment that drops A still keeps
+        // the sample clock and Session ready for B/C/D.
+        if (m_cfg.collection.streams.streamA) {
+            const std::size_t refCapacity =
+                static_cast<std::size_t>(m_cfg.sampleRate) * 8;
+            m_referenceRing = std::make_unique<
+                ::echobox::collection::ReferenceRing>(refCapacity);
+            ::echobox::collection::ContinuousWriterConfig cwCfg;
+            cwCfg.outputDir   = m_cfg.collection.dir / "reference";
+            cwCfg.sampleRate  = m_cfg.sampleRate;
+            cwCfg.channels    = m_cfg.channels;
+            m_continuousWriter = std::make_unique<
+                ::echobox::collection::ContinuousWriter>(
+                cwCfg, *m_referenceRing, m_sampleClock);
+        }
         m_session = std::make_unique<::echobox::collection::Session>(
             m_cfg.collection, m_sampleClock, m_cfg.collection.dir);
         ::echobox::collection::SessionMetadata meta;
@@ -227,6 +245,10 @@ int Application::run() {
             logging::Logger::instance().stop();
             return 4;
         }
+        // Stream A starts AFTER the session header is on disk so a crash
+        // during Session::start() leaves no orphan WAV chunks with no
+        // header to interpret them.
+        if (m_continuousWriter) m_continuousWriter->start();
     }
 
     try {
@@ -331,6 +353,11 @@ int Application::run() {
     m_recorder->stop();
     m_dsp->stop();
     m_source->close();
+    // Stream A stops BEFORE Session::stop() writes SESSION_END so the last
+    // chunk's manifest record lands before the end marker (and the
+    // integrity check can rely on the invariant "final chunk end_sample
+    // <= SESSION_END.end_sample").
+    if (m_continuousWriter) m_continuousWriter->stop();
     if (m_session) m_session->stop();
 
     LS_INFO("app", "stopped");
@@ -376,6 +403,29 @@ void Application::captureLoop() {
         //     discipline: byte-identical to R2v3 when disabled.
         if (m_cfg.collection.enabled) {
             m_sampleClock.advance(static_cast<std::uint64_t>(n));
+        }
+
+        // 1c. Stream A tap: push raw int16 samples into the reference
+        //     ring for the continuous writer thread. Wait-free; drops are
+        //     counted on the ring and surfaced via a rate-limited warning
+        //     (matches the DSP-drop discipline in the same loop). The
+        //     plan (§2.2 A, §3) treats any drop as a session-invalidating
+        //     event that the offline integrity checks must catch.
+        if (m_referenceRing) {
+            const std::size_t refDropped = m_referenceRing->pushBatch(
+                std::span<const std::int16_t>(intBuf.data(), n));
+            if (refDropped > 0) {
+                const auto now = std::chrono::steady_clock::now();
+                if (now - m_lastRefDropWarnAt >= std::chrono::seconds(1)) {
+                    LS_WARN("collection",
+                            "STREAM_A_OVERFLOW dropped=%zu total=%llu — "
+                            "writer is not keeping up; §3 gap check will fail",
+                            refDropped,
+                            static_cast<unsigned long long>(
+                                m_referenceRing->dropped()));
+                    m_lastRefDropWarnAt = now;
+                }
+            }
         }
 
         // 2. Convert + push into the DSP ring, best-effort. The audio thread

@@ -14,6 +14,7 @@ add_executable(unit_tests
     test_Recorder.cpp
     test_ConsoleSink.cpp
     test_Session.cpp
+    test_ContinuousWriter.cpp
 )
 
 target_link_libraries(unit_tests

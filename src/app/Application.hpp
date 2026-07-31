@@ -9,6 +9,8 @@
 
 #include "Config.hpp"
 #include "audio/IAudioSource.hpp"
+#include "collection/ContinuousWriter.hpp"
+#include "collection/ReferenceRing.hpp"
 #include "collection/SampleClock.hpp"
 #include "collection/Session.hpp"
 #include "common/LockFreeRingBuffer.hpp"
@@ -72,9 +74,16 @@ private:
     // Data-collection overlay. m_sampleClock is a tiny atomic uint64 that
     // is only advanced when m_cfg.collection.enabled is true — the audio
     // hot loop skips the fetch_add otherwise, so the shipping-off path is
-    // byte-identical to R2v3. m_session is null when the overlay is off.
-    ::echobox::collection::SampleClock       m_sampleClock;
-    std::unique_ptr<::echobox::collection::Session> m_session;
+    // byte-identical to R2v3. Everything else is null when the overlay is
+    // off (the ring/writer are Stream-A-only; a small-card deployment can
+    // opt out via --collection-streams).
+    ::echobox::collection::SampleClock                     m_sampleClock;
+    std::unique_ptr<::echobox::collection::Session>        m_session;
+    std::unique_ptr<::echobox::collection::ReferenceRing>  m_referenceRing;
+    std::unique_ptr<::echobox::collection::ContinuousWriter> m_continuousWriter;
+    // Rate-limited drop warning so a sustained ring-full doesn't flood the
+    // op log; the exact drop count is always available on the ReferenceRing.
+    std::chrono::steady_clock::time_point m_lastRefDropWarnAt{};
 
     std::atomic<bool> m_running{false};
     std::thread       m_captureThread;
