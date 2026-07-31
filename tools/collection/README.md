@@ -4,6 +4,18 @@ Run these against a session directory produced by
 `--collection-mode on` (see the plan doc,
 `private_docs/plans/DATA_COLLECTION_IMPL_VALIDATION_PLAN.md`, §3–4).
 
+Operator-facing docs live in `docs/`:
+
+- [`docs/VALIDATION_PROVENANCE.md`](docs/VALIDATION_PROVENANCE.md) —
+  every metric this branch can emit, its backing truth, and its current
+  colour on the provenance ladder. **Read this before quoting any
+  number this branch produced.**
+- [`docs/DEPLOYMENT_CHECKLIST.md`](docs/DEPLOYMENT_CHECKLIST.md) —
+  pre-departure / on-site / before-dark / during / after checklist for
+  a one-shot field session.
+- [`docs/BENCH_REHEARSAL.md`](docs/BENCH_REHEARSAL.md) — the executable
+  gate that authorises the field session.
+
 ## The three §3 firmware-integrity checks
 
 | # | Check | Provenance | Script |
