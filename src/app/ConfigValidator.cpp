@@ -96,6 +96,20 @@ std::optional<std::string> checkSilenceExceedsHangover(const Config& cfg) {
 // for `silenceMs` of trailing quiet before closing. If max < pre-roll +
 // silence the recorder is guaranteed to close before the detected call can
 // play out, producing files with no usable audio.
+// --save-rejected is a strict superset of --cricket-filter; if the filter
+// is off the recorder never enters the discard branch, so no clip would
+// ever be routed to the rejected sink. Surface the misconfiguration
+// instead of silently doing nothing.
+std::optional<std::string> checkSaveRejectedRequiresFilter(const Config& cfg) {
+    if (cfg.saveRejected == Config::SaveRejectedMode::Off) return std::nullopt;
+    if (!cfg.cricketFilter) {
+        return "--save-rejected requires --cricket-filter on (with the filter "
+               "off, no clip is ever cricket-discarded and nothing would ever "
+               "be written to rejected/)";
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> checkRecordingBudget(const Config& cfg) {
     if (cfg.maxLengthMs == 0) return std::nullopt;   // cap disabled
     const std::uint32_t minNeeded = cfg.preRollMs + cfg.silenceMs;
@@ -124,6 +138,7 @@ std::vector<std::string> validateConfig(const Config& cfg) {
     run(checkLengthOrder(cfg));
     run(checkRecordingBudget(cfg));
     run(checkSilenceExceedsHangover(cfg));
+    run(checkSaveRejectedRequiresFilter(cfg));
 
     return errors;
 }

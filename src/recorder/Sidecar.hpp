@@ -38,6 +38,19 @@ struct SidecarRecording {
     std::string             algorithm;       ///< e.g. "BandEnergyDetector"
     std::string             boot_iso8601;    ///< Device boot timestamp.
     std::string             capture_iso8601; ///< When the WAV started.
+
+    // --- Rejected-sink metadata (empty for accepted clips) ---
+    //
+    // Non-empty only when the sidecar is being written next to a rejected
+    // clip (--save-rejected). @c rejected_reason is a short tag inferred
+    // from the event's own features + the detector's current tunables at
+    // close time: "sweep" (sweep-shape gate rejected), "temporal" (temporal
+    // repetition-rate guard vetoed), or "unknown" for a plain no-bat-like
+    // event that carried no attributable clause. @c rejected_mode is the
+    // sink mode string ("all" / "sample" / "boundary") that decided to
+    // preserve this clip. Accepted-clip sidecars omit both fields.
+    std::string             rejected_reason;
+    std::string             rejected_mode;
 };
 
 /// Single (key, value) tunable snapshot. The Recorder builds this list by

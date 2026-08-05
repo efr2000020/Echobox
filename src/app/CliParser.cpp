@@ -139,6 +139,22 @@ const char* helpText() {
         "                            produces bat calls the gate can't characterise.\n"
         "                            (default: on)\n"
         "\n"
+        "Rejected capture (observability — off = byte-identical to today):\n"
+        "  --save-rejected off|all|sample|boundary\n"
+        "                            Preserve cricket-discarded clips under\n"
+        "                            <output>/rejected/ so they can be reviewed later.\n"
+        "                              off      no rejected/ dir is created (default)\n"
+        "                              all      save every rejected clip (local/offline\n"
+        "                                       validation; storage-heavy)\n"
+        "                              sample   save a random 1-in-N\n"
+        "                              boundary save only near-threshold near-misses\n"
+        "                                       (highest-value field mode)\n"
+        "  --save-rejected-sample-n <int>       1-in-N sampling ratio for mode 'sample'\n"
+        "                                       (default: 500; must be >= 1)\n"
+        "  --save-rejected-max-per-hour <int>   Storage governor: cap on rejected clips\n"
+        "                                       written per rolling hour. 0 = unlimited\n"
+        "                                       (for local 'all' runs). (default: 200)\n"
+        "\n"
         "Logging:\n"
         "  --log-dir <path>          Log output dir (default: ./logs)\n"
         "  --log-level off|debug|info|warn|error   (default: off)\n"
@@ -236,6 +252,22 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
         else if (k == "heartbeat-sec") {
             std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --heartbeat-sec");
             cfg.heartbeatSec = u;
+        }
+        else if (k == "save-rejected") {
+            if      (v == "off")      cfg.saveRejected = Config::SaveRejectedMode::Off;
+            else if (v == "all")      cfg.saveRejected = Config::SaveRejectedMode::All;
+            else if (v == "sample")   cfg.saveRejected = Config::SaveRejectedMode::Sample;
+            else if (v == "boundary") cfg.saveRejected = Config::SaveRejectedMode::Boundary;
+            else return err("invalid --save-rejected (use off|all|sample|boundary)");
+        }
+        else if (k == "save-rejected-sample-n") {
+            std::uint32_t u;
+            if (!parseUInt(v, u) || u == 0) return err("invalid --save-rejected-sample-n (must be >= 1)");
+            cfg.saveRejectedSampleN = u;
+        }
+        else if (k == "save-rejected-max-per-hour") {
+            std::uint32_t u; if (!parseUInt(v, u)) return err("invalid --save-rejected-max-per-hour");
+            cfg.saveRejectedMaxPerHour = u;
         }
         else {
             return err("unknown option --" + std::string(k));

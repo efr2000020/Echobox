@@ -142,6 +142,54 @@ TEST_CASE("CliParser: recorder options", "[cli]") {
     CHECK(cfg.maxLengthMs == 10000);
 }
 
+TEST_CASE("CliParser: --save-rejected modes and knobs", "[cli][save-rejected]") {
+    SECTION("default is off") {
+        Config cfg;
+        Argv a({"Echobox"});
+        auto res = parseCli(a.argc(), a.argv(), cfg);
+        REQUIRE(res.kind == CliResult::Kind::Ok);
+        CHECK(cfg.saveRejected == Config::SaveRejectedMode::Off);
+    }
+    SECTION("all") {
+        Config cfg;
+        Argv a({"Echobox", "--save-rejected", "all",
+                "--save-rejected-max-per-hour", "0"});
+        auto res = parseCli(a.argc(), a.argv(), cfg);
+        REQUIRE(res.kind == CliResult::Kind::Ok);
+        CHECK(cfg.saveRejected == Config::SaveRejectedMode::All);
+        CHECK(cfg.saveRejectedMaxPerHour == 0);
+    }
+    SECTION("sample with N") {
+        Config cfg;
+        Argv a({"Echobox", "--save-rejected=sample",
+                "--save-rejected-sample-n=1000"});
+        auto res = parseCli(a.argc(), a.argv(), cfg);
+        REQUIRE(res.kind == CliResult::Kind::Ok);
+        CHECK(cfg.saveRejected == Config::SaveRejectedMode::Sample);
+        CHECK(cfg.saveRejectedSampleN == 1000);
+    }
+    SECTION("boundary") {
+        Config cfg;
+        Argv a({"Echobox", "--save-rejected", "boundary"});
+        auto res = parseCli(a.argc(), a.argv(), cfg);
+        REQUIRE(res.kind == CliResult::Kind::Ok);
+        CHECK(cfg.saveRejected == Config::SaveRejectedMode::Boundary);
+    }
+    SECTION("invalid mode is rejected") {
+        Config cfg;
+        Argv a({"Echobox", "--save-rejected", "everything"});
+        auto res = parseCli(a.argc(), a.argv(), cfg);
+        CHECK(res.kind == CliResult::Kind::Error);
+        CHECK(res.errorMessage.find("--save-rejected") != std::string::npos);
+    }
+    SECTION("sample N=0 is rejected") {
+        Config cfg;
+        Argv a({"Echobox", "--save-rejected-sample-n", "0"});
+        auto res = parseCli(a.argc(), a.argv(), cfg);
+        CHECK(res.kind == CliResult::Kind::Error);
+    }
+}
+
 TEST_CASE("CliParser: DSP options", "[cli]") {
     Config cfg;
     Argv a({"Echobox", 

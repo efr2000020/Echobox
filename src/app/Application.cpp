@@ -181,6 +181,20 @@ int Application::run() {
     // via DspPipelineConfig.cricketFilter → sweep_gate_enabled tunable
     // above; recorder-side is the post-hoc no-bat-like-event discard here.
     rcfg.cricketDiscard = m_cfg.cricketFilter;
+    // Rejected-capture observability. Off = byte-identical to pre-feature
+    // behaviour; any other mode adds writes to <output>/rejected/.
+    switch (m_cfg.saveRejected) {
+        case Config::SaveRejectedMode::Off:
+            rcfg.saveRejected = recorder::SaveRejectedMode::Off; break;
+        case Config::SaveRejectedMode::All:
+            rcfg.saveRejected = recorder::SaveRejectedMode::All; break;
+        case Config::SaveRejectedMode::Sample:
+            rcfg.saveRejected = recorder::SaveRejectedMode::Sample; break;
+        case Config::SaveRejectedMode::Boundary:
+            rcfg.saveRejected = recorder::SaveRejectedMode::Boundary; break;
+    }
+    rcfg.saveRejectedSampleN     = m_cfg.saveRejectedSampleN;
+    rcfg.saveRejectedMaxPerHour  = m_cfg.saveRejectedMaxPerHour;
     m_recorder = std::make_unique<recorder::Recorder>(rcfg, m_preRoll, *m_dsp);
 
     try {

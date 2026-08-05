@@ -95,6 +95,26 @@ struct Config {
     // field escape hatch: if a deployment site produces bat calls the
     // gate can't characterise, one flag turns the whole filter off.
     bool                  cricketFilter{true};
+
+    // --- Rejected-capture observability ---
+    // Selects which cricket-discarded clips get preserved (into
+    // <output>/rejected/) instead of being deleted. The feature is off by
+    // default so a shipped unit is byte-identical to the pre-feature
+    // recorder; when enabled it only adds writes to the parallel rejected/
+    // sink, never mutates the accepted path.
+    enum class SaveRejectedMode {
+        Off,       ///< Feature disabled; no rejected/ dir is ever created.
+        All,       ///< Save every rejected clip. Local / offline-validation mode.
+        Sample,    ///< Save a random 1-in-N via saveRejectedSampleN.
+        Boundary,  ///< Save only near-threshold ("plausible bat") rejects.
+    };
+    SaveRejectedMode      saveRejected{SaveRejectedMode::Off};
+    /// 1-in-N sampling ratio used when saveRejected == Sample. Must be >= 1.
+    std::uint32_t         saveRejectedSampleN{500};
+    /// Storage governor: at most N rejected clips per rolling hour. Field
+    /// deployments set a real cap (default 200); local runs pass 0 for
+    /// unlimited when the "all" mode is used for offline validation.
+    std::uint32_t         saveRejectedMaxPerHour{200};
 };
 
 } // namespace echobox::app

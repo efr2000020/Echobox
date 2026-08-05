@@ -40,6 +40,11 @@ public:
     /// Final path the recording is renamed to on close.
     std::filesystem::path finalPath(std::chrono::system_clock::time_point start) const;
 
+    /// Final path for a rejected clip (--save-rejected). Lives under
+    /// @c <outputDir>/rejected/<YYYY-MM-DD>/ so the accepted-clip layout
+    /// is unaffected and either dir tree can be `rsync`'d independently.
+    std::filesystem::path rejectedPath(std::chrono::system_clock::time_point start) const;
+
 private:
     std::filesystem::path m_outputDir{"./recordings"};
 };

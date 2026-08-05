@@ -14,13 +14,23 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <memory>
+#include <random>
 #include <thread>
 
 namespace echobox::recorder {
 
 class WavWriter;
+
+/// --save-rejected mode selector. See RecorderConfig::saveRejected.
+enum class SaveRejectedMode {
+    Off,       ///< No rejected/ dir; feature entirely disabled.
+    All,       ///< Save every rejected clip.
+    Sample,    ///< Save a random 1-in-N.
+    Boundary,  ///< Save only near-threshold near-misses.
+};
 
 /**
  * @brief Construction-time configuration for Recorder.
@@ -62,6 +72,24 @@ struct RecorderConfig {
     /// to the @c --cricket-filter CLI flag; disabling both halves with
     /// that one switch restores the behaviour of the pre-gate recorder.
     bool                  cricketDiscard{true};
+
+    // --- Rejected-capture observability ---
+    // When @c saveRejected is not @c Off, a clip that would be cricket-
+    // discarded is instead renamed into @c outputDir/rejected/ with a
+    // sidecar (rejection reason + the features the detector already
+    // computed). Off (default) keeps the recorder byte-identical to
+    // pre-feature behaviour — no rejected/ dir is ever created and the
+    // discard branch continues to abort the WAV.
+    SaveRejectedMode      saveRejected{SaveRejectedMode::Off};
+    /// 1-in-N sampling ratio for @c SaveRejectedMode::Sample. Must be >= 1.
+    std::uint32_t         saveRejectedSampleN{500};
+    /// Storage governor: at most N rejected clips per rolling hour.
+    /// @c 0 disables the cap (unlimited — for local offline-validation runs).
+    std::uint32_t         saveRejectedMaxPerHour{200};
+    /// Skip the rejected-sink write when free disk drops below this many MB.
+    /// @c 0 disables the check. Bounds any risk of the observability sink
+    /// filling the SD card faster than the operator can rotate it.
+    std::uint32_t         saveRejectedMinDiskMb{100};
 };
 
 /**
@@ -108,6 +136,18 @@ private:
     void appendLiveAudio();
     void endRecording();
 
+    // --- Rejected-capture sink helpers ---
+    //
+    // saveRejectedClip() is called from endRecording() ONLY on the
+    // cricket-discard branch, before the WAV is aborted, when the
+    // sink mode + governor allow. It renames the temp WAV into
+    // outputDir/rejected/ and writes a sidecar next to it. Returns
+    // true iff the clip was preserved (caller then skips abort).
+    bool shouldSaveRejected(const class SidecarPayload& payload);
+    bool saveRejectedClip(const class SidecarPayload& payload);
+    bool rejectedGovernorAllows();
+    void recordRejectedWrite();
+
     RecorderConfig                m_cfg;
     const PreRollBuffer&          m_preRoll;
     IDetectorStateProvider&       m_detector;
@@ -115,6 +155,19 @@ private:
     FilenameBuilder               m_names;
     std::atomic<bool>             m_running{false};
     std::thread                   m_thread;
+
+    // Rolling per-hour timestamp ring for the storage governor. The oldest
+    // entry is popped before comparing against the cap; drift-free and
+    // proportional in size to the actual write rate. Recorder-thread-only —
+    // no lock needed.
+    std::deque<std::chrono::steady_clock::time_point> m_rejectedWriteTimes;
+    /// Per-process rejected-write count since boot. Logged for tuning.
+    std::uint64_t                 m_rejectedWrittenTotal{0};
+    /// PRNG for @c SaveRejectedMode::Sample; recorder-thread-only.
+    std::mt19937                  m_rng{std::random_device{}()};
+    /// Sticky low-disk state: once we log LOW_DISK we suppress subsequent
+    /// rejected-writes silently until the check clears again.
+    bool                          m_rejectedLowDiskLogged{false};
 
     // --- active recording state ---
     State                                m_state{State::Idle};

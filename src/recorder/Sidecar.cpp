@@ -163,8 +163,17 @@ bool writeSidecar(const std::filesystem::path& wavPath,
     os << "    \"freq_lo_hz\": "        << fmtFloat(meta.freq_lo_hz)        << ",\n";
     os << "    \"freq_hi_hz\": "        << fmtFloat(meta.freq_hi_hz)        << ",\n";
     os << "    \"preroll_ms\": "        << meta.preroll_ms                  << ",\n";
-    os << "    \"silence_ms\": "        << meta.silence_ms                  << "\n";
-    os << "  },\n";
+    os << "    \"silence_ms\": "        << meta.silence_ms;
+    // Rejected-sink annotations. Emitted only next to a rejected/ WAV;
+    // omitted from accepted-clip sidecars so byte-identical checksums are
+    // preserved for the pre-feature accepted path.
+    if (!meta.rejected_reason.empty() || !meta.rejected_mode.empty()) {
+        os << ",\n    \"rejected\": {"
+           << "\"reason\": \"" << jsonEscape(meta.rejected_reason) << "\""
+           << ", \"mode\": \""  << jsonEscape(meta.rejected_mode)   << "\""
+           << "}";
+    }
+    os << "\n  },\n";
 
     // --- detector + tunables + floor snapshot ---
     os << "  \"detector\": {\n";

@@ -13,10 +13,13 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <ctime>
 #include <limits>
+#include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -29,6 +32,14 @@ constexpr std::size_t kDrainChunkSamples = 4096;
 std::uint64_t framesForMs(std::uint32_t ms, int sampleRate) {
     return static_cast<std::uint64_t>(ms) * static_cast<std::uint64_t>(sampleRate) / 1000ULL;
 }
+
+// Near-miss margin around the primary sweep-shape gate threshold. Events
+// whose 10-dB bandwidth sits within ± this many kHz of the tunable
+// min_bandwidth_khz qualify as "boundary" near-misses under
+// SaveRejectedMode::Boundary. Fixed at construction time (not a tunable)
+// because it purely controls what we OBSERVE, not what we decide: the
+// gate's own decision has already been made when we consult this.
+constexpr float kBoundaryBandwidthMarginKhz = 0.30f;
 
 // UTC ISO-8601 with millisecond precision. Matches the log timestamp format
 // so a sidecar's capture_ts and a [dsp.bed] log line can be cross-correlated
@@ -51,6 +62,51 @@ std::string formatIso8601Utc(std::chrono::system_clock::time_point tp) {
                   utc.tm_hour, utc.tm_min, utc.tm_sec,
                   static_cast<long long>(millis));
     return buf;
+}
+
+const char* modeName(SaveRejectedMode m) {
+    switch (m) {
+        case SaveRejectedMode::Off:      return "off";
+        case SaveRejectedMode::All:      return "all";
+        case SaveRejectedMode::Sample:   return "sample";
+        case SaveRejectedMode::Boundary: return "boundary";
+    }
+    return "off";
+}
+
+// Attribute the rejection to the specific gate clause using the event
+// features we already have + the current tunable value. Mirrors the
+// two-way split the detector prints at close time
+// (BandEnergyDetector: sweepBatLike ? "temporal" : "sweep").
+// "unknown" covers pathological cases: no events in the payload (spurious
+// trigger that never opened a real event), or missing tunable metadata.
+std::string classifyRejection(const SidecarPayload& payload,
+                              const IDetectorStateProvider& detector) {
+    if (payload.events.empty()) return "unknown";
+    double minBw = 0.0;
+    bool haveTunable = false;
+    {
+        std::vector<TunableValue> tv;
+        if (detector.currentTunables(tv)) {
+            for (const auto& t : tv) {
+                if (t.key == "min_bandwidth_khz") {
+                    minBw = t.value;
+                    haveTunable = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (!haveTunable) return "unknown";
+
+    // Any rejected event whose bandwidth failed the sweep-shape gate
+    // marks the whole clip as "sweep"-attributable; otherwise the
+    // temporal repetition-rate guard was the sole downgrader.
+    for (const auto& e : payload.events) {
+        if (!e.gate_rejected) continue;
+        if (static_cast<double>(e.bandwidth_khz) < minBw) return "sweep";
+    }
+    return "temporal";
 }
 } // namespace
 
@@ -254,6 +310,37 @@ void Recorder::endRecording() {
     if (m_cfg.cricketDiscard && !m_lastCloseWasMaxLenActive) {
         const auto s = m_detector.snapshot();
         if (s.batLikeEvents == m_batLikeAtStart) {
+            // Drain the detector's staged events for this clip *first*.
+            // Two roles: (a) if --save-rejected is on, we need the
+            // features to classify and to write the rejected sidecar;
+            // (b) drained-and-dropped keeps stale events from leaking
+            // into the next recording's payload. Skip the drain only if
+            // no consumer needs it (writeSidecar off AND saveRejected
+            // off) to preserve the pre-feature fast path exactly.
+            SidecarPayload payload;
+            const bool needPayload = m_cfg.writeSidecar
+                                     || m_cfg.saveRejected != SaveRejectedMode::Off;
+            if (needPayload) {
+                m_detector.drainSidecarPayload(payload);
+            }
+
+            // Parallel rejected sink: preserve the clip under
+            // <output>/rejected/ instead of aborting. Runs entirely on
+            // the recorder thread (never the audio thread) — the audio
+            // path's contract is unchanged. If any step of the rejected
+            // write fails, or the mode/governor declines, fall through
+            // to the abort branch below so the discard behaviour is
+            // preserved.
+            if (m_cfg.saveRejected != SaveRejectedMode::Off
+                && shouldSaveRejected(payload)
+                && rejectedGovernorAllows()
+                && saveRejectedClip(payload)) {
+                recordRejectedWrite();
+                m_writer.reset();
+                m_state = State::Idle;
+                return;
+            }
+
             LS_DEBUG("recorder",
                      "RECORDING_DISCARDED file=%s reason=cricket-gate "
                      "(no bat-like event) duration=%ums band=%.1f-%.1fkHz",
@@ -261,12 +348,6 @@ void Recorder::endRecording() {
                      durationMs, loHz / 1000.0f, hiHz / 1000.0f);
             m_writer->abort();
             m_writer.reset();
-            // Discard any staged sidecar events for this clip so they don't
-            // leak into the next recording's payload.
-            if (m_cfg.writeSidecar) {
-                SidecarPayload stale;
-                m_detector.drainSidecarPayload(stale);
-            }
             m_state = State::Idle;
             return;
         }
@@ -321,6 +402,162 @@ void Recorder::endRecording() {
     }
 
     m_state = State::Idle;
+}
+
+// --- Rejected-sink helpers -----------------------------------------------
+//
+// Runs on the recorder thread only. The audio thread's push into the pre-
+// roll buffer is unchanged; the DSP thread's snapshot publication is
+// unchanged. Adding this sink strictly extends what the recorder does on
+// the discard branch — the accepted branch is untouched.
+
+bool Recorder::shouldSaveRejected(const SidecarPayload& payload) {
+    switch (m_cfg.saveRejected) {
+        case SaveRejectedMode::Off:
+            return false;
+        case SaveRejectedMode::All:
+            return true;
+        case SaveRejectedMode::Sample: {
+            const std::uint32_t n = m_cfg.saveRejectedSampleN > 0
+                                    ? m_cfg.saveRejectedSampleN : 1u;
+            std::uniform_int_distribution<std::uint32_t> d(0, n - 1);
+            return d(m_rng) == 0;
+        }
+        case SaveRejectedMode::Boundary: {
+            // Near-miss iff any rejected event's 10-dB bandwidth sits
+            // within kBoundaryBandwidthMarginKhz of the sweep-shape gate's
+            // primary threshold. Skips a boundary-mode write when we
+            // can't query the tunable (older plugin: fall through to
+            // "all", since the operator explicitly asked us to observe).
+            std::vector<TunableValue> tv;
+            double minBw = 0.0;
+            bool have = false;
+            if (m_detector.currentTunables(tv)) {
+                for (const auto& t : tv) {
+                    if (t.key == "min_bandwidth_khz") {
+                        minBw  = t.value;
+                        have   = true;
+                        break;
+                    }
+                }
+            }
+            if (!have) return true;
+            for (const auto& e : payload.events) {
+                if (!e.gate_rejected) continue;
+                const double d = std::fabs(static_cast<double>(e.bandwidth_khz) - minBw);
+                if (d <= static_cast<double>(kBoundaryBandwidthMarginKhz)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+    return false;
+}
+
+bool Recorder::rejectedGovernorAllows() {
+    // 0 = unlimited (local offline-validation mode).
+    if (m_cfg.saveRejectedMaxPerHour == 0) {
+        // Still perform the low-disk check so a runaway local run doesn't
+        // silently fill the boot volume.
+    } else {
+        const auto now       = std::chrono::steady_clock::now();
+        const auto oneHourAgo = now - std::chrono::hours(1);
+        while (!m_rejectedWriteTimes.empty()
+               && m_rejectedWriteTimes.front() < oneHourAgo) {
+            m_rejectedWriteTimes.pop_front();
+        }
+        if (m_rejectedWriteTimes.size() >= m_cfg.saveRejectedMaxPerHour) {
+            // Log at most once per cap-hit to keep the log quiet on a
+            // noisy site — a tail-of-log operator sees exactly one line
+            // per cap event.
+            LS_DEBUG("recorder",
+                     "REJECTED_CAP hit (%u/hour) — dropping this "
+                     "rejected clip",
+                     m_cfg.saveRejectedMaxPerHour);
+            return false;
+        }
+    }
+
+    if (m_cfg.saveRejectedMinDiskMb > 0) {
+        std::error_code ec;
+        auto s = std::filesystem::space(m_cfg.outputDir, ec);
+        if (!ec) {
+            const std::uint64_t freeMb = s.available / (1024ULL * 1024ULL);
+            if (freeMb < m_cfg.saveRejectedMinDiskMb) {
+                if (!m_rejectedLowDiskLogged) {
+                    LS_WARN("recorder",
+                            "REJECTED_LOW_DISK free=%lluMB (< %uMB) — "
+                            "suppressing rejected-clip writes until "
+                            "disk recovers",
+                            static_cast<unsigned long long>(freeMb),
+                            m_cfg.saveRejectedMinDiskMb);
+                    m_rejectedLowDiskLogged = true;
+                }
+                return false;
+            }
+            m_rejectedLowDiskLogged = false;
+        }
+    }
+    return true;
+}
+
+void Recorder::recordRejectedWrite() {
+    ++m_rejectedWrittenTotal;
+    m_rejectedWriteTimes.push_back(std::chrono::steady_clock::now());
+}
+
+bool Recorder::saveRejectedClip(const SidecarPayload& payload) {
+    const auto rejPath = m_names.rejectedPath(m_eventStartWall);
+
+    // Rename the temp WAV into the rejected/ tree. WavWriter::closeAndRename
+    // creates parent dirs and falls back to copy+remove across filesystems.
+    // Failure here means the clip is lost — fall through so endRecording()
+    // reverts to abort() and the operator sees the existing discard log.
+    try {
+        m_writer->closeAndRename(rejPath);
+    } catch (...) {
+        LS_WARN("recorder", "rejected-sink rename failed for %s",
+                m_currentTempPath.filename().string().c_str());
+        return false;
+    }
+
+    // Sidecar: reuse the accepted-clip payload; add the rejected tag
+    // block so downstream tooling can trivially split accepted vs
+    // rejected sidecars on the "rejected" key.
+    if (m_cfg.writeSidecar) {
+        SidecarRecording meta;
+        meta.wav_path        = rejPath.filename().string();
+        meta.sample_rate     = m_cfg.sampleRate;
+        meta.fft_size        = m_detector.fftSize();
+        meta.hop_size        = m_detector.hopSize();
+        meta.freq_lo_hz      = m_detector.freqLoHz();
+        meta.freq_hi_hz      = m_detector.freqHiHz();
+        meta.preroll_ms      = m_cfg.preRollMs;
+        meta.silence_ms      = m_cfg.silenceMs;
+        meta.algorithm       = m_detector.algorithmName();
+        meta.boot_iso8601    = formatIso8601Utc(m_cfg.bootWall);
+        meta.capture_iso8601 = formatIso8601Utc(m_eventStartWall);
+        meta.rejected_reason = classifyRejection(payload, m_detector);
+        meta.rejected_mode   = modeName(m_cfg.saveRejected);
+
+        std::vector<TunableValue> tunables;
+        m_detector.currentTunables(tunables);
+        if (!writeSidecar(rejPath, meta, tunables, payload)) {
+            LS_WARN("recorder", "rejected-sink sidecar write failed for %s",
+                    rejPath.filename().string().c_str());
+            // WAV is already safely on disk; a missing sidecar is a
+            // recoverable operational glitch, not a reason to reject the
+            // clip preservation.
+        }
+    }
+
+    LS_DEBUG("recorder",
+             "REJECTED_SAVED file=%s reason=%s mode=%s",
+             rejPath.filename().string().c_str(),
+             classifyRejection(payload, m_detector).c_str(),
+             modeName(m_cfg.saveRejected));
+    return true;
 }
 
 } // namespace echobox::recorder
