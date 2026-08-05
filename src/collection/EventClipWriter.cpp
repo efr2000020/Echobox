@@ -49,8 +49,9 @@ void EventClipWriter::stop() {
     m_cv.notify_all();
     if (m_thread.joinable()) m_thread.join();
     LS_INFO("collection",
-            "STREAM_B_STOP clips_written=%llu",
-            static_cast<unsigned long long>(m_clipsWritten.load()));
+            "STREAM_B_STOP clips_written=%llu clips_dropped=%llu",
+            static_cast<unsigned long long>(m_clipsWritten.load()),
+            static_cast<unsigned long long>(m_clipsDropped.load()));
 }
 
 void EventClipWriter::enqueue(const EventFeatures& e,
@@ -70,41 +71,47 @@ void EventClipWriter::enqueue(const EventFeatures& e,
 }
 
 void EventClipWriter::loop() {
-    while (m_running.load(std::memory_order_acquire)) {
+    // Loop until the queue is drained even after stop() has been called —
+    // dropping in-flight jobs at shutdown was a silent 2-3% event loss on
+    // long field runs. The tail-wait inside the loop respects
+    // tailWaitTimeout, which caps the shutdown lag per stalled job.
+    for (;;) {
         Job j{};
-        bool haveJob = false;
         {
             std::unique_lock<std::mutex> lk(m_mutex);
             m_cv.wait(lk, [&] {
                 return !m_running.load(std::memory_order_acquire)
                     || !m_queue.empty();
             });
-            if (!m_queue.empty()) {
-                j = m_queue.front();
-                m_queue.pop_front();
-                haveJob = true;
-            }
+            if (m_queue.empty()) return;   // stopped AND drained
+            j = m_queue.front();
+            m_queue.pop_front();
         }
-        if (!haveJob) continue;
 
         // Wait for the audio thread to have captured up to
-        // end_sample + postSamples. If it never does (shutdown), give up
-        // after tailWaitTimeout and write whatever we have.
+        // end_sample + postSamples, or give up after tailWaitTimeout and
+        // let writeClipWav decide whether the window is usable. Do NOT
+        // exit early on m_running=false — we still want to flush queued
+        // jobs at shutdown.
         const std::uint64_t desiredEnd = j.end_sample + m_cfg.postSamples;
         const auto waitStart = std::chrono::steady_clock::now();
-        while (m_clock.now() < desiredEnd
-               && m_running.load(std::memory_order_acquire)) {
+        while (m_clock.now() < desiredEnd) {
             if (std::chrono::steady_clock::now() - waitStart
                 >= m_cfg.tailWaitTimeout) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
 
-        writeClipWav(j);
+        if (!writeClipWav(j)) {
+            m_clipsDropped.fetch_add(1, std::memory_order_relaxed);
+        }
     }
 }
 
 bool EventClipWriter::writeClipWav(const Job& j) {
     // Window: [start_sample - preSamples, end_sample + postSamples].
+    // The filename encodes @c windowStart (not @c j.start_sample) so a
+    // reader can slice Stream A at the number in the filename and get
+    // byte-identical PCM back. The offline §3 A/B check depends on this.
     const std::uint64_t windowStart =
         (j.start_sample > m_cfg.preSamples) ? (j.start_sample - m_cfg.preSamples) : 0;
     const std::uint64_t windowEnd = j.end_sample + m_cfg.postSamples;
@@ -149,7 +156,7 @@ bool EventClipWriter::writeClipWav(const Job& j) {
 
     const auto path = m_cfg.outputDir
         / (j.gate_rejected ? "rejected" : "accepted")
-        / sampleFilename(j.start_sample);
+        / sampleFilename(windowStart);
 
     SF_INFO info{};
     info.samplerate = m_cfg.sampleRate;

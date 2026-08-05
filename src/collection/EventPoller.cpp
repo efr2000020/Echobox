@@ -24,7 +24,6 @@ EventPoller::~EventPoller() { stop(); }
 
 void EventPoller::start() {
     if (m_running.exchange(true, std::memory_order_acq_rel)) return;
-    m_seen.reserve(m_cfg.dedupeCapacity);
     m_thread = std::thread(&EventPoller::loop, this);
 }
 
@@ -96,21 +95,13 @@ void EventPoller::loop() {
         if (!m_running.load(std::memory_order_acquire)) break;
 
         scratch.clear();
-        if (!m_pipeline.peekPendingEvents(scratch)) continue;
+        // Destructive drain of the collection-only queue: each event is
+        // handed to us exactly once, so no dedupe is needed and no event
+        // can be lost to a race with the recorder's sidecar drain.
+        if (!m_pipeline.drainCollectionEvents(scratch)) continue;
 
         for (const auto& e : scratch) {
-            // Eviction: keep unbounded growth in check without corrupting
-            // dedupe within a night's worth of events. Drop the whole
-            // set at the cap; the tracker's own queue is drained by the
-            // recorder often enough that a repeat start_frame across the
-            // eviction is unlikely (and offline readers detect it).
-            if (m_seen.size() >= m_cfg.dedupeCapacity) {
-                m_seen.clear();
-                m_seen.reserve(m_cfg.dedupeCapacity);
-            }
-            if (m_seen.insert(e.start_frame).second) {
-                handleNew(e);
-            }
+            handleNew(e);
         }
     }
     m_log.flush();

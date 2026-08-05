@@ -57,6 +57,7 @@ public:
 
     bool          drainSidecarPayload(SidecarPayload& out) override;
     bool          peekPendingEvents(std::vector<EventFeatures>& out) const override;
+    bool          drainCollectionEvents(std::vector<EventFeatures>& out) override;
     bool          seedNoiseFloor(std::span<const float> floor) override;
     std::uint64_t totalEventsSinceBoot() const override;
 
@@ -278,6 +279,12 @@ private:
     mutable std::mutex          m_diagnosticsMutex;
     EventFeatures               m_inProgressEvent{};
     std::vector<EventFeatures>  m_pendingEvents;
+    // Second, collection-only mirror of m_pendingEvents. Populated at the
+    // same point but drained by the collection poller — not touched by
+    // drainSidecarPayload. Lets EventPoller pull events destructively at
+    // its own cadence without racing the recorder's per-clip drain (which
+    // was silently swallowing events that fired between poller wake-ups).
+    std::vector<EventFeatures>  m_collectionEvents;
     // Snapshot of m_noiseFloor taken at the open of the FIRST event since the
     // last drain. Empty between drain and the next event-open. The recorder
     // drains both the events vector and this snapshot atomically.

@@ -269,6 +269,26 @@ public:
     }
 
     /**
+     * Destructive drain of a SECOND, collection-only events queue that runs
+     * alongside the sidecar queue. Populated by @c processFrame at the same
+     * point as @c m_pendingEvents (event close), but consumed independently.
+     *
+     * Why a second queue: the sidecar queue is cleared by the recorder at
+     * every clip close (or cricket-gate reject) via @c drainSidecarPayload.
+     * A collection poller using @c peekPendingEvents with @c start_frame
+     * dedupe still LOSES events whose entire lifetime fits between two
+     * pollers wake-ups AND a recorder drain in-between. This queue is
+     * touched only by the collection poller, so no such race exists.
+     *
+     * Default no-op keeps older plugins compiling; the collection layer
+     * falls back to @c peekPendingEvents when this returns false. Impls
+     * MUST take the same @c m_diagnosticsMutex the sidecar drain takes.
+     */
+    virtual bool drainCollectionEvents(std::vector<EventFeatures>& /*out*/) {
+        return false;
+    }
+
+    /**
      * Seed the per-bin noise floor estimate. Used by the offline validator
      * to bypass the EMA's cold-start convergence period on short clips,
      * by feeding in a snapshot the device captured at trigger time.

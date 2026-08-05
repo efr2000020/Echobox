@@ -6,7 +6,15 @@
 /// Stream B: per-event WAV clips. For every detector event surfaced by
 /// EventPoller (accepted AND gate-rejected) we extract a fixed-width
 /// window around the event from a dedicated preroll buffer and dump it
-/// to <collection-dir>/events/{accepted|rejected}/<start_sample>.wav.
+/// to <collection-dir>/events/{accepted|rejected}/<window_start>.wav.
+///
+/// Filename convention: the 20-digit prefix is the absolute sample index
+/// of the WAV's first sample (i.e. the event's start_sample minus
+/// @c EventClipConfig::preSamples), NOT the event's trigger sample.
+/// This lets an offline reader slice Stream A at exactly the number in
+/// the filename and get byte-identical PCM back — the §3 A/B integrity
+/// check depends on it. To correlate back to the event log, add
+/// @c preSamples to the filename to recover the event's start_sample.
 ///
 /// The buffer is a second @c recorder::PreRollBuffer instance sized for
 /// the widest window we might need — the audio thread writes into it
@@ -75,6 +83,12 @@ public:
     std::uint64_t clipsWritten() const {
         return m_clipsWritten.load(std::memory_order_acquire);
     }
+    /// Clips whose write was skipped — window aged out of the preroll,
+    /// audio stream ended before postSamples were available, or the
+    /// libsndfile open failed. Surfaced on STREAM_B_STOP.
+    std::uint64_t clipsDropped() const {
+        return m_clipsDropped.load(std::memory_order_acquire);
+    }
 
 private:
     struct Job {
@@ -99,6 +113,7 @@ private:
     std::atomic<bool>               m_running{false};
     std::thread                     m_thread;
     std::atomic<std::uint64_t>      m_clipsWritten{0};
+    std::atomic<std::uint64_t>      m_clipsDropped{0};
 };
 
 } // namespace echobox::collection

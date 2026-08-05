@@ -3,11 +3,18 @@
 
 #pragma once
 /// @file
-/// Stream C poller: polls the DSP tracker's pending-events queue at a
-/// fast cadence, dedupes by @c EventFeatures::start_frame, writes one
-/// "event" JSONL record per new event to the DecisionLog, and hands the
-/// same event off to the EventClipWriter (if set) so Stream B can save
-/// the surrounding audio window.
+/// Stream C poller: destructively drains the DSP tracker's collection-
+/// only events queue at a fast cadence, writes one "event" JSONL record
+/// per event to the DecisionLog, and hands the same event off to the
+/// EventClipWriter (if set) so Stream B can save the surrounding audio
+/// window.
+///
+/// The tracker maintains a second queue populated in parallel with the
+/// sidecar queue (see @c ISweepTracker::drainCollectionEvents), so this
+/// poller can pull events without racing the recorder's per-clip
+/// @c drainSidecarPayload — earlier revisions used a non-destructive
+/// peek + start_frame dedupe and silently lost events whose entire
+/// lifetime fit between two poller wake-ups.
 ///
 /// Runs on its own thread so the DSP hot loop is untouched by
 /// collection concerns. See DATA_COLLECTION_IMPL_VALIDATION_PLAN §2.2 C.
@@ -22,7 +29,6 @@
 #include <cstdint>
 #include <string>
 #include <thread>
-#include <unordered_set>
 
 namespace echobox::dsp { class DspPipeline; }
 
@@ -31,17 +37,15 @@ namespace echobox::collection {
 class EventClipWriter;
 
 /**
- * @brief Poll interval + dedupe controls for the event poller.
+ * @brief Poll interval for the event poller.
  *
- * The poll cadence must be shorter than the recorder's silence timeout
- * so that events which trigger a WAV are logged BEFORE that WAV closes
- * and drainSidecarPayload() clears the queue. 100 ms is comfortable for
- * the shipped 50 ms silence + hangover budget (events still sit in the
- * queue for at least the silence-timeout window from close).
+ * Cadence primarily controls end-to-end latency between an event closing
+ * on the DSP thread and its WAV landing in @c events/. A tighter cadence
+ * also shortens the window over which Stream B's preroll buffer must
+ * hold audio waiting for a clip to be written.
  */
 struct EventPollerConfig {
     std::chrono::milliseconds pollInterval{50};
-    std::size_t               dedupeCapacity{4096};   // ~a night's events
     std::size_t               hopSize{512};           // frame→sample conversion
     int                       sampleRate{384000};
 };
@@ -83,13 +87,6 @@ private:
     std::atomic<bool>       m_running{false};
     std::thread             m_thread;
     std::atomic<std::uint64_t> m_eventsLogged{0};
-
-    // Dedupe set: start_frame values already logged. Bounded — we evict
-    // the oldest half when we hit the cap so a long night doesn't leak
-    // memory. Collisions across the eviction boundary would double-log
-    // (which the offline reader detects and warns about); with hop=512
-    // and 30 fps event rate the cap is >1h of headroom before eviction.
-    std::unordered_set<std::uint32_t> m_seen;
 };
 
 } // namespace echobox::collection

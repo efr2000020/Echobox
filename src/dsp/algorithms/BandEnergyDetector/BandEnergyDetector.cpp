@@ -103,6 +103,7 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     {
         std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
         m_pendingEvents.clear();
+        m_collectionEvents.clear();
         m_floorSnapshotAtFirstEvent.clear();
         m_inProgressEvent          = EventFeatures{};
         m_framesProcessedSinceBoot = 0;
@@ -446,6 +447,7 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                     m_inProgressEvent.mono_fraction = shape.mono_fraction;
                     m_inProgressEvent.gate_rejected = m_gateRejected;
                     m_pendingEvents.push_back(m_inProgressEvent);
+                    m_collectionEvents.push_back(m_inProgressEvent);
                 }
 
                 // --- Publish the per-event verdict to the recorder ---
@@ -888,6 +890,13 @@ bool BandEnergyDetector::peekPendingEvents(std::vector<EventFeatures>& out) cons
     // side by EventFeatures::start_frame so a peek that spans a drain
     // boundary does not double-log.
     out.assign(m_pendingEvents.begin(), m_pendingEvents.end());
+    return true;
+}
+
+bool BandEnergyDetector::drainCollectionEvents(std::vector<EventFeatures>& out) {
+    std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+    out.assign(m_collectionEvents.begin(), m_collectionEvents.end());
+    m_collectionEvents.clear();
     return true;
 }
 

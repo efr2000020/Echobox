@@ -245,13 +245,18 @@ int Application::run() {
                 ::echobox::collection::ContinuousWriter>(
                 cwCfg, *m_referenceRing, m_sampleClock);
         }
-        // Stream B preroll: 2 seconds — comfortably wider than any clip
-        // window we'll ask for. Independent of Stream A ring; the two
-        // are populated in lockstep from the capture loop so the byte-
-        // identity check in §3 diffs matching sample ranges.
+        // Stream B preroll: 8 seconds — comfortably wider than any clip
+        // window we'll ask for, and sized so a cricket-heavy burst can
+        // back the writer thread up for several seconds without a job
+        // aging out of the ring (a 2 s ring silently lost ~3% of events
+        // during a 9.7 h field session). At 384 kHz mono int16 the ring
+        // is ~6 MB — cheap on the Pi Zero 2 W's 512 MB RAM.
+        // Independent of Stream A ring; the two are populated in lockstep
+        // from the capture loop so the byte-identity check in §3 diffs
+        // matching sample ranges.
         if (m_cfg.collection.streams.streamB) {
             const std::size_t bufSamples =
-                static_cast<std::size_t>(m_cfg.sampleRate) * 2;
+                static_cast<std::size_t>(m_cfg.sampleRate) * 8;
             m_collectionPreRoll = std::make_unique<recorder::PreRollBuffer>(bufSamples);
         }
         // Streams B and C both write to the decision-log directory tree,

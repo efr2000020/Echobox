@@ -136,6 +136,11 @@ public:
     /// the recorder's drain. Callers must dedupe by @c EventFeatures::
     /// start_frame. Off-hot-loop; takes the tracker's diagnostics lock.
     bool        peekPendingEvents(std::vector<EventFeatures>& out) const;
+    /// Destructive drain of the tracker's collection-only events queue.
+    /// Preferred over @c peekPendingEvents in collection mode — events
+    /// are seen exactly once and never race with the recorder's sidecar
+    /// drain. Off-hot-loop; takes the tracker's diagnostics lock.
+    bool        drainCollectionEvents(std::vector<EventFeatures>& out);
     bool        currentTunables(std::vector<echobox::recorder::TunableValue>& out) const override;
     std::string algorithmName() const override;
     std::size_t fftSize()  const override { return m_cfg.fftSize; }
