@@ -74,6 +74,11 @@ __pycache__/
 *$py.class
 .venv/
 .env
+# uv/PEP 517 project scaffolding — Echobox is a C++ project and each
+# Python tool ships its own requirements.txt; the root pyproject/lock
+# are venv-management artefacts only, never committed.
+pyproject.toml
+uv.lock
 
 # Audio Files
 *.wav
