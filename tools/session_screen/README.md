@@ -65,6 +65,57 @@ python -m tools.session_screen.validate score \
     --output-dir validation_out
 ```
 
+### Ingesting the shipping app's `rejected/` capture
+
+Pass `--rejected-dir <path>` to `score` (or `all`) to have the report
+scan sidecars written by the shipping app's `--save-rejected` feature
+and add a "Rejected-set — device's own near-miss population" section.
+
+The `rejected/` capture is the **more trustworthy signal** than the
+BatDetect2 comparison alone: it is exactly what the app threw away, so
+the near-threshold count is the direct tuning target.
+
+```bash
+# Field unit ran with --save-rejected all (or boundary), producing:
+#   /path/to/recordings/rejected/YYYY-MM-DD/*.wav + .json
+
+python -m tools.session_screen.validate score \
+    --truth   validation_out/truth_manifest.parquet \
+    --replay  validation_out/replay_manifest.parquet \
+    --output-dir validation_out \
+    --rejected-dir /path/to/recordings/rejected
+
+# Optional: also run BatDetect2 over the rejected clips, then join. The
+# report gains "N of M rejected clips were real bats" — the direct
+# 'recall we lost' number.
+python -m tools.session_screen.validate truth \
+    --input  /path/to/recordings/rejected \
+    --output validation_out/rejected_truth.parquet
+python -m tools.session_screen.validate score \
+    --truth   validation_out/truth_manifest.parquet \
+    --replay  validation_out/replay_manifest.parquet \
+    --output-dir validation_out \
+    --rejected-dir   /path/to/recordings/rejected \
+    --rejected-truth validation_out/rejected_truth.parquet
+```
+
+### On-device — turning `--save-rejected` on
+
+The shipping app has four modes, chosen by trade-off:
+
+- `--save-rejected off` — default; behaviour byte-identical to today.
+- `--save-rejected all` — keep every rejected clip. **Local /
+  offline-validation mode**; storage-heavy. Pair with
+  `--save-rejected-max-per-hour 0` on a scratch machine.
+- `--save-rejected sample --save-rejected-sample-n 500` — random
+  1-in-500 sample. Cheap continuous observability.
+- `--save-rejected boundary` — save only near-threshold near-misses
+  (within ±0.30 kHz of the sweep-shape gate's `min_bandwidth_khz`).
+  **Highest-value field mode** — most tuning signal per megabyte.
+
+Field deployments should always cap: `--save-rejected-max-per-hour 200`
+is the default and matches a busy night's ceiling.
+
 The `replay` subcommand auto-discovers `<input>/../SESSION_HEADER.json`
 so the offline harness runs with the config the device actually used;
 pass `--session-header PATH` to override, or omit for built-in defaults.

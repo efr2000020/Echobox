@@ -213,9 +213,29 @@ def cmd_score(args: argparse.Namespace) -> int:
                   file=sys.stderr)
             return 2
 
-    summary = score.score_and_write(truth_path, replay_path, output_dir)
+    rejected_dir = Path(args.rejected_dir) if args.rejected_dir else None
+    if rejected_dir is not None and not rejected_dir.is_dir():
+        print(f"error: --rejected-dir {rejected_dir} is not a directory. "
+              f"Pass the same path the device wrote its --save-rejected clips "
+              f"into (typically <output>/rejected/).",
+              file=sys.stderr)
+        return 2
+    rejected_truth = (Path(args.rejected_truth) if args.rejected_truth
+                      else None)
+    if rejected_truth is not None and not rejected_truth.exists():
+        print(f"error: --rejected-truth {rejected_truth} not found. "
+              f"Run 'truth --input <rejected-dir>' first, or omit the flag "
+              f"to skip the BatDetect2 cross-reference.",
+              file=sys.stderr)
+        return 2
+
+    summary = score.score_and_write(truth_path, replay_path, output_dir,
+                                    rejected_dir=rejected_dir,
+                                    rejected_truth_path=rejected_truth)
     print()
     print(f"score: wrote report.md, results.csv, disagreements.csv → {output_dir}")
+    if rejected_dir is not None:
+        print(f"score: rejected/ ingest scanned {rejected_dir}")
     print()
     print("Headline (rough tuning proxy, not device-exact):")
     print(f"  files scored: {summary.n_files} "
@@ -271,6 +291,8 @@ def cmd_all(args: argparse.Namespace) -> int:
         truth=str(_default_truth_path(output_dir)),
         replay=str(_default_replay_path(output_dir)),
         output_dir=str(output_dir),
+        rejected_dir=args.rejected_dir,
+        rejected_truth=args.rejected_truth,
     )
     return cmd_score(score_args)
 
@@ -332,6 +354,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_score.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR),
                          help="Where report.md and CSVs land "
                               "(default: %(default)s).")
+    p_score.add_argument("--rejected-dir", default=None,
+                         help="Directory of sidecars written by the shipping "
+                              "app's --save-rejected feature. When set, the "
+                              "report gains a 'Rejected-set — device's own "
+                              "near-miss population' section.")
+    p_score.add_argument("--rejected-truth", default=None,
+                         help="Optional truth manifest built by running "
+                              "'truth --input <rejected-dir>' first. When "
+                              "provided, the rejected/ section reports how "
+                              "many discarded clips BatDetect2 flagged as "
+                              "real bats — the direct 'recall we lost' "
+                              "tuning signal.")
     p_score.set_defaults(func=cmd_score)
 
     p_all = sub.add_parser(
@@ -344,6 +378,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_all.add_argument("--device", default="auto",
                        choices=["auto", "cpu", "cuda"])
     p_all.add_argument("--session-header", default=None)
+    p_all.add_argument("--rejected-dir", default=None,
+                       help="Optional sidecar dir from --save-rejected. See "
+                            "'score --help'.")
+    p_all.add_argument("--rejected-truth", default=None,
+                       help="Optional truth manifest built over --rejected-dir. "
+                            "See 'score --help'.")
     p_all.add_argument("--limit", type=int, default=None,
                        help="Process only the first N WAVs (fast smoke).")
     p_all.set_defaults(func=cmd_all)

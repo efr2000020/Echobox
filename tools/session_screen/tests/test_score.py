@@ -220,3 +220,48 @@ def test_score_and_write_end_to_end(tmp_path: Path) -> None:
     assert summary.n_fp == 1
     report_body = (out / "report.md").read_text()
     assert "rough tuning proxy" in report_body.lower()
+
+
+def test_score_and_write_with_rejected_dir(tmp_path: Path) -> None:
+    """The score → report path picks up a sidecar dir and injects the
+    'device's own near-miss population' section into report.md."""
+    import json as _json
+
+    truth_rows = [
+        m.TruthRow(file="a.wav", duration_s=60, bat_present=True,
+                   n_detections=1, top_species="Pipistrellus",
+                   top_confidence=0.9, detections_json="[]",
+                   resample_hz=256000, model_hash="x"),
+    ]
+    replay_rows = [
+        m.ReplayRow(file="a.wav", duration_s=60, n_would_save=1,
+                    n_would_discard=0, would_save=True,
+                    clip_starts_ms="[]", clip_ends_ms="[]",
+                    discard_reasons="[]"),
+    ]
+    truth_path  = tmp_path / "truth.parquet"
+    replay_path = tmp_path / "replay.parquet"
+    m.write_truth_manifest(truth_path, truth_rows)
+    m.write_replay_manifest(replay_path, replay_rows)
+
+    rejected_dir = tmp_path / "rejected"
+    rejected_dir.mkdir()
+    (rejected_dir / "clip.json").write_text(_json.dumps({
+        "recording": {
+            "wav_path": "clip.wav",
+            "capture_ts": "2026-08-05T20:00:01.000Z",
+            "rejected": {"reason": "sweep", "mode": "all"},
+        },
+        "detector": {"tunables": {"min_bandwidth_khz": 0.9}},
+        "events": [{"bandwidth_khz": 0.5, "drift_khz": 0.0,
+                    "gate_rejected": True}],
+    }))
+
+    out = tmp_path / "out"
+    out.mkdir()
+    s.score_and_write(truth_path, replay_path, out,
+                      rejected_dir=rejected_dir)
+    body = (out / "report.md").read_text()
+    assert "device's own near-miss population" in body
+    # The per-sidecar CSV also ends up in output_dir.
+    assert (out / "rejected_summary.csv").exists()

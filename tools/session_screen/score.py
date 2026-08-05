@@ -18,6 +18,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from .manifest import read_replay_manifest, read_truth_manifest
+from . import rejected as rejected_mod
 
 
 HEADLINE_CAVEATS = (
@@ -211,7 +212,8 @@ def disagreements(truth: pd.DataFrame, replay: pd.DataFrame) -> pd.DataFrame:
 # --- rendering --------------------------------------------------------------
 
 def render_report(summary: ScoreSummary, per_species: pd.DataFrame, *,
-                  truth_path: Path, replay_path: Path) -> str:
+                  truth_path: Path, replay_path: Path,
+                  rejected_section: str = "") -> str:
     """Markdown report body. Caveats always ride at the top."""
     lines: List[str] = []
     lines.append("# Echobox validation quick-win — report")
@@ -243,6 +245,8 @@ def render_report(summary: ScoreSummary, per_species: pd.DataFrame, *,
                  "recall, tripped the cricket FP, or hit a CF/Rhinolophus "
                  "species (always listed for human review).")
     lines.append("")
+    if rejected_section:
+        lines.append(rejected_section)
     return "\n".join(lines)
 
 
@@ -282,10 +286,21 @@ def _df_to_md_table(df: pd.DataFrame) -> str:
 # --- top-level entry point --------------------------------------------------
 
 def score_and_write(truth_path: Path, replay_path: Path,
-                    output_dir: Path) -> ScoreSummary:
+                    output_dir: Path,
+                    *,
+                    rejected_dir: Optional[Path] = None,
+                    rejected_truth_path: Optional[Path] = None,
+                    ) -> ScoreSummary:
     """Load both manifests, emit ``report.md`` + ``results.csv`` +
     ``disagreements.csv`` into ``output_dir``. Returns the headline summary
-    so a CLI caller can print it directly."""
+    so a CLI caller can print it directly.
+
+    When ``rejected_dir`` is provided, the report gets an extra section
+    reading sidecars from that dir (the shipping app's ``--save-rejected``
+    output). If ``rejected_truth_path`` is also given, BatDetect2 hits
+    over the rejected clips are joined in as "real bats the gate
+    discarded" — the more trustworthy signal (see rejected.py).
+    """
     truth  = read_truth_manifest(truth_path)
     replay = read_replay_manifest(replay_path)
 
@@ -293,9 +308,22 @@ def score_and_write(truth_path: Path, replay_path: Path,
     per_species = score_per_species(truth, replay)
     disagrees   = disagreements(truth, replay)
 
+    rejected_section = ""
+    if rejected_dir is not None:
+        rej_df = rejected_mod.load_rejected_dir(rejected_dir)
+        truth_join = None
+        if rejected_truth_path is not None and rejected_truth_path.exists():
+            truth_join = read_truth_manifest(rejected_truth_path)
+        rej_summary = rejected_mod.summarise(rej_df, truth_join=truth_join)
+        rejected_section = rejected_mod.render_section(rej_summary)
+        if not rej_df.empty:
+            rej_df.to_csv(output_dir / "rejected_summary.csv", index=False)
+
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "report.md").write_text(render_report(
-        summary, per_species, truth_path=truth_path, replay_path=replay_path))
+        summary, per_species,
+        truth_path=truth_path, replay_path=replay_path,
+        rejected_section=rejected_section))
     per_species.to_csv(output_dir / "results.csv", index=False)
     disagrees.to_csv(output_dir / "disagreements.csv", index=False)
     return summary
