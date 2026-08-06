@@ -16,6 +16,12 @@ option(ECHOBOX_BUILD_TESTS "Build unit tests (fetches Catch2 over the network)" 
 option(ECHOBOX_DYNAMIC_PLUGINS
        "Load detectors as hot-swappable .so plugins from ./algorithms (dev). OFF statically links the detector into a single binary (release)."
        OFF)
+# Off-tree offline validation tool. OFF ⇒ tools/replay/ contributes no
+# sources, targets, or install artefacts — the shipping binary and its
+# install layout are byte-identical to a tree without the replay dir.
+option(ECHOBOX_BUILD_REPLAY
+       "Build the echobox-replay offline validation tool (workstation-only). OFF ships nothing from tools/replay/."
+       OFF)
 
 # Optimization / debug flags.
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -56,6 +62,12 @@ if(ECHOBOX_BUILD_TESTS)
     add_subdirectory(tests/unit)
 endif()
 
+# Replay tool — workstation-only, off by default. Kept behind a build-time
+# gate rather than #ifdefs in core code, so the shipping tree stays clean.
+if(ECHOBOX_BUILD_REPLAY)
+    add_subdirectory(tools/replay)
+endif()
+
 # Install layout: binary, algorithm plugins.
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/deploy" CACHE PATH "Default install path" FORCE)
@@ -68,3 +80,4 @@ message(STATUS "Echobox config:")
 message(STATUS "  build type        : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  dynamic plugins   : ${ECHOBOX_DYNAMIC_PLUGINS}")
 message(STATUS "  tests             : ${ECHOBOX_BUILD_TESTS}")
+message(STATUS "  replay tool       : ${ECHOBOX_BUILD_REPLAY}")

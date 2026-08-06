@@ -217,6 +217,32 @@ are useful when SSH'd into a running unit. Adjust or disable with:
 
 The build produces a standalone binary in `deploy/bin/`. By default the detector is statically linked. To use hot-swappable plugins, pass `-DECHOBOX_DYNAMIC_PLUGINS=ON` to the build script. Tools for offline tuning and simulation are in `tools/`.
 
+### Offline replay
+
+`./build_dev.sh --replay` also builds `deploy/bin/echobox-replay`, a workstation-only
+tool that streams a directory of WAV recordings through the same DspPipeline + Recorder
+the shipping binary uses, so a corpus of field recordings produces the same
+`accepted/` + `rejected/` layout the device would. Plain `./build_dev.sh` is unchanged
+and the shipping binary is byte-identical either way — none of the replay code lives
+in `src/`.
+
+```sh
+deploy/bin/echobox-replay \
+  --input  field_samples/collection_08-04-2026/collection/reference \
+  --output ./replay_out \
+  --save-rejected all
+```
+
+If a `SESSION_HEADER.json` sits in `--input` (or a parent directory), replay
+uses its capture config (preroll, silence, thresholds, freq window, etc.) as
+the baseline; CLI flags still override. Every run also writes
+`<output>/replay_manifest.json` recording the platform (`x86-replay`), build
+type, effective config, and where that config came from — the scoring pipeline
+should read it to distinguish device runs from replay runs.
+
+Caveat: replay is x86 (Release adds `-ffast-math`); the device is ARM. Feature
+values are a tuning proxy, not device-exact.
+
 ---
 
 ## License
