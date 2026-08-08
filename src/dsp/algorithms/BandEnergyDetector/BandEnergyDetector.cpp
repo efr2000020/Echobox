@@ -95,10 +95,10 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     m_dominantBandHiBin     = 0;
     m_domRingCount          = 0;
     m_domRingHead           = 0;
-    m_gateDecidedThisEvent  = false;
-    m_provisionalSuppressed = false;
-    m_gateRejected          = false;
-    m_provisionalRejectedThisEvent = false;
+    m_provisionalSuppressed          = false;
+    m_gateRejected                   = false;
+    m_provisionalRejectedThisEvent   = false;
+    m_framesSinceLastProvisionalEval = 0;
 
     // Reset the cross-event onset ring. The ring intentionally survives an
     // event close (its whole point is measuring inter-event regularity), so
@@ -258,10 +258,10 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             m_dominantAnchorBin    = 0;
             m_dominantBandLoBin    = 0;
             m_dominantBandHiBin    = 0;
-            m_gateDecidedThisEvent = false;
-            m_provisionalSuppressed = false;
-            m_gateRejected         = false;
-            m_provisionalRejectedThisEvent = false;
+            m_provisionalSuppressed          = false;
+            m_gateRejected                   = false;
+            m_provisionalRejectedThisEvent   = false;
+            m_framesSinceLastProvisionalEval = 0;
             // Record the onset in the cross-event ring for the temporal
             // repetition-rate guard. Circular append — no allocation, no
             // lock; RT-safe. The ring persists across events (it lives past
@@ -323,6 +323,7 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             m_domMagRing[m_domRingHead] = bestPeakBinMag;
             m_domRingHead = (m_domRingHead + 1) % SWEEP_RING_CAP;
             if (m_domRingCount < SWEEP_RING_CAP) ++m_domRingCount;
+            ++m_framesSinceLastProvisionalEval;
             if (bestPeakBinMag > m_dominantFramePeakMag) {
                 m_dominantFramePeakMag = bestPeakBinMag;
                 // Persist the sub-band context of the snapshot so the
@@ -535,27 +536,30 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 m_activeRun        = 0;
                 m_silenceFrames    = 0;
                 m_eventPeakSnr     = 0.0f;
-                m_gateDecidedThisEvent       = false;
-                m_provisionalSuppressed      = false;
-                m_gateRejected               = false;
-                m_provisionalRejectedThisEvent = false;
+                m_provisionalSuppressed          = false;
+                m_gateRejected                   = false;
+                m_provisionalRejectedThisEvent   = false;
+                m_framesSinceLastProvisionalEval = 0;
             }
         } else {
             m_activeRun = 0;
         }
     }
 
-    // 5. Sweep-shape gate — provisional suppression (fast-drop only).
+    // 5. Sweep-shape gate — periodic provisional suppression.
     //
-    // First GATE_DECISION_FRAMES inside an event are reported as active
-    // so the recorder gets its leading-edge trigger. Once the ring
-    // fills, we evaluate the bandwidth-OR-sweep test and set
-    // @c m_provisionalSuppressed so the recorder treats obvious junk
-    // as silence. This is a *non-binding* flag: it drives outState.active
+    // Fires whenever GATE_DECISION_FRAMES fresh ring frames have arrived
+    // since the last provisional evaluation. The first fire lands
+    // naturally at ~8 ms (6 hot frames from event open) and re-runs at
+    // the same cadence for the rest of the event — so a bat call
+    // arriving inside a still-open cricket event has a chance to flip
+    // @c m_provisionalSuppressed back OFF and reopen the recorder's
+    // window. This is a *non-binding* flag: it drives outState.active
     // only. The binding gate_rejected verdict is set at close-time from
     // the full-event ring, independently.
-    if (m_sweepGateEnabled && m_inEvent && !m_gateDecidedThisEvent
-        && m_domRingCount >= GATE_DECISION_FRAMES) {
+    if (m_sweepGateEnabled && m_inEvent
+        && m_domRingCount >= GATE_DECISION_FRAMES
+        && m_framesSinceLastProvisionalEval >= GATE_DECISION_FRAMES) {
         const SweepShape s = computeSweepShape(
             m_domBinRing, m_domRingCount,
             m_dominantFrameMags.data(), m_dominantFrameMags.size(),
@@ -567,14 +571,21 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             || (s.drift_khz     >= m_sweepDriftKhz
                 && s.path_ratio    <= m_sweepPathRatioMax
                 && s.mono_fraction >= m_sweepMonoFracMin);
-        m_gateDecidedThisEvent = true;
+        const bool wasSuppressed = m_provisionalSuppressed;
         m_provisionalSuppressed = !batLike;
-        // Diagnostic bool for the sidecar: this event was ever
-        // provisionally suppressed at least once. Observability only.
+        m_framesSinceLastProvisionalEval = 0;
+        // Diagnostic: sticky-once "was ever suppressed at least once".
+        // Report unchanged from before A3 — the recovery-recovery
+        // analysis relies on this pool identity.
         if (m_provisionalSuppressed) m_provisionalRejectedThisEvent = true;
-        if (m_provisionalSuppressed) {
+        if (m_provisionalSuppressed && !wasSuppressed) {
             LS_DEBUG("dsp.bed",
                      "event provisionally suppressed bw=%.2fkHz drift=%.1fkHz "
+                     "path=%.2f mono=%.2f",
+                     s.bandwidth_khz, s.drift_khz, s.path_ratio, s.mono_fraction);
+        } else if (!m_provisionalSuppressed && wasSuppressed) {
+            LS_DEBUG("dsp.bed",
+                     "event provisionally re-opened bw=%.2fkHz drift=%.1fkHz "
                      "path=%.2f mono=%.2f",
                      s.bandwidth_khz, s.drift_khz, s.path_ratio, s.mono_fraction);
         }

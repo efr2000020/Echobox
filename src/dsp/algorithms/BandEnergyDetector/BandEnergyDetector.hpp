@@ -242,7 +242,7 @@ private:
     //   - @c m_provisionalSuppressed drives @c outState.active (the
     //     recorder's fast-drop leading edge). Set by the periodic
     //     provisional gate on partial-event data; can flip either way
-    //     during the event (see A3).
+    //     during the event as new evidence arrives.
     //   - @c m_gateRejected is the BINDING close-time verdict. It
     //     drives the emitted @c Annotation and the batLike / rejected
     //     event counters the recorder polls at endRecording. Set only
@@ -252,9 +252,19 @@ private:
     // early in an event that is a partially-windowed, attenuated frame,
     // an unreliable basis for a binding verdict. The close-time block
     // must re-examine the full event unconditionally.
-    bool m_gateDecidedThisEvent = false;
-    bool m_provisionalSuppressed = false;
-    bool m_gateRejected          = false;
+    //
+    // @c m_framesSinceLastProvisionalEval counts hot frames appended to
+    // the dominant-bin ring since the last provisional evaluation. The
+    // provisional block fires whenever this reaches GATE_DECISION_FRAMES
+    // — the initial fire is natural (starts at 0, ticks up one per hot
+    // frame, hits 6 exactly when the ring has 6 hot frames) and every
+    // subsequent fire runs on GATE_DECISION_FRAMES of newly-appended
+    // ring data. See A3: the previous one-shot latch let a cricket
+    // pulse train + 10.7 ms hangover merge into one long suppressed
+    // event that swallowed any bat call arriving inside it.
+    bool        m_provisionalSuppressed        = false;
+    bool        m_gateRejected                 = false;
+    std::size_t m_framesSinceLastProvisionalEval = 0;
     // Sidecar diagnostic — true iff this event was rejected by the
     // 6-frame provisional gate (line ~536) as opposed to the full
     // close-time check. Read once at event close, then reset. Not on
