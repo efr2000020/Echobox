@@ -91,6 +91,7 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     m_domRingHead           = 0;
     m_gateDecidedThisEvent  = false;
     m_gateRejected          = false;
+    m_provisionalRejectedThisEvent = false;
 
     // Reset the cross-event onset ring. The ring intentionally survives an
     // event close (its whole point is measuring inter-event regularity), so
@@ -249,6 +250,7 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             m_dominantFramePeakMag = 0.0f;
             m_gateDecidedThisEvent = false;
             m_gateRejected         = false;
+            m_provisionalRejectedThisEvent = false;
             // Record the onset in the cross-event ring for the temporal
             // repetition-rate guard. Circular append — no allocation, no
             // lock; RT-safe. The ring persists across events (it lives past
@@ -344,12 +346,25 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                     m_dominantFramePeakMag,
                     m_inBandLo, m_inBandHi,
                     m_binResolution);
+                // --- Decision-path diagnostic state, hoisted so the
+                //     sidecar drain (below) can record which rejection
+                //     path fired. Populated by the sweep-gate block; if
+                //     the block is skipped (gate off, or event already
+                //     provisionally rejected), the sidecar-side observer
+                //     for these fields simply reflects the earlier decision.
+                bool     dxSweepBatLike = false;
+                bool     dxVetoApplied  = false;
+                float    dxRepRateHz    = 0.0f;
+                float    dxRepCv        = 0.0f;
+                uint16_t dxRepNOnsets   = 0;
+
                 if (m_sweepGateEnabled && !m_gateRejected) {
                     const bool sweepBatLike =
                         (shape.bandwidth_khz >= m_minBandwidthKhz)
                         || (shape.drift_khz     >= m_sweepDriftKhz
                             && shape.path_ratio    <= m_sweepPathRatioMax
                             && shape.mono_fraction >= m_sweepMonoFracMin);
+                    dxSweepBatLike = sweepBatLike;
 
                     // --- Temporal repetition-rate guard ---
                     // The sweep-shape features alone can't reliably
@@ -393,6 +408,11 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                                      && (rep.rate_hz <= m_repRateMaxHz)
                                      && (rep.cv_idi   >= m_repCvMin)
                                      && (rep.cv_idi   <= m_repCvMax);
+                        dxRepRateHz  = rep.rate_hz;
+                        dxRepCv      = rep.cv_idi;
+                        dxRepNOnsets = static_cast<std::uint16_t>(
+                            std::min<std::size_t>(rep.n,
+                                std::numeric_limits<std::uint16_t>::max()));
                     }
                     // Protect any event whose *own* sweep shape marks it as a
                     // clear bat call — either a wide-band event (bw >= keep
@@ -410,6 +430,10 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                             && shape.mono_fraction >= m_sweepMonoFracMin);
                     const bool batLike = sweepBatLike
                                          && !(metronomic && !clearBat);
+                    // "veto_applied" = the sweep-shape said keep but the
+                    // temporal guard flipped it. This is the exact
+                    // population the followup2 analysis needs to bucket.
+                    dxVetoApplied = sweepBatLike && !batLike;
 
                     if (!batLike) {
                         m_gateRejected = true;
@@ -445,6 +469,19 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                     m_inProgressEvent.path_ratio    = shape.path_ratio;
                     m_inProgressEvent.mono_fraction = shape.mono_fraction;
                     m_inProgressEvent.gate_rejected = m_gateRejected;
+                    // Decision-path diagnostics (observability, no
+                    // behaviour change). If the sweep-gate block was
+                    // skipped because a provisional decision already
+                    // rejected this event, `m_provisionalRejectedThisEvent`
+                    // stays true and the sidecar reflects that. Otherwise
+                    // the local dx* values were populated above.
+                    m_inProgressEvent.sweep_bat_like       = dxSweepBatLike;
+                    m_inProgressEvent.veto_applied         = dxVetoApplied;
+                    m_inProgressEvent.provisional_rejected =
+                        m_provisionalRejectedThisEvent;
+                    m_inProgressEvent.rep_rate_hz          = dxRepRateHz;
+                    m_inProgressEvent.rep_cv               = dxRepCv;
+                    m_inProgressEvent.rep_n_onsets         = dxRepNOnsets;
                     m_pendingEvents.push_back(m_inProgressEvent);
                 }
 
@@ -480,8 +517,9 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 m_activeRun        = 0;
                 m_silenceFrames    = 0;
                 m_eventPeakSnr     = 0.0f;
-                m_gateDecidedThisEvent = false;
-                m_gateRejected         = false;
+                m_gateDecidedThisEvent       = false;
+                m_gateRejected               = false;
+                m_provisionalRejectedThisEvent = false;
             }
         } else {
             m_activeRun = 0;
@@ -512,6 +550,10 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 && s.mono_fraction >= m_sweepMonoFracMin);
         m_gateDecidedThisEvent = true;
         m_gateRejected         = !batLike;
+        // Diagnostic bool for the sidecar: this reject came from the
+        // provisional gate (partial-event view), not the close-time
+        // check. Observability only — filter behaviour unchanged.
+        if (m_gateRejected) m_provisionalRejectedThisEvent = true;
         if (m_gateRejected) {
             LS_DEBUG("dsp.bed",
                      "event rejected by sweep gate bw=%.2fkHz drift=%.1fkHz "
@@ -772,8 +814,10 @@ std::span<const TunableInfo> BandEnergyDetector::listTunables() const {
          "Max total-travel/net-range ratio for a sweep to count as smooth (>~2 = hopping)."},
         {"sweep_mono_frac_min",  TunableType::Float, 0.7,   0.0,    1.0,
          "Min fraction of dominant-bin steps in a single direction for a smooth sweep."},
-        {"rep_guard_enabled",    TunableType::Int,   1.0,   0.0,    1.0,
-         "Master switch (0/1) for the temporal repetition-rate guard."},
+        {"rep_guard_enabled",    TunableType::Int,   0.0,   0.0,    1.0,
+         "Master switch (0/1) for the temporal repetition-rate guard. "
+         "Default 0 (off) as of the veto-recovery pre-release; set to 1 "
+         "for CF-heavy sites where metronomic-call rejection matters."},
         {"rep_rate_min_hz",      TunableType::Float, 1.0,   0.0,    100.0,
          "Lower bound of the cricket pulse-rate band (Hz)."},
         {"rep_rate_max_hz",      TunableType::Float, 20.0,  0.0,    200.0,

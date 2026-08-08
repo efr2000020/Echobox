@@ -24,7 +24,7 @@ except ImportError as e:  # pragma: no cover - surfaced by validate.py at entry
 
 
 TRUTH_MANIFEST_SCHEMA_VERSION = 1
-REPLAY_MANIFEST_SCHEMA_VERSION = 1
+REPLAY_MANIFEST_SCHEMA_VERSION = 2
 
 
 @dataclass
@@ -50,16 +50,34 @@ class TruthRow:
 
 @dataclass
 class ReplayRow:
-    """One Echobox offline-harness pass over one input WAV."""
-    file:            str
-    duration_s:      float
-    n_would_save:    int
-    n_would_discard: int
-    would_save:      bool
-    clip_starts_ms:  str        # JSON list[float]
-    clip_ends_ms:    str        # JSON list[float]
-    discard_reasons: str        # JSON list[str] (one entry per discarded clip)
-    error:           str = ""
+    """One clip produced by ``echobox-replay`` on one source WAV.
+
+    The row is per-clip (not per-source-file, as v1 was) because the
+    plan asks for a time-overlap join against BatDetect2 detections. To
+    get FN from the device's own ``rejected/`` sidecars, we need one row
+    per accepted/rejected clip with its window in source-WAV time.
+
+    A source WAV that produced zero clips still contributes one row with
+    ``no_clips=True`` so the scorer can distinguish "processed cleanly,
+    nothing triggered" from "not scored" (an error). Nothing-triggered
+    rows do not contribute to any confusion bucket.
+    """
+    source_file:            str    # source WAV path (join key against truth)
+    clip_wav:               str    # output clip WAV, relative to replay output root
+    kept:                   bool   # True = accepted/, False = rejected/
+    rejected_reason:        str    # "" for accepted; "sweep"/"temporal"/... for rejected
+    rejected_mode:          str    # "" for accepted; "all"/"boundary"/... for rejected
+    clip_start_ms:          float  # start of clip in SOURCE WAV time
+    clip_end_ms:            float  # end   of clip in SOURCE WAV time
+    clip_duration_ms:       float  # from output WAV byte length
+    n_events:               int
+    n_gate_rejected_events: int
+    min_bandwidth_khz:      float  # min across gate-rejected events (0.0 if none)
+    max_drift_khz:          float
+    tunable_min_bw_khz:     float  # snapshot of the sweep-gate threshold
+    frames_processed:       int    # DSP hop count at clip-write time (debug/repro)
+    no_clips:               bool = False   # True when the source produced zero clips
+    error:                  str  = ""
 
 
 def _rows_to_frame(rows: Iterable[object], schema_version: int) -> pd.DataFrame:

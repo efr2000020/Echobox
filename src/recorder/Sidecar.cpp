@@ -144,7 +144,12 @@ bool writeSidecar(const std::filesystem::path& wavPath,
     os.imbue(std::locale::classic());
 
     os << "{\n";
-    os << "  \"format_version\": 1,\n";
+    // Bumped to 2 when EventFeatures gained the decision-path
+    // diagnostic fields (sweep_bat_like, veto_applied,
+    // provisional_rejected, rep_rate_hz, rep_cv, rep_n_onsets).
+    // Older readers ignore unknown keys; newer readers can branch on
+    // the version to know whether to expect the new fields.
+    os << "  \"format_version\": 2,\n";
 
     // --- device counters ---
     os << "  \"device\": {\n";
@@ -219,6 +224,14 @@ bool writeSidecar(const std::filesystem::path& wavPath,
            << ", \"path_ratio\": "     << fmtFloat(e.path_ratio)
            << ", \"mono_fraction\": "  << fmtFloat(e.mono_fraction)
            << ", \"gate_rejected\": "  << (e.gate_rejected ? "true" : "false")
+           // Decision-path diagnostics (format_version >= 2).
+           // Observability only; filter behaviour unchanged.
+           << ", \"sweep_bat_like\": "     << (e.sweep_bat_like       ? "true" : "false")
+           << ", \"veto_applied\": "       << (e.veto_applied         ? "true" : "false")
+           << ", \"provisional_rejected\": "<< (e.provisional_rejected ? "true" : "false")
+           << ", \"rep_rate_hz\": "        << fmtFloat(e.rep_rate_hz)
+           << ", \"rep_cv\": "             << fmtFloat(e.rep_cv)
+           << ", \"rep_n_onsets\": "       << e.rep_n_onsets
            << "}";
     }
     os << (payload.events.empty() ? "" : "\n  ") << "]\n";

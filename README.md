@@ -154,7 +154,7 @@ Examples:
 ## Cricket filter
 
 Sites with active crickets can easily fill an SD card with cricket
-recordings before bats show up. Echobox now recognises the shape of a
+recordings before bats show up. Echobox recognises the shape of a
 cricket chirp — narrow bandwidth, a metronomic repetition pattern — and
 rejects it in two places:
 
@@ -164,10 +164,7 @@ rejects it in two places:
   so an isolated event that survives the detector still gets dropped
   before it becomes a WAV.
 
-The filter is **on by default** and requires no configuration. Bat
-recall on the validation corpora is unchanged (including narrow-band
-species like *Nyctalus leisleri*, *Nyctalus noctula*, and
-*Rhinolophus ferrumequinum*).
+The filter is **on by default** and requires no configuration.
 
 If a deployment site produces bat calls the filter can't recognise, turn
 it off — one flag disables both halves:
@@ -178,6 +175,59 @@ it off — one flag disables both halves:
 
 With `--cricket-filter off` the recorder behaves as if the filter were
 never present.
+
+### Temporal rep-guard (advanced) — OFF by default as of 0.3.0-rc1
+
+Sitting inside the cricket filter is a secondary check called the
+**temporal repetition-rate guard**: it looks at the timing of recent
+events and vetoes an otherwise-passing sweep when surrounding onsets
+form a metronomic pattern. On the Pipistrellus validation corpus we
+measured that this guard was discarding about **2,500 real bat calls
+per night** that our own sweep-shape gate had already accepted —
+enough that it's no longer worth its cricket-rejection contribution
+on typical Pipistrellus deployments.
+
+As of the veto-recovery pre-release (**0.3.0-rc1**) the temporal
+rep-guard defaults to **off**. The measured effect, on our reference
+corpus:
+
+- **+~2,500 BatDetect2-visible bat calls recovered per night** (calls
+  the recorder previously discarded near cricket-like onset patterns).
+- **+~14% output volume** (more `.wav` files reach the SD card and,
+  downstream, whatever the operator feeds them into).
+- **~30% relative increase in cricket-shaped false positives**
+  (129 → ~168 leaked cricket clips per night on this corpus).
+
+The guard is **retained in the codebase** — it's a boolean tunable, not
+a code deletion. Sites that see metronomic-calling species (notably
+**Rhinolophus / horseshoe** and **Nyctalus** CF species, on which we
+have no validation data) may want to turn it back on:
+
+```
+# In your Echobox tunables / session-header:
+rep_guard_enabled = 1
+```
+
+`rep_guard_enabled=1` restores the pre-0.3.0 temporal-veto behaviour
+(the veto's decision logic is unchanged; validation observed ~1%
+event-count drift between the CLI-override path and the pre-flip
+code-default path on x86 fast-math builds — re-check on ARM before
+treating it as bit-exact at a new site).
+
+**Caveats you should read before shipping this default to a new site:**
+
+- The recovery number was measured on **x86 with `-ffast-math`**; the
+  device is ARM. Verify per-site with
+  `tools/collection/verify_feature_parity.py`. The on/off is a boolean
+  so it's arch-robust, but the leak/recovery magnitudes should be
+  confirmed on hardware before a shipping decision at a new site.
+- The measurements come from a **BatDetect2 screen** and cover
+  **Pipistrellus only** — no CF/QCF species are present on our
+  reference corpus. The rep-guard exists specifically to reject
+  metronomic patterns, which is the mechanism most likely to matter at
+  Rhinolophus/Nyctalus sites. If you're deploying at a CF-heavy site,
+  turn it back on until you've collected a per-site validation set.
+- The measurements are against a screen, not human ground truth.
 
 ---
 

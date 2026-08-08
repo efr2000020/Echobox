@@ -49,29 +49,45 @@ def test_truth_manifest_round_trip(tmp_path: Path) -> None:
 
 
 def test_replay_manifest_round_trip(tmp_path: Path) -> None:
+    """Per-clip schema (v2). One accepted clip, one rejected clip, one
+    no-clips row — the three shapes the scorer distinguishes."""
     rows = [
         m.ReplayRow(
-            file="a.wav", duration_s=60.0,
-            n_would_save=2, n_would_discard=1, would_save=True,
-            clip_starts_ms=m.encode_json_list([100.0, 500.0]),
-            clip_ends_ms=m.encode_json_list([180.0, 600.0]),
-            discard_reasons=m.encode_json_list(["cricket-gate"]),
+            source_file="a.wav", clip_wav="2026-08-06/kept.wav",
+            kept=True, rejected_reason="", rejected_mode="",
+            clip_start_ms=100.0, clip_end_ms=280.0, clip_duration_ms=180.0,
+            n_events=1, n_gate_rejected_events=0,
+            min_bandwidth_khz=0.0, max_drift_khz=0.0,
+            tunable_min_bw_khz=0.9, frames_processed=210,
         ),
         m.ReplayRow(
-            file="b.wav", duration_s=60.0,
-            n_would_save=0, n_would_discard=0, would_save=False,
-            clip_starts_ms="[]", clip_ends_ms="[]", discard_reasons="[]",
+            source_file="a.wav", clip_wav="rejected/2026-08-06/cut.wav",
+            kept=False, rejected_reason="sweep", rejected_mode="all",
+            clip_start_ms=500.0, clip_end_ms=650.0, clip_duration_ms=150.0,
+            n_events=1, n_gate_rejected_events=1,
+            min_bandwidth_khz=0.5, max_drift_khz=1.2,
+            tunable_min_bw_khz=0.9, frames_processed=487,
+        ),
+        m.ReplayRow(
+            source_file="b.wav", clip_wav="",
+            kept=False, rejected_reason="", rejected_mode="",
+            clip_start_ms=0.0, clip_end_ms=0.0, clip_duration_ms=0.0,
+            n_events=0, n_gate_rejected_events=0,
+            min_bandwidth_khz=0.0, max_drift_khz=0.0,
+            tunable_min_bw_khz=0.0, frames_processed=0,
+            no_clips=True,
         ),
     ]
     path = tmp_path / "replay.parquet"
     m.write_replay_manifest(path, rows)
 
     df = m.read_replay_manifest(path)
-    assert list(df["file"]) == ["a.wav", "b.wav"]
-    assert int(df.loc[0, "n_would_save"]) == 2
-    assert bool(df.loc[0, "would_save"]) is True
-    starts = m.decode_json_list(df.loc[0, "clip_starts_ms"])
-    assert starts == [100.0, 500.0]
+    assert list(df["source_file"]) == ["a.wav", "a.wav", "b.wav"]
+    assert bool(df.loc[0, "kept"])       is True
+    assert bool(df.loc[1, "kept"])       is False
+    assert df.loc[1, "rejected_reason"]  == "sweep"
+    assert bool(df.loc[2, "no_clips"])   is True
+    assert float(df.loc[0, "clip_end_ms"]) == 280.0
 
 
 def test_stale_schema_version_is_rejected(tmp_path: Path) -> None:

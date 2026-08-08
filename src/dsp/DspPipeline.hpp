@@ -20,6 +20,8 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
+#include <vector>
 #include <thread>
 
 namespace echobox::dsp {
@@ -58,6 +60,17 @@ struct DspPipelineConfig {
     /// don't expose the tunable ignore this silently (a plain warn logged
     /// in start()).
     bool         cricketFilter{true};
+
+    /// Diagnostic tracker-tunable overrides applied at the end of
+    /// @c start(), immediately after the built-in setTunable() calls
+    /// (@c band_snr_threshold, @c sweep_gate_enabled, @c hop_size_samples)
+    /// and *before* the worker thread is spawned. The pre-spawn timing
+    /// eliminates any race between the main thread's write and the
+    /// worker's first read. Used by the workstation-only
+    /// @c echobox-replay tool's @c --tunable CLI flag for A/B validation
+    /// runs. Shipping @c Application leaves this empty; behaviour is
+    /// byte-identical to the pre-vector code path.
+    std::vector<std::pair<std::string, double>> extraTrackerTunables;
 };
 
 /**
@@ -131,6 +144,20 @@ public:
     // take the tracker's internal lock briefly; the rest are pure accessors.
     bool        drainSidecarPayload(SidecarPayload& out) override;
     bool        currentTunables(std::vector<echobox::recorder::TunableValue>& out) const override;
+
+    /**
+     * @brief Forward a tunable override to the tracker.
+     *
+     * Diagnostic use only — the shipping app configures tunables via
+     * ``start()`` from ``DspPipelineConfig``, not via this method. The
+     * workstation-only ``echobox-replay`` tool exposes a ``--tunable``
+     * CLI flag that calls this after ``start()`` for A/B validation
+     * runs (e.g. reproducing pre-flip behaviour when a default was
+     * changed). Not present in ``IDetectorStateProvider`` because
+     * only the concrete pipeline needs it; a plugin that ignores the
+     * key returns false and the caller can log-and-continue.
+     */
+    bool        setTrackerTunable(const char* key, double value);
     std::string algorithmName() const override;
     std::size_t fftSize()  const override { return m_cfg.fftSize; }
     std::size_t hopSize()  const override { return m_cfg.hopSize; }

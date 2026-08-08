@@ -107,11 +107,35 @@ void DspPipeline::start() {
     m_tracker->setTunable("hop_size_samples",
                           static_cast<double>(m_cfg.hopSize));
 
+    // Diagnostic overrides applied here — before the worker thread is
+    // spawned — so there is no window where a frame could be processed
+    // with the built-in default instead of the override. Shipping
+    // Application leaves this empty; workstation echobox-replay uses it
+    // for --tunable KEY=VALUE forwarding.
+    for (const auto& [key, value] : m_cfg.extraTrackerTunables) {
+        if (!m_tracker->setTunable(key.c_str(), value)) {
+            LS_WARN("dsp", "tracker '%s' rejected --tunable %s=%g",
+                    m_cfg.algorithm.c_str(), key.c_str(), value);
+        } else {
+            LS_INFO("dsp", "applied --tunable %s=%g", key.c_str(), value);
+        }
+    }
+
     LS_INFO("dsp", "pipeline start algo=%s sr=%d fft=%zu hop=%zu hpf=%.0fHz snr=%.2f",
             m_cfg.algorithm.c_str(), m_cfg.sampleRate,
             m_cfg.fftSize, m_cfg.hopSize, hpfCutoff, m_cfg.snrThreshold);
 
     m_thread = std::thread(&DspPipeline::loop, this);
+}
+
+bool DspPipeline::setTrackerTunable(const char* key, double value) {
+    // Diagnostic forwarder — see header. If the tracker plugin isn't
+    // loaded (e.g. called before start() or after stop()), we can't
+    // apply the tunable; return false so a workstation caller can
+    // log-and-continue rather than silently proceed with the wrong
+    // gate setting.
+    if (!m_tracker) return false;
+    return m_tracker->setTunable(key, value);
 }
 
 void DspPipeline::stop() {

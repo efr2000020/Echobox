@@ -53,6 +53,15 @@ struct EventFeatures {
     float    path_ratio;        // sum(|Δbin|) / max(1, range); ~1 sweep, ~2 hopping
     float    mono_fraction;     // max(#up,#down) / (#up+#down)
     bool     gate_rejected;     // reserved for a future in-detector gate; today always false
+    // --- decision-path diagnostics (populated by BandEnergyDetector; older
+    //     detectors leave these zero. Observability only — filter behaviour
+    //     is unchanged whether these are populated or not.) ---
+    bool     sweep_bat_like;    // OR clause result (path A OR path B) at final gate check
+    bool     veto_applied;      // temporal rep-guard flipped an OR-passing event to reject
+    bool     provisional_rejected;  // 6-frame provisional gate rejected before full close
+    float    rep_rate_hz;       // onset ring's estimated rate at gate-decision time
+    float    rep_cv;            // onset ring's CV(IDI) at gate-decision time
+    uint16_t rep_n_onsets;      // onset ring occupancy at gate-decision time
 };
 
 // Bundle of state the recorder drains from the tracker when a WAV closes,

@@ -227,6 +227,12 @@ private:
     // reject by the close-time full-event re-evaluation.
     bool m_gateDecidedThisEvent = false;
     bool m_gateRejected         = false;
+    // Sidecar diagnostic — true iff this event was rejected by the
+    // 6-frame provisional gate (line ~536) as opposed to the full
+    // close-time check. Read once at event close, then reset. Not on
+    // the RT hot path; touched from the audio thread only, no locking
+    // needed.
+    bool m_provisionalRejectedThisEvent = false;
 
     // --- Temporal repetition-rate guard ---
     // Cross-event onset ring: the discriminating signature only emerges
@@ -245,7 +251,17 @@ private:
     // (Rhinolophus) are similarly regular. Bursty passes (e.g. Barbastella)
     // sit above the band. The veto fires on the *middle* of the CV axis,
     // between rep_cv_min and rep_cv_max — not just "below max".
-    int   m_repGuardEnabled     = 1;
+    // Shipping default is OFF as of the veto-recovery pre-release: on the
+    // Pipistrellus corpus the guard was discarding ~2500 real bat calls
+    // per night. Re-enable with tunable ``rep_guard_enabled=1`` for
+    // deployments in CF-heavy (Rhinolophus/Nyctalus) sites where
+    // metronomic-call rejection matters. The gate site is the sole
+    // consumer of this flag and both branches are unchanged from prior
+    // releases — the veto's decision logic is functionally identical
+    // when set back to 1. (Validation observed ~1% event-count drift
+    // between the CLI-override path and the code-default path on x86
+    // fast-math builds; see CHANGELOG.md.)
+    int   m_repGuardEnabled     = 0;
     float m_repRateMinHz        = 1.0f;
     float m_repRateMaxHz        = 20.0f;
     float m_repCvMin            = 0.50f;

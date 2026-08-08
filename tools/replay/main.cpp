@@ -92,6 +92,15 @@ void printHelp() {
         "  --save-rejected-sample-n <int>            (default: 500)\n"
         "  --save-rejected-max-per-hour <int>        (default: 0 = unlimited for replay)\n"
         "\n"
+        "\n"
+        "Diagnostic tracker-tunable override (repeatable):\n"
+        "  --tunable KEY=VALUE       Forwarded to the loaded plugin via\n"
+        "                            setTunable() after dsp.start(). Used to\n"
+        "                            A/B-test a pre-flip default against the\n"
+        "                            new one without a rebuild. Example:\n"
+        "                            --tunable rep_guard_enabled=1 reproduces\n"
+        "                            the pre-0.3.0-rc1 temporal-veto behaviour.\n"
+        "\n"
         "  -h, --help                Show this help and exit\n"
         "\n"
         "Config precedence: if a SESSION_HEADER.json is found in --input (or a\n"
@@ -116,6 +125,13 @@ struct ReplayCli {
     fs::path input;
     fs::path output;
     Config   cfg;
+    /// Diagnostic tracker-tunable overrides. Repeatable ``--tunable
+    /// KEY=VAL`` on the CLI; each pair is forwarded to the loaded
+    /// plugin via ``DspPipeline::setTrackerTunable`` right after
+    /// ``dsp.start()``. Used to reproduce pre-flip behaviour when a
+    /// shipping default was changed (e.g. veto-recovery byte-identity
+    /// check). Not for shipping — Application.cpp doesn't use them.
+    std::vector<std::pair<std::string, double>> trackerTunables;
 };
 
 bool parseArg(const std::string& v, std::uint32_t& out) {
@@ -270,6 +286,28 @@ int parseCli(int argc, char** argv, ReplayCli& out) {
             auto s = req("--save-rejected-max-per-hour");
             if (!parseArg(s, out.cfg.saveRejectedMaxPerHour)) {
                 std::fprintf(stderr, "error: invalid --save-rejected-max-per-hour\n"); return 2;
+            }
+        }
+        else if (a == "--tunable") {
+            // KEY=VALUE. Split on the first '='. VALUE is parsed as
+            // double so booleans (0/1), ints, and floats all round-trip
+            // through the ISweepTracker::setTunable double signature.
+            auto kv = req("--tunable");
+            const auto eq = kv.find('=');
+            if (eq == std::string::npos || eq == 0 || eq + 1 == kv.size()) {
+                std::fprintf(stderr, "error: --tunable expects KEY=VALUE, got '%s'\n",
+                             kv.c_str());
+                return 2;
+            }
+            std::string key = kv.substr(0, eq);
+            std::string val = kv.substr(eq + 1);
+            try {
+                double d = std::stod(val);
+                out.trackerTunables.emplace_back(std::move(key), d);
+            } catch (...) {
+                std::fprintf(stderr, "error: --tunable value '%s' not a number\n",
+                             val.c_str());
+                return 2;
             }
         }
         else {
@@ -488,6 +526,7 @@ int main(int argc, char** argv) {
     dcfg.algorithm      = cli.cfg.algorithm;
     dcfg.snrThreshold   = cli.cfg.snrThreshold;
     dcfg.cricketFilter  = cli.cfg.cricketFilter;
+    dcfg.extraTrackerTunables = cli.trackerTunables;
     echobox::dsp::DspPipeline dsp(dcfg, dspRing);
 
     echobox::recorder::RecorderConfig rcfg;
@@ -525,6 +564,10 @@ int main(int argc, char** argv) {
         echobox::logging::Logger::instance().stop();
         return 3;
     }
+
+    // --tunable overrides were plumbed through DspPipelineConfig and
+    // applied inside dsp.start() before the worker thread was spawned;
+    // no post-start work needed here.
     recorder.start();
 
     std::printf("Replaying %zu file(s) from '%s' → '%s'\n",

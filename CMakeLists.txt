@@ -2,7 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 cmake_minimum_required(VERSION 3.16)
-project(Echobox VERSION 0.2.0 LANGUAGES C CXX)
+project(Echobox VERSION 0.3.0 LANGUAGES C CXX)
+# 0.3.0-rc1 — veto-recovery pre-release. Temporal rep-guard disabled by
+# default (recovers ~2500 bat calls/night on Pipistrellus corpora at
+# the cost of ~30% relative cricket-FP increase). Re-enable in-config
+# with ``rep_guard_enabled=1`` for CF/Rhinolophus sites. See CHANGELOG.md.
+set(ECHOBOX_PRERELEASE "rc1")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
