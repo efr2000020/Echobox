@@ -28,7 +28,10 @@ BandEnergyDetector::BandEnergyDetector()
       m_frameCount(0), m_maxBandSnrInHeartbeat(0.0f), m_peakBandInHeartbeat(-1),
       m_domBinRing{}, m_domMagRing{},
       m_domRingCount(0), m_domRingHead(0),
-      m_dominantFramePeakMag(0.0f) {}
+      m_dominantFramePeakMag(0.0f),
+      m_dominantAnchorBin(0),
+      m_dominantBandLoBin(0),
+      m_dominantBandHiBin(0) {}
 
 void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
                                    float freqLoHz, float freqHiHz) {
@@ -87,6 +90,9 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     // it is the only writer, and the size is fixed from here on.
     m_dominantFrameMags.assign(numBins, 0.0f);
     m_dominantFramePeakMag  = 0.0f;
+    m_dominantAnchorBin     = 0;
+    m_dominantBandLoBin     = 0;
+    m_dominantBandHiBin     = 0;
     m_domRingCount          = 0;
     m_domRingHead           = 0;
     m_gateDecidedThisEvent  = false;
@@ -248,6 +254,9 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             m_domRingCount         = 0;
             m_domRingHead          = 0;
             m_dominantFramePeakMag = 0.0f;
+            m_dominantAnchorBin    = 0;
+            m_dominantBandLoBin    = 0;
+            m_dominantBandHiBin    = 0;
             m_gateDecidedThisEvent = false;
             m_gateRejected         = false;
             m_provisionalRejectedThisEvent = false;
@@ -314,6 +323,13 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             if (m_domRingCount < SWEEP_RING_CAP) ++m_domRingCount;
             if (bestPeakBinMag > m_dominantFramePeakMag) {
                 m_dominantFramePeakMag = bestPeakBinMag;
+                // Persist the sub-band context of the snapshot so the
+                // bandwidth walk anchors on the *winning band's* peak,
+                // not a global arg-max that could belong to a louder
+                // narrowband source elsewhere in-band.
+                m_dominantAnchorBin    = bestPeakBin;
+                m_dominantBandLoBin    = m_bands[bestBand].loBin;
+                m_dominantBandHiBin    = m_bands[bestBand].hiBin;
                 std::copy(magnitudes.begin(), magnitudes.end(),
                           m_dominantFrameMags.begin());
             }
@@ -343,8 +359,8 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 const SweepShape shape = computeSweepShape(
                     m_domBinRing, m_domRingCount,
                     m_dominantFrameMags.data(), m_dominantFrameMags.size(),
-                    m_dominantFramePeakMag,
-                    m_inBandLo, m_inBandHi,
+                    m_dominantAnchorBin,
+                    m_dominantBandLoBin, m_dominantBandHiBin,
                     m_binResolution);
                 // --- Decision-path diagnostic state, hoisted so the
                 //     sidecar drain (below) can record which rejection
@@ -540,8 +556,8 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
         const SweepShape s = computeSweepShape(
             m_domBinRing, m_domRingCount,
             m_dominantFrameMags.data(), m_dominantFrameMags.size(),
-            m_dominantFramePeakMag,
-            m_inBandLo, m_inBandHi,
+            m_dominantAnchorBin,
+            m_dominantBandLoBin, m_dominantBandHiBin,
             m_binResolution);
         const bool batLike =
             (s.bandwidth_khz >= m_minBandwidthKhz)
@@ -582,9 +598,9 @@ BandEnergyDetector::SweepShape BandEnergyDetector::computeSweepShape(
         std::size_t        count,
         const float*       dominantFrameMags,
         std::size_t        numBins,
-        float              dominantFramePeakMag,
-        std::size_t        inBandLo,
-        std::size_t        inBandHi,
+        std::size_t        anchorBin,
+        std::size_t        bandLoBin,
+        std::size_t        bandHiBin,
         float              binResolutionHz) {
     SweepShape out{0.0f, 0.0f, 0.0f, 0.0f};
     if (count == 0) return out;
@@ -626,32 +642,32 @@ BandEnergyDetector::SweepShape BandEnergyDetector::computeSweepShape(
     }
 
     // --- 10-dB bandwidth at the dominant frame ---
-    // 10 dB in amplitude = factor of sqrt(10). Walk left/right from the
-    // loudest in-band bin until magnitude drops below peak/sqrt(10), then
-    // report the width in kHz.
-    if (dominantFramePeakMag > 0.0f && numBins > 0 && inBandHi > inBandLo
-        && inBandHi <= numBins) {
-        const float threshold = dominantFramePeakMag / std::sqrt(10.0f);
-        std::size_t peakBin = inBandLo;
-        float       peakMag = 0.0f;
-        for (std::size_t i = inBandLo; i < inBandHi; ++i) {
-            if (dominantFrameMags[i] > peakMag) {
-                peakMag = dominantFrameMags[i];
-                peakBin = i;
+    // 10 dB in amplitude = factor of sqrt(10). Walk left/right from
+    // @c anchorBin (the winning sub-band's dominant bin at the loudest
+    // snapshot frame) until magnitude drops below refMag/sqrt(10), then
+    // report the width in kHz. Confined to @c [bandLoBin, bandHiBin) so
+    // the walk never leaves the winning sub-band — a re-scanned arg-max
+    // over the full in-band range would jump to a louder narrowband
+    // source (e.g. a nearby cricket) and measure *its* bandwidth,
+    // producing a spuriously narrow result for the actual bat event.
+    if (numBins > 0 && bandHiBin > bandLoBin && bandHiBin <= numBins
+        && anchorBin >= bandLoBin && anchorBin < bandHiBin) {
+        const float refMag = dominantFrameMags[anchorBin];
+        if (refMag > 0.0f) {
+            const float threshold = refMag / std::sqrt(10.0f);
+            std::size_t leftBin = anchorBin;
+            while (leftBin > bandLoBin
+                   && dominantFrameMags[leftBin - 1] > threshold) {
+                --leftBin;
             }
+            std::size_t rightBin = anchorBin;
+            while (rightBin + 1 < bandHiBin
+                   && dominantFrameMags[rightBin + 1] > threshold) {
+                ++rightBin;
+            }
+            out.bandwidth_khz = (static_cast<float>(rightBin - leftBin)
+                                 * binResolutionHz) / 1000.0f;
         }
-        std::size_t leftBin = peakBin;
-        while (leftBin > inBandLo
-               && dominantFrameMags[leftBin - 1] > threshold) {
-            --leftBin;
-        }
-        std::size_t rightBin = peakBin;
-        while (rightBin + 1 < inBandHi
-               && dominantFrameMags[rightBin + 1] > threshold) {
-            ++rightBin;
-        }
-        out.bandwidth_khz = (static_cast<float>(rightBin - leftBin)
-                             * binResolutionHz) / 1000.0f;
     }
 
     return out;

@@ -90,13 +90,22 @@ public:
         float path_ratio;        // sum(|Δbin|) / max(1, range)
         float mono_fraction;     // max(#up,#down) / (#up+#down)
     };
+    // The 10-dB bandwidth walk is anchored on @c anchorBin (the event's
+    // per-frame dominant bin at the loudest snapshot) and confined to
+    // @c [bandLoBin, bandHiBin) — the winning sub-band's range at that
+    // snapshot. Both are required: band selection upstream is by top-K
+    // SNR, so a distant bat can win the sub-band while a nearby cricket
+    // owns the global magnitude peak; anchoring on the sub-band peak
+    // ensures the walk measures the winning event's own bandwidth. The
+    // walk's reference magnitude is @c dominantFrameMags[anchorBin], so
+    // the origin and the drop-threshold come from the same signal.
     static SweepShape computeSweepShape(const std::size_t* domBins,
                                         std::size_t        count,
                                         const float*       dominantFrameMags,
                                         std::size_t        numBins,
-                                        float              dominantFramePeakMag,
-                                        std::size_t        inBandLo,
-                                        std::size_t        inBandHi,
+                                        std::size_t        anchorBin,
+                                        std::size_t        bandLoBin,
+                                        std::size_t        bandHiBin,
                                         float              binResolutionHz);
 
     // --- Repetition-rate helper (temporal cricket rejection) ---
@@ -219,6 +228,15 @@ private:
     std::size_t        m_domRingHead;        // next write index (circular)
     std::vector<float> m_dominantFrameMags;  // spectrum snapshot at loudest dom frame
     float              m_dominantFramePeakMag;
+    // Anchor for the 10-dB bandwidth walk. Captured at the same instant
+    // as @c m_dominantFrameMags (the "loudest snapshot frame"). Anchoring
+    // on the *winning sub-band's* dominant bin — not a re-scan across the
+    // full 20-192 kHz range — keeps the walk on the event's own peak;
+    // otherwise a louder narrowband source elsewhere in-band drags the
+    // walk onto the wrong signal.
+    std::size_t        m_dominantAnchorBin;
+    std::size_t        m_dominantBandLoBin;
+    std::size_t        m_dominantBandHiBin;
 
     // Per-event gate state. A provisional decision fires once the ring
     // reaches GATE_DECISION_FRAMES; subsequent frames inside the same
