@@ -86,7 +86,11 @@ CliResult err(std::string msg) {
 } // namespace
 
 const char* versionText() {
-    return "Echobox 0.2.0\n";
+    // Hardcoded string, hand-synced to CMakeLists.txt's project(VERSION ...).
+    // Already drifted once (was 0.2.0 while CMakeLists.txt was at 0.3.0);
+    // wire this to a CMake-generated header (e.g. configure_file with
+    // ECHOBOX_VERSION) in a future round.
+    return "Echobox 0.4.0\n";
 }
 
 const char* helpText() {
@@ -119,14 +123,14 @@ const char* helpText() {
         "\n"
         "Recorder:\n"
         "  --output-dir <path>       WAV output root (default: ./recordings)\n"
-        "  --preroll-ms <int>        Pre-detection audio to include (default: 50)\n"
-        "  --silence-ms <int>        Idle time after last activity before close (default: 50).\n"
+        "  --preroll-ms <int>        Pre-detection audio to include (default: 10)\n"
+        "  --silence-ms <int>        Idle time after last activity before close (default: 20).\n"
         "                            With --cricket-filter on, this must be >= a derived\n"
-        "                            floor (~40 ms at the shipped 384 kHz / hop-512) so\n"
+        "                            floor (~16 ms at the shipped 384 kHz / hop-512) so\n"
         "                            the discard counter read cannot race an event still\n"
         "                            closing; --cricket-filter off removes the floor.\n"
         "  --min-length-ms <int>     Discard recordings shorter than this (default: 0, off)\n"
-        "  --max-length-ms <int>     Close recordings reaching this length (default: 200, 0 = no cap).\n"
+        "  --max-length-ms <int>     Close recordings reaching this length (default: 40, 0 = no cap).\n"
         "                            For R1/R2v2-style long clips, pass e.g.\n"
         "                            --preroll-ms 1000 --silence-ms 2000 --max-length-ms 5000.\n"
         "\n"

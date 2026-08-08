@@ -1,5 +1,118 @@
 # Changelog
 
+## 0.4.0 — 2026-08-09
+
+The short-clip release: cricket-gate correctness fixes + a much
+shorter default clip geometry chosen for the customer's
+solar-powered downstream BatDetect2 workflow. Supersedes the
+untagged 0.3.0-rc1.
+
+### Cricket-gate correctness (A1–A4, A7)
+
+Four correctness defects in the sweep-shape / cricket gate were
+silently discarding real bat clips. Fixes landed as one commit each:
+
+- **A1** — The 10-dB bandwidth walk was anchored on a re-scanned
+  global arg-max across the full 20–192 kHz range, so a louder
+  narrowband source elsewhere in-band could drag the walk onto
+  itself and rate the actual bat event as narrowband. Now anchored
+  on the winning sub-band's dominant bin at the loudest-snapshot
+  frame, confined to that sub-band's bin range.
+- **A2** — Split the single `m_gateRejected` verdict into a
+  non-binding `m_provisionalSuppressed` (fast-drop for the
+  recorder) and a binding close-time `m_gateRejected`. The
+  close-time re-evaluation now runs unconditionally on gate-on
+  runs, so a provisional reject taken at ~8 ms in is no longer
+  permanent.
+- **A3** — Dropped the one-shot latch on the provisional gate.
+  It now re-evaluates every `GATE_DECISION_FRAMES` (6) hot frames
+  and can flip both ways, so a bat call arriving inside a
+  still-open cricket event has a chance to reopen the recorder's
+  window.
+- **A7** — The sidecar's `provisional_rejected` field is no
+  longer sticky-once; it now reflects the event's final
+  suppression state after A3's re-evaluation.
+
+Measured on the reference corpus (585 × 1 min WAVs, session
+08-04-2026) at the previous 200 ms geometry:
+
+- per-file recall  97.5 % → 98.6 %  (+1.1 pp; +5 files recovered)
+- per-pass recall  64.6 % → 66.1 %  (+1.5 pp; +34 passes recovered)
+- rejected clips   12 953 → 12 459  (−494 wrongly rejected)
+- cricket-FP clips 301 → 310         (+9; expected, no compensating tuning)
+
+### Short-clip defaults (A5, A6, geometry change)
+
+New defaults, chosen by the Part B six-config sweep on the same
+corpus:
+
+- `--preroll-ms  50 → 10`
+- `--silence-ms  50 → 20`
+- `--max-length-ms 200 → 40`
+
+End-to-end clip length: **40 ms** (from ~200 ms). Enabled by two
+supporting changes:
+
+- **A5** — Recorder poll interval `5 ms → 1 ms`. Term in the
+  cricket-filter silence floor; also fixes a leading-edge miss on
+  events whose active window is shorter than the old poll.
+- **A6** — Recomputed the cricket-filter silence floor. Old:
+  `ceil(8 · frame_ms) + 5 + 24 = 40 ms`. New:
+  `ceil(8 · frame_ms) + 1 + 4 = 16 ms`. Old safety margin was
+  arbitrary padding.
+
+Measured effect on the same corpus, against the 0.3.0-rc1 200 ms
+geometry, with A1–A7 in both arms:
+
+- **MB/night   2 213 → 1 008  (−54 %)**  — customer's cost metric
+- per-file recall  98.6 % → 99.8 %       (+1.2 pp)
+- per-pass recall  66.1 % → 71.8 %       (+5.7 pp)
+- cricket-FP rate  31.9 % → 35.1 %       (+3.2 pp)
+- accepted-cricket count 310 → 3 902     (fragmentation: one long
+  cricket sequence becomes ~6-7 short clips at the new geometry)
+
+Long-pass profile (R1/R2v2-style grouping) remains available as an
+opt-in:
+
+```
+--preroll-ms 1000 --silence-ms 2000 --max-length-ms 5000
+```
+
+### Instrumentation carried forward from 0.3.0-rc1
+
+The rep-guard still ships **off by default** and the six decision-path
+sidecar fields introduced in 0.3.0-rc1 remain unchanged
+(`format_version: 2`).
+
+### Caveats to read alongside these numbers
+
+- **Re-check on ARM.** All figures are x86 replay with `-ffast-math`
+  and `-march=native`. Near-threshold per-event values are a tuning
+  proxy, not device-exact. Any threshold decision derived from
+  these numbers should be re-verified via
+  `tools/collection/verify_feature_parity.py` before landing on
+  device.
+- **BatDetect2 is a proxy screen, not ground truth.** The reference
+  corpus is Pipistrellus-only — no CF/QCF species. Deltas between
+  runs are trustworthy; absolute rates are soft. CF recall is
+  untested on this session.
+
+### Known limitations (not fixed this round)
+
+- The 10-dB bandwidth walk is amplitude-relative, not
+  noise-floor-relative. A future round should sweep this.
+- `tests/unit/test_SweepShape.cpp` uses the pre-A1 signature and
+  no longer compiles. Deliberately out of scope; do not gate
+  release on the unit test suite.
+- The global-band spectral-flatness upper bound (`max_flatness =
+  0.65`) is a binding constraint on some short-geometry bat passes.
+  Raising it to 0.80 recovered +5 pp per-pass in the sweep, but at
+  only +0.2 pp per-file it did not clear the plan's committing
+  threshold — filed for the next round.
+- The rejected-clip pool grew ~5× at the new geometry (fragmentation).
+  Rejected clips do not exfiltrate, so this is a bytes non-issue,
+  but any per-clip analytics or dashboards should be sanity-checked.
+
 ## 0.3.0-rc1 — 2026-08-07 (pre-release)
 
 ### Temporal rep-guard disabled by default

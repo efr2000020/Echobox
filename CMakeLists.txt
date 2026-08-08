@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 cmake_minimum_required(VERSION 3.16)
-project(Echobox VERSION 0.3.0 LANGUAGES C CXX)
-# 0.3.0-rc1 — veto-recovery pre-release. Temporal rep-guard disabled by
-# default (recovers ~2500 bat calls/night on Pipistrellus corpora at
-# the cost of ~30% relative cricket-FP increase). Re-enable in-config
-# with ``rep_guard_enabled=1`` for CF/Rhinolophus sites. See CHANGELOG.md.
-set(ECHOBOX_PRERELEASE "rc1")
+project(Echobox VERSION 0.4.0 LANGUAGES C CXX)
+# 0.4.0 — short-clip release. Cricket-gate correctness fixes (A1-A4, A7)
+# plus new default clip geometry (preroll 10 / silence 20 / max 40 ms)
+# chosen to halve overnight audio bytes for the customer's solar-powered
+# BatDetect2 workflow while improving presence recall. Rep-guard still
+# ships off by default; ``rep_guard_enabled=1`` restores the pre-0.3.0
+# temporal-veto behaviour for CF/Rhinolophus sites. See CHANGELOG.md.
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
