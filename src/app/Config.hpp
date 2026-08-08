@@ -49,17 +49,20 @@ struct Config {
 
     // --- Recorder ---
     std::filesystem::path outputDir{"./recordings"};
-    // Short-clip defaults (R2v3): downstream classifiers commonly cap ingest
-    // at ~200 ms per file, so the shipped recorder produces one clip per
-    // bat call rather than grouping a pass into one long WAV. preRollMs
-    // covers the ~3 ms trigger latency with headroom while leaving room
-    // under the 200 ms cap; silenceMs sits just above the derived cricket-
-    // filter counter-race floor (see ConfigValidator). Operators who want
-    // R1/R2v2-style grouping should pass the "long-pass profile"
+    // Short-clip defaults (0.4.0 release): the customer runs BatDetect2
+    // daily on a solar-powered, resource-limited device, so total audio
+    // bytes per night is the currency that matters. The shipped 40 ms
+    // end-to-end cap cuts MB/night by ~54 % against the previous 200 ms
+    // cap while gaining +1.2 pp per-file presence recall and +5.7 pp
+    // per-pass recall on the reference corpus (session 08-04-2026).
+    // preRollMs covers the ~3 ms trigger latency with headroom;
+    // silenceMs sits above the derived cricket-filter counter-race floor
+    // (16 ms at 384 kHz / hop-512; see ConfigValidator). Operators who
+    // want R1/R2v2-style grouping should pass the "long-pass profile"
     // documented in the README: --preroll-ms 1000 --silence-ms 2000
     // --max-length-ms 5000.
-    std::uint32_t   preRollMs{50};
-    std::uint32_t   silenceMs{50};
+    std::uint32_t   preRollMs{10};
+    std::uint32_t   silenceMs{20};
     // Min / max length of the saved WAV (pre-roll + active + hangover, end to
     // end). Recordings shorter than min are deleted instead of finalized;
     // recordings reaching max are closed early. maxLengthMs == 0 means "no
@@ -68,7 +71,7 @@ struct Config {
     // leaves room for preRollMs + silenceMs, so the defaults below cannot
     // silently degenerate into "always closes before the call".
     std::uint32_t   minLengthMs{0};
-    std::uint32_t   maxLengthMs{200};
+    std::uint32_t   maxLengthMs{40};
 
     std::filesystem::path logDir{"./logs"};
     // Off by default: a shipped unit running unattended writes nothing to

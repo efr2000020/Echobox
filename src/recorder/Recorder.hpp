@@ -43,15 +43,23 @@ struct RecorderConfig {
     int                   sampleRate{384000};
     int                   channels{1};
     /// Audio to keep from *before* the leading edge of each event.
-    std::uint32_t         preRollMs{1000};
+    /// Mirrors the shipping default in @c echobox::app::Config so a
+    /// RecorderConfig built ex-nihilo (e.g. from a test fixture) matches
+    /// the production geometry. The two must be updated together.
+    std::uint32_t         preRollMs{10};
     /// Quiet time the detector must show before the recording closes.
-    std::uint32_t         silenceMs{100};
+    /// Mirrors the shipping default in @c echobox::app::Config. Must sit
+    /// at or above the cricket-filter counter-race floor derived in
+    /// @c ConfigValidator::checkSilenceExceedsHangover (16 ms at the
+    /// shipping 384 kHz / hop-512 defaults).
+    std::uint32_t         silenceMs{20};
     /// Minimum end-to-end WAV length. Files shorter than this are deleted
     /// instead of finalized. @c 0 disables the gate.
     std::uint32_t         minLengthMs{0};
     /// Maximum end-to-end WAV length. Recordings reaching this length close
-    /// early. @c 0 disables the cap.
-    std::uint32_t         maxLengthMs{50};
+    /// early. @c 0 disables the cap. Mirrors the shipping default in
+    /// @c echobox::app::Config.
+    std::uint32_t         maxLengthMs{40};
     /// How often the recorder polls the detector state, in ms.
     /// 1 ms because (i) it is a term in the cricket-filter silence floor
     /// (@c ConfigValidator::checkSilenceExceedsHangover), and at the
