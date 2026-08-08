@@ -359,8 +359,25 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 // We re-evaluate the close-time gate UNCONDITIONALLY (see
                 // A2) so the binding verdict comes from the full-event view
                 // regardless of what the provisional gate decided.
+                // Unroll the circular dominant-bin ring into temporal
+                // order before evaluating. path_ratio and mono_fraction
+                // are order-dependent (they consume per-frame steps);
+                // reading the ring linearly after it wraps at 64 frames
+                // (85 ms) introduces one artificial discontinuity at
+                // the wrap point and computes the shape over a
+                // temporally scrambled sequence. drift_khz and
+                // bandwidth_khz are order-independent and unaffected.
+                // Pattern mirrors the onset-ring unroll a few lines
+                // below.
+                std::size_t orderedDomBinsClose[SWEEP_RING_CAP];
+                const std::size_t startClose =
+                    (m_domRingCount < SWEEP_RING_CAP) ? 0 : m_domRingHead;
+                for (std::size_t i = 0; i < m_domRingCount; ++i) {
+                    orderedDomBinsClose[i] = m_domBinRing[
+                        (startClose + i) % SWEEP_RING_CAP];
+                }
                 const SweepShape shape = computeSweepShape(
-                    m_domBinRing, m_domRingCount,
+                    orderedDomBinsClose, m_domRingCount,
                     m_dominantFrameMags.data(), m_dominantFrameMags.size(),
                     m_dominantAnchorBin,
                     m_dominantBandLoBin, m_dominantBandHiBin,
@@ -560,8 +577,17 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
     if (m_sweepGateEnabled && m_inEvent
         && m_domRingCount >= GATE_DECISION_FRAMES
         && m_framesSinceLastProvisionalEval >= GATE_DECISION_FRAMES) {
+        // Unroll the circular dominant-bin ring into temporal order —
+        // see A4 comment at the close-time call site above.
+        std::size_t orderedDomBins[SWEEP_RING_CAP];
+        const std::size_t start =
+            (m_domRingCount < SWEEP_RING_CAP) ? 0 : m_domRingHead;
+        for (std::size_t i = 0; i < m_domRingCount; ++i) {
+            orderedDomBins[i] = m_domBinRing[
+                (start + i) % SWEEP_RING_CAP];
+        }
         const SweepShape s = computeSweepShape(
-            m_domBinRing, m_domRingCount,
+            orderedDomBins, m_domRingCount,
             m_dominantFrameMags.data(), m_dominantFrameMags.size(),
             m_dominantAnchorBin,
             m_dominantBandLoBin, m_dominantBandHiBin,
