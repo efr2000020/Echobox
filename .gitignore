@@ -45,6 +45,7 @@ _deps/
 
 # Build Directory
 build/
+build_*/
 bin/
 lib/
 
@@ -63,6 +64,17 @@ lib/
 logs/
 recordings/
 deploy/
+deploy_*/
+# Scratch scripts + one-off artefacts. tools/tmp/ is the agreed scratch
+# location for ad-hoc runner scripts; root-level tar/zip archives are
+# operator convenience bundles, never source of truth.
+tools/tmp/
+/Archive.tar.gz
+/session_screen.tar.gz
+/tools.zip
+
+# Claude Code local config (per-repo settings, not project code)
+.claude/
 
 # System files
 .DS_Store
