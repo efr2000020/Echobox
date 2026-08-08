@@ -238,13 +238,23 @@ private:
     std::size_t        m_dominantBandLoBin;
     std::size_t        m_dominantBandHiBin;
 
-    // Per-event gate state. A provisional decision fires once the ring
-    // reaches GATE_DECISION_FRAMES; subsequent frames inside the same
-    // event use the cached result. The provisional decision only ever
-    // *rejects* early — a provisional accept can still be downgraded to
-    // reject by the close-time full-event re-evaluation.
+    // Per-event gate state — split into two distinct verdicts:
+    //   - @c m_provisionalSuppressed drives @c outState.active (the
+    //     recorder's fast-drop leading edge). Set by the periodic
+    //     provisional gate on partial-event data; can flip either way
+    //     during the event (see A3).
+    //   - @c m_gateRejected is the BINDING close-time verdict. It
+    //     drives the emitted @c Annotation and the batLike / rejected
+    //     event counters the recorder polls at endRecording. Set only
+    //     at event close, from the full-event ring.
+    // The two are deliberately separate: a provisional reject taken at
+    // ~8 ms in (6 hot frames) runs on the loudest frame seen so far —
+    // early in an event that is a partially-windowed, attenuated frame,
+    // an unreliable basis for a binding verdict. The close-time block
+    // must re-examine the full event unconditionally.
     bool m_gateDecidedThisEvent = false;
-    bool m_gateRejected         = false;
+    bool m_provisionalSuppressed = false;
+    bool m_gateRejected          = false;
     // Sidecar diagnostic — true iff this event was rejected by the
     // 6-frame provisional gate (line ~536) as opposed to the full
     // close-time check. Read once at event close, then reset. Not on

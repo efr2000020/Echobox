@@ -96,6 +96,7 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     m_domRingCount          = 0;
     m_domRingHead           = 0;
     m_gateDecidedThisEvent  = false;
+    m_provisionalSuppressed = false;
     m_gateRejected          = false;
     m_provisionalRejectedThisEvent = false;
 
@@ -258,6 +259,7 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
             m_dominantBandLoBin    = 0;
             m_dominantBandHiBin    = 0;
             m_gateDecidedThisEvent = false;
+            m_provisionalSuppressed = false;
             m_gateRejected         = false;
             m_provisionalRejectedThisEvent = false;
             // Record the onset in the cross-event ring for the temporal
@@ -350,12 +352,12 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 // Finalise sweep-shape features over the whole event ring.
                 // The provisional GATE_DECISION_FRAMES decision runs on
                 // partial data — cricket-pulse onsets can look transiently
-                // broadband before their narrow harmonic character emerges.
-                // We re-evaluate here with the full ring so late-emerging
-                // narrowness still rejects. The provisional decision only
-                // ever *rejects* early (so outState.active drops fast on
-                // the device); a provisional accept can still be
-                // downgraded to reject by the full-event view.
+                // broadband before their narrow harmonic character emerges,
+                // and early frames are partially-windowed / attenuated so a
+                // provisional reject on ~8 ms of data is not trustworthy.
+                // We re-evaluate the close-time gate UNCONDITIONALLY (see
+                // A2) so the binding verdict comes from the full-event view
+                // regardless of what the provisional gate decided.
                 const SweepShape shape = computeSweepShape(
                     m_domBinRing, m_domRingCount,
                     m_dominantFrameMags.data(), m_dominantFrameMags.size(),
@@ -364,17 +366,17 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                     m_binResolution);
                 // --- Decision-path diagnostic state, hoisted so the
                 //     sidecar drain (below) can record which rejection
-                //     path fired. Populated by the sweep-gate block; if
-                //     the block is skipped (gate off, or event already
-                //     provisionally rejected), the sidecar-side observer
-                //     for these fields simply reflects the earlier decision.
+                //     path fired. Since A2 the sweep-gate block runs
+                //     unconditionally when the gate is enabled, so these
+                //     are always populated on gate-on runs (previously
+                //     `false`/`0` for provisionally-rejected events).
                 bool     dxSweepBatLike = false;
                 bool     dxVetoApplied  = false;
                 float    dxRepRateHz    = 0.0f;
                 float    dxRepCv        = 0.0f;
                 uint16_t dxRepNOnsets   = 0;
 
-                if (m_sweepGateEnabled && !m_gateRejected) {
+                if (m_sweepGateEnabled) {
                     const bool sweepBatLike =
                         (shape.bandwidth_khz >= m_minBandwidthKhz)
                         || (shape.drift_khz     >= m_sweepDriftKhz
@@ -534,6 +536,7 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 m_silenceFrames    = 0;
                 m_eventPeakSnr     = 0.0f;
                 m_gateDecidedThisEvent       = false;
+                m_provisionalSuppressed      = false;
                 m_gateRejected               = false;
                 m_provisionalRejectedThisEvent = false;
             }
@@ -542,15 +545,15 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
         }
     }
 
-    // 5. Sweep-shape gate — provisional decision.
+    // 5. Sweep-shape gate — provisional suppression (fast-drop only).
     //
-    // First GATE_DECISION_FRAMES inside an event are reported as active so
-    // the recorder gets its leading-edge trigger. Once the ring fills, we
-    // evaluate the bandwidth-OR-sweep test once and cache the result for
-    // the rest of the event. A rejected event keeps m_inEvent=true (so the
-    // event-end machinery still emits the sidecar EventFeatures with
-    // gate_rejected=true) but reports active=false so the recorder treats
-    // it as silence.
+    // First GATE_DECISION_FRAMES inside an event are reported as active
+    // so the recorder gets its leading-edge trigger. Once the ring
+    // fills, we evaluate the bandwidth-OR-sweep test and set
+    // @c m_provisionalSuppressed so the recorder treats obvious junk
+    // as silence. This is a *non-binding* flag: it drives outState.active
+    // only. The binding gate_rejected verdict is set at close-time from
+    // the full-event ring, independently.
     if (m_sweepGateEnabled && m_inEvent && !m_gateDecidedThisEvent
         && m_domRingCount >= GATE_DECISION_FRAMES) {
         const SweepShape s = computeSweepShape(
@@ -565,21 +568,24 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                 && s.path_ratio    <= m_sweepPathRatioMax
                 && s.mono_fraction >= m_sweepMonoFracMin);
         m_gateDecidedThisEvent = true;
-        m_gateRejected         = !batLike;
-        // Diagnostic bool for the sidecar: this reject came from the
-        // provisional gate (partial-event view), not the close-time
-        // check. Observability only — filter behaviour unchanged.
-        if (m_gateRejected) m_provisionalRejectedThisEvent = true;
-        if (m_gateRejected) {
+        m_provisionalSuppressed = !batLike;
+        // Diagnostic bool for the sidecar: this event was ever
+        // provisionally suppressed at least once. Observability only.
+        if (m_provisionalSuppressed) m_provisionalRejectedThisEvent = true;
+        if (m_provisionalSuppressed) {
             LS_DEBUG("dsp.bed",
-                     "event rejected by sweep gate bw=%.2fkHz drift=%.1fkHz "
+                     "event provisionally suppressed bw=%.2fkHz drift=%.1fkHz "
                      "path=%.2f mono=%.2f",
                      s.bandwidth_khz, s.drift_khz, s.path_ratio, s.mono_fraction);
         }
     }
 
     // 6. Per-frame state snapshot for the downstream recorder.
-    const bool reportActive = m_inEvent && !m_gateRejected;
+    // Uses @c m_provisionalSuppressed (the non-binding fast-drop flag).
+    // The binding @c m_gateRejected verdict is set at event close and
+    // propagates via the batLike/rejected counters the recorder polls
+    // at endRecording — it does not gate per-frame reporting here.
+    const bool reportActive = m_inEvent && !m_provisionalSuppressed;
     outState.active = reportActive;
     outState.lo_hz  = reportActive ? m_eventLoHz : 0.0f;
     outState.hi_hz  = reportActive ? m_eventHiHz : 0.0f;
