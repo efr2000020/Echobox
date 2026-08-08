@@ -600,10 +600,16 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
         const bool wasSuppressed = m_provisionalSuppressed;
         m_provisionalSuppressed = !batLike;
         m_framesSinceLastProvisionalEval = 0;
-        // Diagnostic: sticky-once "was ever suppressed at least once".
-        // Report unchanged from before A3 — the recovery-recovery
-        // analysis relies on this pool identity.
-        if (m_provisionalSuppressed) m_provisionalRejectedThisEvent = true;
+        // Diagnostic: mirror the CURRENT provisional state so the sidecar
+        // reflects the event's final suppression, not "was ever suppressed
+        // at least once". A3 made suppression re-evaluable, so an event
+        // that was suppressed early and then re-opened would otherwise
+        // still be labelled provisional_rejected in the sidecar — which
+        // put ~10 k re-opened clips in followup2's provisional_only
+        // bucket even though tuning the provisional gate would recover
+        // nothing (the events are already being reopened). Observability
+        // only; no filter behaviour change.
+        m_provisionalRejectedThisEvent = m_provisionalSuppressed;
         if (m_provisionalSuppressed && !wasSuppressed) {
             LS_DEBUG("dsp.bed",
                      "event provisionally suppressed bw=%.2fkHz drift=%.1fkHz "
