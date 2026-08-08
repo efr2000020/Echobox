@@ -72,14 +72,18 @@ std::optional<std::string> checkSilenceExceedsHangover(const Config& cfg) {
     // that tunable; if a future build exposes --hangover-frames, recompute
     // this from the configured value instead.
     constexpr std::uint32_t ASSUMED_HANGOVER_FRAMES = 8;
-    constexpr std::uint32_t RECORDER_POLL_MS        = 5;   // Recorder.hpp default
-    constexpr std::uint32_t SAFETY_MARGIN_MS        = 24;
+    constexpr std::uint32_t RECORDER_POLL_MS        = 1;   // Recorder.hpp default
+    constexpr std::uint32_t SAFETY_MARGIN_MS        = 4;
     const double frameMs =
         1000.0 * static_cast<double>(cfg.hopSize) / static_cast<double>(cfg.sampleRate);
     const std::uint32_t kMinSilenceMs =
         static_cast<std::uint32_t>(std::ceil(ASSUMED_HANGOVER_FRAMES * frameMs))
         + RECORDER_POLL_MS + SAFETY_MARGIN_MS;
-    // Evaluates to 40 ms at the shipping 384 kHz / hop-512 defaults.
+    // Evaluates to 16 ms at the shipping 384 kHz / hop-512 defaults
+    // (ceil(8 * 1.333) + 1 + 4). Cut from 40 ms in the short-clip release
+    // round: the old 24 ms margin was arbitrary padding and made a
+    // ~40 ms end-to-end clip unreachable (max_length must be >= preroll
+    // + silence).
 
     if (cfg.silenceMs < kMinSilenceMs) {
         return "--silence-ms (" + std::to_string(cfg.silenceMs)
