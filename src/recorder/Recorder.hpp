@@ -53,7 +53,13 @@ struct RecorderConfig {
     /// early. @c 0 disables the cap.
     std::uint32_t         maxLengthMs{50};
     /// How often the recorder polls the detector state, in ms.
-    std::uint32_t         pollIntervalMs{5};
+    /// 1 ms because (i) it is a term in the cricket-filter silence floor
+    /// (@c ConfigValidator::checkSilenceExceedsHangover), and at the
+    /// ~40 ms end-to-end clip budget the short-clip release round pushed
+    /// for, every millisecond of that floor counts; (ii) the detector's
+    /// active window can be as short as ~5 ms when the provisional gate
+    /// suppresses, so a 5 ms poll could miss the leading edge entirely.
+    std::uint32_t         pollIntervalMs{1};
     /// Wall-clock instant the device booted. Stamped into every sidecar
     /// alongside the per-recording capture timestamp; lets the offline
     /// tuning tools reason about uptime and event-rate windows. Defaults
