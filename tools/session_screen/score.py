@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import json
 
@@ -145,15 +145,40 @@ class ConfusionCounts:
 
 
 @dataclass
+class PerCallCounts:
+    """Detection-side recall counters.
+
+    - ``n_calls_total``: every BatDetect2 detection in the corpus.
+    - ``n_calls_captured``: detections overlapped by at least one KEPT
+      clip window (± ``CLIP_EDGE_SLOP_MS``).
+
+    Denominator is fixed by BatDetect2 alone, so it does not move when
+    the recorder config changes what clips get emitted — this is the
+    defect per-file and per-clip recall have and the reason per-call
+    recall is the new primary KPI.
+    """
+    n_calls_total:    int = 0
+    n_calls_captured: int = 0
+
+    @property
+    def recall(self) -> Optional[float]:
+        if self.n_calls_total == 0:
+            return None
+        return self.n_calls_captured / self.n_calls_total
+
+
+@dataclass
 class ScoreSummary:
     """Aggregate pooled confusion + rates for one config's run."""
     n_clips:      int
     n_no_clip_sources: int
     n_error_rows: int
     confusion:    ConfusionCounts
+    per_call:     PerCallCounts = field(default_factory=PerCallCounts)
     cricket_rejection_rate: Optional[float] = None
     recall:                 Optional[float] = None
     fp_rate:                Optional[float] = None
+    per_call_recall:        Optional[float] = None
 
     def as_row(self) -> Dict[str, object]:
         return {
@@ -165,6 +190,9 @@ class ScoreSummary:
             "recall":                 self.recall,
             "fp_rate":                self.fp_rate,
             "cricket_rejection_rate": self.cricket_rejection_rate,
+            "n_calls_total":          self.per_call.n_calls_total,
+            "n_calls_captured":       self.per_call.n_calls_captured,
+            "per_call_recall":        self.per_call_recall,
         }
 
 
@@ -292,6 +320,93 @@ def assign_clips(truth: pd.DataFrame,
     return assignments
 
 
+# --- per-call recall (inverted join: detection-side) -------------------------
+
+def _kept_clips_by_basename(
+        replay: pd.DataFrame) -> Dict[str, List[Tuple[float, float]]]:
+    """Map source WAV basename → list of ``(clip_start_ms, clip_end_ms)``
+    for KEPT clips only.
+
+    Skips ``no_clips`` and error rows to match ``assign_clips``. Keyed
+    by basename for the same reason ``_detections_by_file`` is — see
+    that function's docstring.
+    """
+    out: Dict[str, List[Tuple[float, float]]] = {}
+    for _, r in replay.iterrows():
+        if bool(r.get("no_clips", False)) or (r.get("error") or ""):
+            continue
+        if not bool(r.get("kept", False)):
+            continue
+        key = Path(str(r["source_file"])).name
+        out.setdefault(key, []).append(
+            (float(r["clip_start_ms"]), float(r["clip_end_ms"])))
+    return out
+
+
+def _detection_captured(det: dict,
+                        kept_clips: List[Tuple[float, float]]) -> bool:
+    """A detection is captured iff at least one kept clip window (widened
+    by ``CLIP_EDGE_SLOP_MS`` on each side) overlaps its window.
+
+    Same overlap arithmetic as ``_pick_overlap`` / ``gate_recovery.
+    count_overlapping_calls`` — kept inline to avoid a third join
+    implementation drifting.
+    """
+    d_lo = float(det.get("start_time_s", 0.0)) * 1000.0
+    d_hi = float(det.get("end_time_s",   0.0)) * 1000.0
+    for c_lo, c_hi in kept_clips:
+        lo = c_lo - CLIP_EDGE_SLOP_MS
+        hi = c_hi + CLIP_EDGE_SLOP_MS
+        if not (d_hi < lo or d_lo > hi):
+            return True
+    return False
+
+
+def per_call_recall(truth: pd.DataFrame, replay: pd.DataFrame
+                    ) -> Tuple[PerCallCounts, pd.DataFrame]:
+    """Detection-side recall — the new primary KPI.
+
+    Returns ``(pooled, per_species_df)``. The per-species breakdown
+    groups detections by *each detection's own* ``species`` field, not
+    by the clip-side top-species assignment used elsewhere.
+
+    Denominator is every BatDetect2 detection in the corpus, so it is
+    invariant to recorder config; a gate-OFF run should be high but not
+    100% (calls the base detector never triggered on are still misses).
+    A 100% result on gate-OFF means the join is wrong.
+    """
+    det_map  = _detections_by_file(truth)
+    kept_map = _kept_clips_by_basename(replay)
+
+    pooled = PerCallCounts()
+    per: Dict[str, PerCallCounts] = {}
+    for basename, dets in det_map.items():
+        kept_clips = kept_map.get(basename, [])
+        for d in dets:
+            species = str(d.get("species", "")) or NO_BAT_LABEL
+            captured = _detection_captured(d, kept_clips)
+            pooled.n_calls_total += 1
+            counts = per.setdefault(species, PerCallCounts())
+            counts.n_calls_total += 1
+            if captured:
+                pooled.n_calls_captured += 1
+                counts.n_calls_captured += 1
+
+    rows: List[Dict[str, object]] = []
+    for species, c in per.items():
+        rows.append({
+            "species":          species,
+            "n_calls_total":    c.n_calls_total,
+            "n_calls_captured": c.n_calls_captured,
+            "per_call_recall":  c.recall,
+        })
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = df.sort_values(["n_calls_total", "species"],
+                            ascending=[False, True]).reset_index(drop=True)
+    return pooled, df
+
+
 # --- summary + per-species ---------------------------------------------------
 
 def score(truth: pd.DataFrame, replay: pd.DataFrame) -> ScoreSummary:
@@ -308,14 +423,18 @@ def score(truth: pd.DataFrame, replay: pd.DataFrame) -> ScoreSummary:
         (replay["error"].fillna("").astype(str) != "").sum()
         if "error" in replay.columns else 0)
 
+    pooled_pc, _ = per_call_recall(truth, replay)
+
     return ScoreSummary(
         n_clips=len(assignments),
         n_no_clip_sources=n_no_clip,
         n_error_rows=n_err,
         confusion=conf,
+        per_call=pooled_pc,
         recall=conf.recall,
         fp_rate=conf.fp_rate,
         cricket_rejection_rate=conf.cricket_rejection,
+        per_call_recall=pooled_pc.recall,
     )
 
 
@@ -397,6 +516,7 @@ def disagreements(truth: pd.DataFrame, replay: pd.DataFrame) -> pd.DataFrame:
 def render_report(summary: ScoreSummary, per_species: pd.DataFrame, *,
                   truth_path: Path, replay_path: Path,
                   config_label: str = "",
+                  per_call_species: Optional[pd.DataFrame] = None,
                   extra_sections: str = "") -> str:
     """Markdown report body. Honesty header rides verbatim at the top."""
     lines: List[str] = []
@@ -410,23 +530,43 @@ def render_report(summary: ScoreSummary, per_species: pd.DataFrame, *,
     lines.append(f"- truth manifest:  `{truth_path}`")
     lines.append(f"- replay manifest: `{replay_path}`")
     lines.append("")
-    lines.append("## Headline (per-clip, all species pooled)")
+    lines.append("## Headline")
     lines.append("")
     conf = summary.confusion
+    pc = summary.per_call
     lines.append(f"- clips scored: **{summary.n_clips}** "
                  f"(sources with no clips: {summary.n_no_clip_sources}; "
                  f"error rows: {summary.n_error_rows})")
-    lines.append(f"- bat-recall (kept ∧ bat / bat): "
-                 f"**{_fmt_pct(summary.recall)}** "
-                 f"({conf.n_tp}/{conf.n_tp + conf.n_fn})")
-    lines.append(f"- cricket-rejection rate (TN / (TN+FP)): "
+    lines.append(f"- **per-call recall (KPI 1)**: "
+                 f"**{_fmt_pct(summary.per_call_recall)}** "
+                 f"({pc.n_calls_captured}/{pc.n_calls_total} BatDetect2 "
+                 f"detections overlapped by ≥1 kept clip)")
+    lines.append(f"- **cricket rejection (KPI 2, TN / (TN+FP))**: "
                  f"**{_fmt_pct(summary.cricket_rejection_rate)}** "
                  f"({conf.n_tn}/{conf.n_tn + conf.n_fp})")
-    lines.append(f"- cricket-FP rate (FP / (FP+TN)): "
-                 f"**{_fmt_pct(summary.fp_rate)}** "
+    lines.append("")
+    lines.append("### Legacy per-clip metrics (retired as decision KPIs)")
+    lines.append("")
+    lines.append("Per-clip recall is distorted by clip creation — the "
+                 "denominator moves with recorder config — and per-file "
+                 "recall is distorted by the arbitrary 1-minute chopping. "
+                 "Kept below for continuity with earlier reports.")
+    lines.append("")
+    lines.append(f"- bat-recall (kept ∧ bat / bat, per-clip): "
+                 f"{_fmt_pct(summary.recall)} "
+                 f"({conf.n_tp}/{conf.n_tp + conf.n_fn})")
+    lines.append(f"- cricket-FP rate (FP / (FP+TN), per-clip): "
+                 f"{_fmt_pct(summary.fp_rate)} "
                  f"({conf.n_fp}/{conf.n_fp + conf.n_tn})")
     lines.append("")
-    lines.append("## Per-species confusion")
+    lines.append("## Per-call recall by species")
+    lines.append("")
+    if per_call_species is None or per_call_species.empty:
+        lines.append("_no BatDetect2 detections in corpus_")
+    else:
+        lines.append(_df_to_md_table(per_call_species))
+    lines.append("")
+    lines.append("## Per-species confusion (per-clip)")
     lines.append("")
     if per_species.empty:
         lines.append("_no scorable clips_")
@@ -448,7 +588,8 @@ def _fmt_pct(x: Optional[float]) -> str:
     return f"{100.0 * x:.1f}%"
 
 
-_RATE_COLUMNS = {"recall", "fp_rate", "cricket_rejection_rate"}
+_RATE_COLUMNS = {"recall", "fp_rate", "cricket_rejection_rate",
+                 "per_call_recall"}
 
 
 def _df_to_md_table(df: pd.DataFrame) -> str:
@@ -478,22 +619,26 @@ def score_and_write(truth_path: Path, replay_path: Path,
                     output_dir: Path, *,
                     config_label: str = "",
                     ) -> ScoreSummary:
-    """Load both manifests, emit report.md + results.csv + disagreements.csv."""
+    """Load both manifests, emit report.md + results.csv + disagreements.csv
+    + per_call_by_species.csv."""
     truth  = read_truth_manifest(truth_path)
     replay = read_replay_manifest(replay_path)
     assert_basenames_unique(truth,  column="file",        source="truth")
     assert_basenames_unique(replay, column="source_file", source="replay")
 
-    summary     = score(truth, replay)
-    per_species = score_per_species(truth, replay)
-    disagrees   = disagreements(truth, replay)
+    summary            = score(truth, replay)
+    per_species        = score_per_species(truth, replay)
+    _, per_call_species = per_call_recall(truth, replay)
+    disagrees          = disagreements(truth, replay)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "report.md").write_text(render_report(
         summary, per_species,
         truth_path=truth_path, replay_path=replay_path,
-        config_label=config_label))
+        config_label=config_label,
+        per_call_species=per_call_species))
     per_species.to_csv(output_dir / "results.csv", index=False)
+    per_call_species.to_csv(output_dir / "per_call_by_species.csv", index=False)
     disagrees.to_csv(output_dir / "disagreements.csv", index=False)
     return summary
 
@@ -504,26 +649,34 @@ def render_config_diff(labels: List[str],
                        summaries: List[ScoreSummary]) -> str:
     """One markdown table summarising two (or more) configs side-by-side.
 
-    Columns: config label, clips scored, bat-recall (num/den), cricket-
-    rejection (num/den), cricket-FP (num/den). Kept flat so a diff of
-    two rows is trivially readable — no split into two sub-tables.
+    Columns: config label, clips scored, **per-call recall (KPI 1)**,
+    cricket-rejection (KPI 2, num/den), plus the retired per-clip
+    bat-recall and cricket-FP kept for continuity. Flat table — no
+    split into sub-tables — so a diff of two rows is trivially readable.
     """
     lines: List[str] = []
     lines.append("## Config comparison")
     lines.append("")
-    lines.append("| config | clips | bat-recall | cricket-rejection | cricket-FP |")
-    lines.append("|---|---|---|---|---|")
+    lines.append(
+        "| config | clips | per-call recall (KPI 1) "
+        "| cricket-rejection (KPI 2) "
+        "| per-clip recall (legacy) | per-clip cricket-FP (legacy) |")
+    lines.append("|---|---|---|---|---|---|")
     for label, s in zip(labels, summaries):
         c = s.confusion
+        pc = s.per_call
         lines.append(
             f"| {label} | {s.n_clips} | "
-            f"{_fmt_pct(s.recall)} ({c.n_tp}/{c.n_tp + c.n_fn}) | "
+            f"{_fmt_pct(s.per_call_recall)} "
+            f"({pc.n_calls_captured}/{pc.n_calls_total}) | "
             f"{_fmt_pct(s.cricket_rejection_rate)} "
             f"({c.n_tn}/{c.n_tn + c.n_fp}) | "
+            f"{_fmt_pct(s.recall)} ({c.n_tp}/{c.n_tp + c.n_fn}) | "
             f"{_fmt_pct(s.fp_rate)} ({c.n_fp}/{c.n_fp + c.n_tn}) |")
     lines.append("")
     lines.append(
-        "Expectation: filtering unchanged — the detector works on live "
-        "audio, not the clip — so any material change is a finding "
-        "worth flagging.")
+        "KPI 1 target: per-call recall ≥ 90%. KPI 2 target: cricket "
+        "rejection ≥ 70%. Per-clip metrics retained for continuity but "
+        "retired as decision metrics — per-clip denominator moves with "
+        "recorder config, per-file denominator is arbitrary chopping.")
     return "\n".join(lines)

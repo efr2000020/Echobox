@@ -261,11 +261,14 @@ def cmd_score(args: argparse.Namespace) -> int:
           f"(no-clip sources: {summary.n_no_clip_sources}, "
           f"error rows: {summary.n_error_rows})")
     c = summary.confusion
-    _print_pct("  bat-recall",         summary.recall,
-               c.n_tp, c.n_tp + c.n_fn)
-    _print_pct("  cricket-rejection", summary.cricket_rejection_rate,
+    pc = summary.per_call
+    _print_pct("  per-call recall (KPI 1)", summary.per_call_recall,
+               pc.n_calls_captured, pc.n_calls_total)
+    _print_pct("  cricket-rejection (KPI 2)", summary.cricket_rejection_rate,
                c.n_tn, c.n_tn + c.n_fp)
-    _print_pct("  cricket-FP",        summary.fp_rate,
+    _print_pct("  per-clip recall (legacy)", summary.recall,
+               c.n_tp, c.n_tp + c.n_fn)
+    _print_pct("  per-clip cricket-FP (legacy)", summary.fp_rate,
                c.n_fp, c.n_fp + c.n_tn)
     return 0
 
