@@ -200,6 +200,9 @@ def _build_replay_config(args: argparse.Namespace):
     ck = getattr(args, "cricket_filter", None)
     if ck is not None:
         cfg.cricket_filter = (ck == "on")
+    tunables = getattr(args, "tunable", None)
+    if tunables:
+        cfg.tunables = list(tunables)
     return cfg
 
 
@@ -225,6 +228,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
             input_dir, output, config=cfg,
             progress=reporter.update,
             limit=args.limit,
+            jobs=getattr(args, "jobs", 1),
         )
     except RuntimeError as e:
         print(f"\nerror: {e}", file=sys.stderr)
@@ -295,6 +299,8 @@ def cmd_all(args: argparse.Namespace) -> int:
         preroll_ms=args.preroll_ms, silence_ms=args.silence_ms,
         min_length_ms=args.min_length_ms, max_length_ms=args.max_length_ms,
         snr_threshold=args.snr_threshold, cricket_filter=args.cricket_filter,
+        tunable=getattr(args, "tunable", None),
+        jobs=getattr(args, "jobs", 1),
     )
     rc = cmd_replay(replay_args)
     if rc != 0:
@@ -358,7 +364,8 @@ def cmd_sweep(args: argparse.Namespace) -> int:
                 return 2
             try:
                 R.run_replay(input_dir, replay_out, config=cfg,
-                             progress=reporter.update, limit=args.limit)
+                             progress=reporter.update, limit=args.limit,
+                             jobs=getattr(args, "jobs", 1))
             except RuntimeError as e:
                 print(f"\nerror: {e}", file=sys.stderr)
                 return 3
@@ -551,6 +558,27 @@ def _add_replay_overrides(p: argparse.ArgumentParser) -> None:
     p.add_argument("--snr-threshold", dest="snr_threshold", type=float, default=None)
     p.add_argument("--cricket-filter", dest="cricket_filter",
                    default=None, choices=["on", "off"])
+    # Repeatable: --tunable KEY=VALUE. Forwarded to echobox-replay
+    # verbatim; the C++ tool applies each via ISweepTracker::setTunable
+    # after dsp.start(). Useful for one-off A/B runs (e.g.
+    # max_flatness=0.80) without editing code.
+    p.add_argument("--tunable", dest="tunable", action="append",
+                   default=None, metavar="KEY=VALUE",
+                   help="Detector tunable override (repeatable). "
+                        "Forwarded to echobox-replay as --tunable KEY=VALUE.")
+
+
+def _add_jobs(p: argparse.ArgumentParser) -> None:
+    """Parallel-replay shard count. Default 1 = single subprocess,
+    byte-identical to pre-flag behaviour. See run_replay's docstring for
+    the state-scoping caveat when jobs>1."""
+    p.add_argument("-j", "--jobs", type=int, default=1,
+                   help="Parallel echobox-replay shards (default: 1). "
+                        "jobs>1 splits the WAV list into contiguous "
+                        "shards and runs one subprocess per shard; any "
+                        "recorder state that crosses file boundaries "
+                        "(silence-window rollover, running stats, "
+                        "rep-guard if re-enabled) is scoped per-shard.")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -595,6 +623,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_replay.add_argument("--limit", type=int, default=None,
                           help="Process only the first N WAVs (fast smoke).")
     _add_replay_overrides(p_replay)
+    _add_jobs(p_replay)
     p_replay.set_defaults(func=cmd_replay)
 
     p_score = sub.add_parser(
@@ -618,6 +647,7 @@ def build_parser() -> argparse.ArgumentParser:
                        choices=["auto", "cpu", "cuda"])
     p_all.add_argument("--limit", type=int, default=None)
     _add_replay_overrides(p_all)
+    _add_jobs(p_all)
     p_all.set_defaults(func=cmd_all)
 
     p_sweep = sub.add_parser(
@@ -630,6 +660,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_sweep.add_argument("--device", default="auto",
                          choices=["auto", "cpu", "cuda"])
     p_sweep.add_argument("--limit", type=int, default=None)
+    _add_jobs(p_sweep)
     p_sweep.set_defaults(func=cmd_sweep)
 
     p_followup2 = sub.add_parser(

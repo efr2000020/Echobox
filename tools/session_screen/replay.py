@@ -37,13 +37,15 @@ from __future__ import annotations
 
 import bisect
 import json
+import concurrent.futures
 import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import wave
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -72,14 +74,21 @@ class ReplayConfig:
     min_length_ms:  int   = 0
     max_length_ms:  int   = 200
     hpf_cutoff_hz:  float = 20_000.0
+    # Repeatable detector tunables (KEY=VALUE strings), forwarded to
+    # echobox-replay as --tunable flags. Empty list = no overrides;
+    # detector uses its compiled defaults.
+    tunables:       List[str] = field(default_factory=list)
 
     def label(self) -> str:
-        return (f"pr{self.preroll_ms}_sl{self.silence_ms}_"
+        base = (f"pr{self.preroll_ms}_sl{self.silence_ms}_"
                 f"mx{self.max_length_ms}_mn{self.min_length_ms}_"
                 f"{'ck' if self.cricket_filter else 'nc'}")
+        if self.tunables:
+            base += "_" + ",".join(self.tunables)
+        return base
 
     def as_cli_flags(self) -> List[str]:
-        return [
+        flags = [
             "--sample-rate",   str(self.sample_rate),
             "--fft-size",      str(self.fft_size),
             "--hop-size",      str(self.hop_size),
@@ -92,6 +101,9 @@ class ReplayConfig:
             "--max-length-ms", str(self.max_length_ms),
             "--cricket-filter", "on" if self.cricket_filter else "off",
         ]
+        for kv in self.tunables:
+            flags += ["--tunable", kv]
+        return flags
 
 
 def load_config_from_session_header(header_path: Path) -> ReplayConfig:
@@ -275,7 +287,11 @@ def _load_sidecar(json_path: Path, root: Path, cfg: ReplayConfig,
         )
 
     rel = json_path.relative_to(root)
-    kept = not (rel.parts and rel.parts[0] == "rejected")
+    # "rejected/" is the recorder's authoritative discard marker. In
+    # single-shard mode it lives at rel.parts[0]; in sharded mode
+    # (--jobs > 1) it sits under a "shard_NN/" prefix, so scan the whole
+    # rel path. We control the shard-dir names, so no false positive.
+    kept = "rejected" not in rel.parts
 
     recording = doc.get("recording") or {}
     device    = doc.get("device")    or {}
@@ -372,20 +388,129 @@ def _prepare_input_for_replay(wavs: List[Path], input_dir: Path,
     return link_dir
 
 
+_STREAM_LOCK = threading.Lock()
+
+
 def _stream_subprocess(argv: List[str], prefix: str = "  ") -> int:
     """Fire ``argv``, tee its combined stdout+stderr to sys.stderr line
     by line, return the exit code. Line-buffered so long-running runs
-    don't sit silent for minutes."""
+    don't sit silent for minutes.
+
+    A module-level lock serialises the per-line writes so parallel shards
+    can't interleave mid-line; the lock is held only for the duration of
+    one line write, not the whole subprocess.
+    """
     proc = subprocess.Popen(argv,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT,
                             text=True, bufsize=1)
     assert proc.stdout is not None
     for line in iter(proc.stdout.readline, ''):
-        sys.stderr.write(prefix + line)
-        sys.stderr.flush()
+        with _STREAM_LOCK:
+            sys.stderr.write(prefix + line)
+            sys.stderr.flush()
     proc.stdout.close()
     return proc.wait()
+
+
+# --- shard helpers ----------------------------------------------------------
+
+def _partition_contiguous(wavs: List[Path], n: int) -> List[List[Path]]:
+    """Split ``wavs`` into ``n`` contiguous chunks of near-equal size.
+
+    Contiguous (not round-robin) so time-adjacent field WAVs stay in the
+    same shard — keeps the recorder's short-timescale state (silence
+    rollover, running noise floor) as close to single-run behaviour as
+    possible. Empty shards are dropped so ``jobs > n_files`` degrades
+    gracefully.
+    """
+    n = max(1, min(n, len(wavs)))
+    base, extra = divmod(len(wavs), n)
+    out: List[List[Path]] = []
+    start = 0
+    for i in range(n):
+        size = base + (1 if i < extra else 0)
+        if size > 0:
+            out.append(wavs[start:start + size])
+            start += size
+    return out
+
+
+def _prepare_shard_input(wavs: List[Path], link_dir: Path) -> Path:
+    """Symlink one shard's WAVs into a fresh dir the C++ tool can enumerate.
+
+    Uses ``w.name`` — matches ``_prepare_input_for_replay``'s existing
+    convention. Two source WAVs with the same basename in different
+    subdirs would collide; not a problem for the flat field-session
+    layouts we ship against.
+    """
+    if link_dir.exists():
+        shutil.rmtree(link_dir)
+    link_dir.mkdir(parents=True)
+    for w in wavs:
+        (link_dir / w.name).symlink_to(w.resolve())
+    return link_dir
+
+
+@dataclass
+class _ShardResult:
+    idx:       int
+    shard_dir: Path
+    wavs:      List[Path]
+    table:     List[_SourceEntry]
+    rc:        int
+
+
+def _run_one_shard(idx: int, shard_wavs: List[Path], cfg: ReplayConfig,
+                   bin_path: Path, replay_root: Path,
+                   n_shards: int) -> _ShardResult:
+    """Launch one echobox-replay subprocess for one shard.
+
+    Returns even on non-zero rc; the caller inspects ``rc`` after all
+    shards complete so a single failure doesn't leave zombies.
+    """
+    shard_dir  = replay_root / f"shard_{idx:02d}"
+    input_link = replay_root / f"_input_shard_{idx:02d}"
+    _prepare_shard_input(shard_wavs, input_link)
+    shard_dir.mkdir(parents=True, exist_ok=True)
+
+    # --save-rejected requires --cricket-filter on (nothing gets rejected
+    # otherwise, so echobox-replay refuses the combination). For ceiling
+    # runs where the filter is off, drop the rejected-sink flags.
+    argv = [
+        str(bin_path),
+        "--input",  str(input_link),
+        "--output", str(shard_dir),
+    ]
+    if cfg.cricket_filter:
+        argv += ["--save-rejected", "all",
+                 "--save-rejected-max-per-hour", "0"]
+    argv += list(cfg.as_cli_flags())
+    prefix = f"  [replay-{idx:02d}/{n_shards - 1:02d}] "
+    rc = _stream_subprocess(argv, prefix=prefix)
+    table = _build_offset_table(shard_wavs)
+    return _ShardResult(idx=idx, shard_dir=shard_dir, wavs=shard_wavs,
+                        table=table, rc=rc)
+
+
+def _collect_shard_rows(shard: _ShardResult, replay_root: Path,
+                        cfg: ReplayConfig) -> List[ReplayRow]:
+    """Walk one shard's sidecar tree and emit its rows (including
+    no_clips rows for its WAVs that produced nothing)."""
+    starts = [e.start_sample for e in shard.table]
+    rows: List[ReplayRow] = []
+    if shard.shard_dir.exists():
+        for p in sorted(shard.shard_dir.rglob("*.json")):
+            if p.name == "replay_manifest.json" or p.name.startswith("."):
+                continue
+            rows.append(_load_sidecar(p, replay_root, cfg,
+                                      shard.table, starts))
+    seen = {r.source_file for r in rows
+            if r.source_file and not r.no_clips}
+    for entry in shard.table:
+        if str(entry.path) not in seen:
+            rows.append(_no_clips_row(entry.path))
+    return rows
 
 
 def run_replay(input_dir: Path, output_path: Path, *,
@@ -394,7 +519,8 @@ def run_replay(input_dir: Path, output_path: Path, *,
                binary: Optional[Path] = None,
                progress: Optional[Callable] = None,
                checkpoint_every: int = 0,
-               limit: Optional[int] = None) -> Path:
+               limit: Optional[int] = None,
+               jobs: int = 1) -> Path:
     """Batch-replay ``input_dir`` through ``echobox-replay`` and write a
     per-clip manifest to ``output_path``.
 
@@ -402,13 +528,23 @@ def run_replay(input_dir: Path, output_path: Path, *,
     sidecar tree lands. Kept after the run for debugging; defaults to
     ``<output_path>.replay/``.
 
+    ``jobs`` — number of parallel echobox-replay subprocesses. Default 1
+    preserves the single-run stream (byte-identical to pre-flag runs).
+    With ``jobs > 1`` the WAV list is split into contiguous shards and
+    each shard becomes its own subprocess under
+    ``<replay_root>/shard_NN/``; any recorder state that crosses file
+    boundaries (silence-window rollover, running stats, rep-guard if
+    re-enabled) is therefore scoped to a shard, not the whole corpus.
+    Rep-guard is OFF by default so this is inert today.
+
     ``progress`` and ``checkpoint_every`` are accepted for compat with
-    the ``truth`` stage's driver signature but unused in single-subprocess
-    mode — the batch either succeeds cleanly or fails; there's nothing
+    the ``truth`` stage's driver signature but unused in subprocess mode
+    — the batch either succeeds cleanly or fails; there's nothing
     meaningful to checkpoint mid-run.
     """
     cfg = config or ReplayConfig()
     bin_path = binary or locate_echobox_replay()
+    jobs = max(1, int(jobs or 1))
 
     if replay_root is None:
         replay_root = output_path.with_suffix(".replay")
@@ -426,48 +562,15 @@ def run_replay(input_dir: Path, output_path: Path, *,
         write_replay_manifest(output_path, [])
         return output_path
 
-    # 1. Cumulative sample-offset table — used to attribute each output
-    # clip's frames_processed back to a source WAV.
     print(f"replay: binary={bin_path}", file=sys.stderr)
-    print(f"replay: {len(wavs)} WAVs; config={cfg.label()}; "
-          f"building offset table…", file=sys.stderr)
-    started_table = time.monotonic()
-    table = _build_offset_table(wavs)
-    table_starts = [e.start_sample for e in table]
-    print(f"replay: offset table built in "
-          f"{time.monotonic() - started_table:.1f}s "
-          f"(total samples: {table[-1].end_sample:,})", file=sys.stderr)
-
-    # 2. One subprocess for the whole corpus.
-    actual_input = _prepare_input_for_replay(wavs, input_dir, replay_root, limit)
-    argv = [
-        str(bin_path),
-        "--input",  str(actual_input),
-        "--output", str(replay_root),
-        "--save-rejected", "all",
-        "--save-rejected-max-per-hour", "0",
-        *cfg.as_cli_flags(),
-    ]
-    print(f"replay: launching echobox-replay (expect ~"
-          f"{15 * len(wavs) / 585:.1f} min for {len(wavs)} WAVs)",
-          file=sys.stderr)
-    started = time.monotonic()
-    rc = _stream_subprocess(argv, prefix="  [replay] ")
-    if rc != 0:
-        raise RuntimeError(f"echobox-replay failed with rc={rc}")
-    print(f"replay: echobox-replay done in "
-          f"{time.monotonic() - started:.1f}s",
+    print(f"replay: {len(wavs)} WAVs; config={cfg.label()}",
           file=sys.stderr)
 
-    # 3. Walk the sidecar tree, attribute each clip.
-    rows = _walk_output_dir(replay_root, cfg, table, table_starts)
-
-    # 4. Emit no_clips rows for sources with zero sidecars.
-    seen_sources = {r.source_file for r in rows
-                    if r.source_file and not r.no_clips}
-    for entry in table:
-        if str(entry.path) not in seen_sources:
-            rows.append(_no_clips_row(entry.path))
+    if jobs > 1:
+        rows = _run_sharded(wavs, cfg, bin_path, replay_root, jobs)
+    else:
+        rows = _run_single(wavs, cfg, bin_path, replay_root,
+                           input_dir, limit)
 
     rows.sort(key=lambda r: (r.source_file, r.clip_start_ms))
 
@@ -481,6 +584,98 @@ def run_replay(input_dir: Path, output_path: Path, *,
           f"{sum(1 for r in rows if r.no_clips)} sources without clips)",
           file=sys.stderr)
     return output_path
+
+
+def _run_single(wavs: List[Path], cfg: ReplayConfig, bin_path: Path,
+                replay_root: Path, input_dir: Path,
+                limit: Optional[int]) -> List[ReplayRow]:
+    """Original single-subprocess path — byte-identical to pre-jobs runs
+    (same argv, same input arg, same output layout, same offset table)."""
+    started_table = time.monotonic()
+    table = _build_offset_table(wavs)
+    table_starts = [e.start_sample for e in table]
+    print(f"replay: offset table built in "
+          f"{time.monotonic() - started_table:.1f}s "
+          f"(total samples: {table[-1].end_sample:,})", file=sys.stderr)
+
+    actual_input = _prepare_input_for_replay(wavs, input_dir, replay_root, limit)
+    # --save-rejected requires --cricket-filter on (see shard variant).
+    argv = [
+        str(bin_path),
+        "--input",  str(actual_input),
+        "--output", str(replay_root),
+    ]
+    if cfg.cricket_filter:
+        argv += ["--save-rejected", "all",
+                 "--save-rejected-max-per-hour", "0"]
+    argv += list(cfg.as_cli_flags())
+    print(f"replay: launching echobox-replay (expect ~"
+          f"{15 * len(wavs) / 585:.1f} min for {len(wavs)} WAVs)",
+          file=sys.stderr)
+    started = time.monotonic()
+    rc = _stream_subprocess(argv, prefix="  [replay] ")
+    if rc != 0:
+        raise RuntimeError(f"echobox-replay failed with rc={rc}")
+    print(f"replay: echobox-replay done in "
+          f"{time.monotonic() - started:.1f}s",
+          file=sys.stderr)
+
+    rows = _walk_output_dir(replay_root, cfg, table, table_starts)
+    seen_sources = {r.source_file for r in rows
+                    if r.source_file and not r.no_clips}
+    for entry in table:
+        if str(entry.path) not in seen_sources:
+            rows.append(_no_clips_row(entry.path))
+    return rows
+
+
+def _run_sharded(wavs: List[Path], cfg: ReplayConfig, bin_path: Path,
+                 replay_root: Path, jobs: int) -> List[ReplayRow]:
+    """Split WAVs into contiguous shards and run N subprocesses in
+    parallel. Merges each shard's sidecar tree into one row list.
+
+    Honesty caveat, printed up-front so it lands in any tee/log:
+    recorder state that crosses file boundaries is scoped to a shard,
+    not the whole corpus. Rep-guard is OFF by default; if you turn it
+    back on, prefer jobs=1 for apples-to-apples with prior runs.
+    """
+    shards = _partition_contiguous(wavs, jobs)
+    n = len(shards)
+    print(f"replay: sharding into {n} parallel jobs "
+          f"({[len(s) for s in shards]} WAVs each)", file=sys.stderr)
+    print(f"replay: HONESTY NOTE — with jobs>1, recorder state that "
+          f"crosses file boundaries (silence-window rollover, running "
+          f"stats, rep-guard if re-enabled) is scoped per-shard, not "
+          f"across the whole corpus. Rep-guard is OFF by default so "
+          f"this is inert today. Use jobs=1 for byte-identical to "
+          f"single-run.", file=sys.stderr)
+    print(f"replay: launching {n} echobox-replay subprocesses (expect "
+          f"~{15 * len(wavs) / (585 * n):.1f} min for {len(wavs)} WAVs)",
+          file=sys.stderr)
+
+    started = time.monotonic()
+    results: List[Optional[_ShardResult]] = [None] * n
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
+        futures = {ex.submit(_run_one_shard, i, shards[i], cfg,
+                             bin_path, replay_root, n): i
+                   for i in range(n)}
+        for f in concurrent.futures.as_completed(futures):
+            i = futures[f]
+            results[i] = f.result()
+
+    for r in results:
+        assert r is not None
+        if r.rc != 0:
+            raise RuntimeError(
+                f"echobox-replay shard {r.idx:02d} failed with rc={r.rc}")
+    print(f"replay: all {n} shards done in "
+          f"{time.monotonic() - started:.1f}s", file=sys.stderr)
+
+    rows: List[ReplayRow] = []
+    for r in results:
+        assert r is not None
+        rows.extend(_collect_shard_rows(r, replay_root, cfg))
+    return rows
 
 
 # --- drop-safety assertion --------------------------------------------------
