@@ -58,7 +58,10 @@ from .manifest import ReplayRow, write_replay_manifest
 class ReplayConfig:
     """Recorder + detector knobs passed to ``echobox-replay`` as CLI flags.
 
-    Defaults mirror the shipping short-clip config. Fields that don't
+    Defaults are the **legacy long-clip** geometry (50/50/200) from the
+    pre-0.4.0 baseline, NOT the current shipping config. The shipping
+    device runs 10/20/40 as of 0.4.0 (see ``src/app/Config.hpp``); use
+    ``validate --config shipping`` to reproduce that. Fields that don't
     affect the join (algorithm plugin name, ring capacity, etc.) live
     inside the C++ tool's own defaults.
     """
@@ -318,7 +321,7 @@ def _load_sidecar(json_path: Path, root: Path, cfg: ReplayConfig,
     start_ms = max(0.0, end_ms - dur_ms)
 
     return ReplayRow(
-        source_file=str(source_path),
+        source_file=source_path.name,
         clip_wav=str(json_path.relative_to(root).with_suffix(".wav")),
         kept=kept,
         rejected_reason=str(rejected_meta.get("reason", "")),
@@ -354,7 +357,7 @@ def _walk_output_dir(output_dir: Path, cfg: ReplayConfig,
 
 def _no_clips_row(source_wav: Path) -> ReplayRow:
     return ReplayRow(
-        source_file=str(source_wav), clip_wav="", kept=False,
+        source_file=source_wav.name, clip_wav="", kept=False,
         rejected_reason="", rejected_mode="",
         clip_start_ms=0.0, clip_end_ms=0.0, clip_duration_ms=0.0,
         n_events=0, n_gate_rejected_events=0,

@@ -204,12 +204,23 @@ device would produce (modulo x86 vs ARM).
 | subcommand  | what it does                                                  | notes |
 |-------------|---------------------------------------------------------------|-------|
 | `truth`     | Runs BatDetect2 over every WAV, caches per-clip detections    | ~90 min on CPU for 585 files; auto-picks CUDA if visible |
-| `replay`    | Runs `echobox-replay` over every WAV, writes per-clip manifest | 8-way sharding via `--jobs 8` cuts a 585-file night to ~10 min |
+| `replay`    | Runs `echobox-replay` over every WAV, writes per-clip manifest | 8-way sharding via `--jobs 8` cuts a 585-file night to ~10 min; also writes `run.json` for provenance |
 | `score`     | Joins truth + replay, emits report + confusion CSVs           | Reads two parquet caches; no re-run |
 | `all`       | `truth` → `replay` → `score` for one config                   | Sequences the three above |
-| `sweep`     | Runs the plan's baseline + shorter configs and diffs them     | Shares one truth manifest across both |
+| `sweep`     | Runs `shipping` + `shorter` configs side-by-side and diffs them | Shares one truth manifest across both |
 | `followup`  | Adds per-file / per-pass recall + cricket-FP profile          | No re-run — reads existing manifests |
 | `followup2` | Veto/provisional pool split + per-knob sweep                  | Needs v2-format sidecars (0.3.0-rc1+) |
+
+**Named `--config` presets** (as of 2026-08):
+
+| preset     | preroll_ms | silence_ms | max_length_ms | notes |
+|------------|-----------|-----------|---------------|-------|
+| `shipping` | 10        | 20        | 40            | Mirrors `src/app/Config.hpp` (0.4.0 short-clip). Use this to measure what the field device actually does. |
+| `legacy`   | 50        | 50        | 200           | Pre-0.4.0 long-clip geometry. Was named `baseline` until 2026-08; renamed to stop it being mistaken for the shipping config. |
+| `shorter`  | 20        | 40        | 200           | Historical intermediate; retained for continuity with older sweeps. |
+
+Any explicit `--preroll-ms` / `--silence-ms` / `--max-length-ms` /
+`--tunable` flag overrides the preset — presets are just a shorthand.
 
 **Typical single-config run:**
 
@@ -223,9 +234,45 @@ python -m tools.session_screen.validate all \
     --jobs 8
 ```
 
-**Reusing a cached truth manifest** — the BatDetect2 pass is the
-expensive stage. Symlink the cache into the target output dir before
-running `replay`/`sweep`/`all`:
+**Preferred: point at a dataset dir instead** — a *dataset* is any
+directory containing `dataset.json`, a `reference/` of WAVs, and (once
+built) `truth.parquet`. Passing `--dataset <path>` fills in `--input`
+from `reference/`, uses (or writes) the dataset's own `truth.parquet`,
+and drops replay outputs into a run-specific dir under sibling `runs/`
+— so the reference data stays immutable and every replay lives in its
+own timestamped folder:
+
+```bash
+python -m tools.session_screen.validate all \
+    --dataset /mnt/data/datasets/session_02 \
+    --config shipping --jobs 8
+# → truth  read from /mnt/data/datasets/session_02/truth.parquet
+# → outputs (+ run.json for provenance) written to
+#   /mnt/data/runs/session_02__shipping__<yyyymmdd-hhmmss>/
+```
+
+The dataset layout used above (as of 2026-08):
+
+```
+/mnt/data/
+├── datasets/<id>/
+│   ├── dataset.json     # entry point for scripts + agents
+│   ├── reference/*.wav  # BatDetect2 inputs
+│   ├── truth.parquet    # BatDetect2 output (shared across all runs)
+│   └── on_device/       # events/, decisions.jsonl, SESSION_*.json
+├── runs/<id>__<tag>__<ts>/   # every replay output lands here
+└── backups/                   # per-dataset .tar / .tar.gz snapshots
+```
+
+The truth ↔ replay join is by WAV **basename**, not absolute path — so
+a dataset stays valid if you move `/mnt/data/` to a different mount
+point. New `truth.parquet` / `replay_manifest.parquet` files write
+basenames directly; older manifests can be rewritten in place with a
+one-liner (`df["file"] = df["file"].map(os.path.basename); df.to_parquet(...)`).
+
+**Reusing a cached truth manifest without `--dataset`** — the BatDetect2
+pass is the expensive stage. Symlink the cache into the target output
+dir before running `replay`/`sweep`/`all`:
 
 ```bash
 mkdir -p validation_out
@@ -292,6 +339,7 @@ Full details: `tools/validator/README.md`.
 | **Investigate a false positive** | `./build_and_deploy.sh` → `./run_debug.sh --device <mic>` |
 | **Field observability of rejected clips** | `./build_and_deploy.sh` → `./run.sh --device <mic> --save-rejected boundary` |
 | **Score one recording against BatDetect2** | `./build_dev.sh --replay` → `python -m tools.session_screen.validate all --input <dir> --output-dir <dir>` |
+| **Score a dataset against BatDetect2** | `./build_dev.sh --replay` → `python -m tools.session_screen.validate all --dataset <path> --config shipping` (auto-derives `runs/<id>__shipping__<ts>/`) |
 | **Sweep short-clip geometries** | Manual Release recipe (§1) → set `ECHOBOX_REPLAY_BIN` → invoke `validate replay` per-config |
 | **Interactive tuning on a single WAV** | `./build_dev.sh` (no `--replay` needed) → `cd tools && python -m validator` |
 | **Compare two detector-tunable settings** | `./build_dev.sh --replay` → `validate replay --tunable KEY=VALUE` twice with different values |

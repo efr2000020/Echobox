@@ -40,8 +40,10 @@ if __package__ in (None, ""):  # pragma: no cover - exercised by CLI, not tests
     __package__ = "tools.session_screen"
 
 import argparse
+import json
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -49,12 +51,161 @@ from typing import List, Optional
 DEFAULT_OUTPUT_DIR = Path("validation_out")
 
 
+# --- dataset resolution -----------------------------------------------------
+#
+# A "dataset" on disk is a directory containing ``dataset.json`` plus
+# ``reference/*.wav`` (BatDetect2 inputs) and ``truth.parquet``
+# (BatDetect2 output). When ``--dataset`` is passed to a subcommand we
+# read the manifest and fill in ``--input`` / truth path / run output dir
+# so that datasets/ stays immutable and runs/ collects every replay.
+
+
+def _load_dataset(path: Path) -> dict:
+    """Read <path>/dataset.json and enrich it with derived paths.
+
+    ``_reference_dir``, ``_truth_path`` are absolute paths inside the
+    dataset. ``_runs_dir`` is the sibling ``runs/`` next to
+    ``datasets/`` in the layout — replay outputs land there.
+    """
+    p = Path(path)
+    meta = json.loads((p / "dataset.json").read_text())
+    meta["_path"] = p
+    meta["_reference_dir"] = p / meta.get("reference_dir", "reference")
+    meta["_truth_path"]    = p / meta.get("truth_parquet", "truth.parquet")
+    meta["_runs_dir"]      = p.parent.parent / "runs"
+    return meta
+
+
+def _slug_for_run(args: argparse.Namespace) -> str:
+    """Compact tag for the run dir name: ``<tag>__<yyyymmdd-hhmmss>``.
+
+    ``tag`` mirrors what the command actually does — the config preset
+    for ``all``/``replay``, "sweep" for ``sweep`` (which produces baseline
+    + shorter subdirs), and the command name for anything else.
+    """
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    cmd = args.command
+    if cmd == "sweep":
+        tag = "sweep"
+    elif cmd in ("all", "replay"):
+        tag = getattr(args, "config", None) or "custom"
+    else:
+        tag = cmd
+    return f"{tag}__{ts}"
+
+
+def _apply_dataset_defaults(args: argparse.Namespace) -> Optional[dict]:
+    """If ``--dataset`` is set, mutate ``args`` with derived defaults.
+
+    Fills only fields the user didn't already provide, so explicit CLI
+    flags always win. Returns the loaded manifest so command handlers
+    can consult it directly (see cmd_all / cmd_sweep for the truth-path
+    handoff).
+    """
+    ds_path = getattr(args, "dataset", None)
+    if not ds_path:
+        return None
+    meta = _load_dataset(Path(ds_path))
+    if getattr(args, "input", None) is None:
+        args.input = str(meta["_reference_dir"])
+    if args.command == "truth" and getattr(args, "output", None) is None:
+        args.output = str(meta["_truth_path"])
+    if args.command == "score" and getattr(args, "truth", None) is None:
+        args.truth = str(meta["_truth_path"])
+    args._dataset_meta = meta
+    return meta
+
+
+def _write_run_json(output_dir: Path, args: argparse.Namespace,
+                    cfg=None, extra: Optional[dict] = None) -> None:
+    """Drop ``<output_dir>/run.json`` alongside the run's other artefacts.
+
+    Records the minimum needed to re-run: dataset id + path, the fully
+    resolved config (preset name + every knob), the exact argv, wall
+    time, and — best-effort — the repo's git sha. Skips silently on any
+    error since provenance should never fail a run.
+    """
+    meta = getattr(args, "_dataset_meta", None)
+    doc: dict = {
+        "command":      getattr(args, "command", "replay"),
+        "started_iso":  datetime.now().astimezone().isoformat(timespec="seconds"),
+        "argv":         list(sys.argv),
+        "dataset_id":   (meta["id"]        if meta else None),
+        "dataset_path": (str(meta["_path"]) if meta else None),
+    }
+    if cfg is not None:
+        doc["config_preset"] = getattr(args, "config", None)
+        doc["config_resolved"] = {
+            "preroll_ms":     cfg.preroll_ms,
+            "silence_ms":     cfg.silence_ms,
+            "min_length_ms":  cfg.min_length_ms,
+            "max_length_ms":  cfg.max_length_ms,
+            "snr_threshold":  cfg.snr_threshold,
+            "cricket_filter": cfg.cricket_filter,
+            "freq_lo_hz":     cfg.freq_lo_hz,
+            "freq_hi_hz":     cfg.freq_hi_hz,
+            "sample_rate":    cfg.sample_rate,
+            "tunables":       list(cfg.tunables or []),
+        }
+    try:
+        import subprocess as _sp                                    # noqa: WPS433
+        sha = _sp.check_output(
+            ["git", "rev-parse", "--short=12", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            stderr=_sp.DEVNULL, timeout=5).decode().strip()
+        doc["git_sha"] = sha
+    except Exception:                              # pragma: no cover - best effort
+        pass
+    if extra:
+        doc.update(extra)
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "run.json").write_text(json.dumps(doc, indent=2))
+    except Exception:                              # pragma: no cover - best effort
+        pass
+
+
+def _resolve_output_dir(args: argparse.Namespace) -> Path:
+    """Effective ``--output-dir`` for the current run.
+
+    Priority: explicit CLI value → dataset-derived ``runs/<id>__<slug>/``
+    → the historical ``validation_out`` fallback.
+    """
+    explicit = getattr(args, "output_dir", None)
+    if explicit is not None:
+        return Path(explicit)
+    meta = getattr(args, "_dataset_meta", None)
+    if meta is None:
+        return DEFAULT_OUTPUT_DIR
+    return meta["_runs_dir"] / f"{meta['id']}__{_slug_for_run(args)}"
+
+
 # --- CLI-configurable replay knobs -------------------------------------------
 #
-# The plan pins baseline + shorter to these exact CLI flags; keeping them in
-# one place means the two entry points ('replay' and 'sweep') can't drift.
+# Three named presets:
+#   - shipping — mirrors src/app/Config.hpp as of 0.4.0. This is what
+#     the field device actually runs; use it to measure device-relevant
+#     behaviour.
+#   - legacy   — the pre-0.4.0 long-clip geometry (50/50/200). Kept so
+#     old reports remain reproducible. Was called "baseline" until
+#     2026-08.
+#   - shorter  — historical intermediate config (20/40/200), retained
+#     for continuity with earlier sweeps.
+#
+# ``sweep`` compares the two most decision-relevant configs today:
+# shipping vs shorter. Explicit --preroll-ms / --silence-ms / --tunable
+# flags still override anything a preset sets.
 
-def _plan_baseline():
+def _plan_shipping():
+    """Mirror the current shipping Config.hpp (0.4.0 short-clip)."""
+    from . import replay as _replay
+    return _replay.ReplayConfig(
+        preroll_ms=10, silence_ms=20,
+        max_length_ms=40, min_length_ms=0, cricket_filter=True)
+
+
+def _plan_legacy():
+    """Pre-0.4.0 long-clip geometry (was 'baseline' until 2026-08)."""
     from . import replay as _replay
     return _replay.ReplayConfig(
         preroll_ms=50, silence_ms=50,
@@ -62,10 +213,20 @@ def _plan_baseline():
 
 
 def _plan_shorter():
+    """Historical intermediate config; retained for continuity."""
     from . import replay as _replay
     return _replay.ReplayConfig(
         preroll_ms=20, silence_ms=40,
         max_length_ms=200, min_length_ms=0, cricket_filter=True)
+
+
+# Named-preset registry — the single source of truth for --config choices.
+# Ordered so the shipping config sits first in --help output.
+_PRESETS = {
+    "shipping": _plan_shipping,
+    "legacy":   _plan_legacy,
+    "shorter":  _plan_shorter,
+}
 
 
 class _ProgressReporter:
@@ -129,6 +290,17 @@ def _default_replay_path(output_dir: Path) -> Path:
     return output_dir / "replay_manifest.parquet"
 
 
+def _require_input(args: argparse.Namespace) -> Optional[int]:
+    """Emit a friendly error and return 2 if neither --input nor --dataset
+    supplied a WAV dir; None otherwise (proceed).
+    """
+    if not getattr(args, "input", None):
+        print("error: pass --input <wav-dir> or --dataset <dataset-dir>.",
+              file=sys.stderr)
+        return 2
+    return None
+
+
 def _report_missing_input_dir(input_dir: Path) -> None:
     """Same 'not a directory' error, but include the absolute path and CWD
     so a user running under PyCharm's default (script-dir) working directory
@@ -146,6 +318,9 @@ def _report_missing_input_dir(input_dir: Path) -> None:
 
 def cmd_truth(args: argparse.Namespace) -> int:
     from . import truth
+    rc = _require_input(args)
+    if rc is not None:
+        return rc
     output = Path(args.output) if args.output else _default_truth_path(
         Path(args.output_dir))
     if output.exists() and not args.force:
@@ -184,12 +359,9 @@ def _build_replay_config(args: argparse.Namespace):
     itself overrides the ReplayConfig defaults.
     """
     from . import replay as R
-    if getattr(args, "config", None) == "baseline":
-        cfg = _plan_baseline()
-    elif getattr(args, "config", None) == "shorter":
-        cfg = _plan_shorter()
-    else:
-        cfg = R.ReplayConfig()
+    preset = getattr(args, "config", None)
+    ctor = _PRESETS.get(preset) if preset else None
+    cfg = ctor() if ctor else R.ReplayConfig()
 
     # Optional per-flag overrides for one-off tuning without editing code.
     for attr in ("preroll_ms", "silence_ms", "min_length_ms", "max_length_ms",
@@ -208,6 +380,9 @@ def _build_replay_config(args: argparse.Namespace):
 
 def cmd_replay(args: argparse.Namespace) -> int:
     from . import replay as R
+    rc = _require_input(args)
+    if rc is not None:
+        return rc
     output = Path(args.output) if args.output else _default_replay_path(
         Path(args.output_dir))
     if output.exists() and not args.force:
@@ -219,6 +394,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
         return 2
 
     cfg = _build_replay_config(args)
+    _write_run_json(Path(args.output_dir), args, cfg=cfg)
     print(f"replay: config={cfg.label()}", file=sys.stderr, flush=True)
 
     reporter = _ProgressReporter("replay")
@@ -242,6 +418,10 @@ def cmd_replay(args: argparse.Namespace) -> int:
 
 def cmd_score(args: argparse.Namespace) -> int:
     from . import score
+    if not getattr(args, "truth", None):
+        print("error: pass --truth <path> or --dataset <dataset-dir>.",
+              file=sys.stderr)
+        return 2
     truth_path  = Path(args.truth)
     replay_path = Path(args.replay)
     output_dir  = Path(args.output_dir)
@@ -283,11 +463,20 @@ def _print_pct(label: str, ratio: Optional[float], num: int, den: int) -> None:
 # --- all --------------------------------------------------------------------
 
 def cmd_all(args: argparse.Namespace) -> int:
+    rc = _require_input(args)
+    if rc is not None:
+        return rc
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # When --dataset is set, truth lives in the (immutable) dataset dir
+    # and is shared across every run; only the replay+score outputs land
+    # in the run dir.
+    meta = getattr(args, "_dataset_meta", None)
+    truth_output = str(meta["_truth_path"]) if meta else None
+
     truth_args = argparse.Namespace(
-        input=args.input, output=None, output_dir=str(output_dir),
+        input=args.input, output=truth_output, output_dir=str(output_dir),
         force=args.force, detection_threshold=args.detection_threshold,
         device=args.device, limit=args.limit,
     )
@@ -305,12 +494,16 @@ def cmd_all(args: argparse.Namespace) -> int:
         tunable=getattr(args, "tunable", None),
         jobs=getattr(args, "jobs", 1),
     )
+    # Propagate dataset context so run.json inside the replay run
+    # records dataset_id/path (argv alone is not machine-friendly).
+    if meta is not None:
+        replay_args._dataset_meta = meta
     rc = cmd_replay(replay_args)
     if rc != 0:
         return rc
 
     score_args = argparse.Namespace(
-        truth=str(_default_truth_path(output_dir)),
+        truth=truth_output or str(_default_truth_path(output_dir)),
         replay=str(_default_replay_path(output_dir)),
         output_dir=str(output_dir),
         label=args.config or "",
@@ -329,25 +522,37 @@ def cmd_sweep(args: argparse.Namespace) -> int:
     config, so re-running it twice would only waste ~an hour of CPU.
     """
     from . import score
+    rc = _require_input(args)
+    if rc is not None:
+        return rc
     output_root = Path(args.output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
+    _write_run_json(output_root, args,
+                    extra={"sweep_configs": ["shipping", "shorter"]})
 
-    # 1. Shared truth manifest (cheap re-check via --force gating).
+    # Truth manifest is shared across both configs. With --dataset it
+    # lives in the dataset dir (immutable, reused across every run);
+    # otherwise it lands at the sweep root for continuity with older
+    # invocations.
+    meta = getattr(args, "_dataset_meta", None)
+    truth_output = str(meta["_truth_path"]) if meta else None
+
     truth_args = argparse.Namespace(
-        input=args.input, output=None, output_dir=str(output_root),
+        input=args.input, output=truth_output, output_dir=str(output_root),
         force=args.force, detection_threshold=args.detection_threshold,
         device=args.device, limit=args.limit,
     )
     rc = cmd_truth(truth_args)
     if rc != 0:
         return rc
-    shared_truth = _default_truth_path(output_root)
+    shared_truth = (Path(truth_output) if truth_output
+                    else _default_truth_path(output_root))
 
     # 2. Per-config replay + score into its own subdir.
     labels: List[str]           = []
     summaries: list             = []
     per_subdir: List[Path]      = []
-    for label, cfg_ctor in (("baseline", _plan_baseline),
+    for label, cfg_ctor in (("shipping", _plan_shipping),
                             ("shorter",  _plan_shorter)):
         sub = output_root / label
         sub.mkdir(parents=True, exist_ok=True)
@@ -551,9 +756,11 @@ def cmd_followup2(args: argparse.Namespace) -> int:
 
 def _add_replay_overrides(p: argparse.ArgumentParser) -> None:
     """Optional per-knob overrides shared by 'replay' and 'all'."""
-    p.add_argument("--config", default=None, choices=["baseline", "shorter"],
-                   help="Named preset from the plan. Overridden by any of "
-                        "the explicit knob flags below.")
+    p.add_argument("--config", default=None, choices=list(_PRESETS),
+                   help="Named preset (shipping = current 0.4.0 device "
+                        "defaults; legacy = pre-0.4.0 long-clip, was "
+                        "'baseline'; shorter = intermediate). Overridden by "
+                        "any explicit knob flags below.")
     p.add_argument("--preroll-ms",    dest="preroll_ms",    type=int, default=None)
     p.add_argument("--silence-ms",    dest="silence_ms",    type=int, default=None)
     p.add_argument("--min-length-ms", dest="min_length_ms", type=int, default=None)
@@ -569,6 +776,19 @@ def _add_replay_overrides(p: argparse.ArgumentParser) -> None:
                    default=None, metavar="KEY=VALUE",
                    help="Detector tunable override (repeatable). "
                         "Forwarded to echobox-replay as --tunable KEY=VALUE.")
+
+
+def _add_dataset_flag(p: argparse.ArgumentParser) -> None:
+    """--dataset PATH reads a dataset.json and fills in the reference dir,
+    the truth manifest path, and (for stages that produce them) a run
+    output dir under sibling ``runs/``. Explicit --input / --output /
+    --output-dir / --truth still win."""
+    p.add_argument("--dataset", default=None, metavar="PATH",
+                   help="Dataset dir containing dataset.json. When set, "
+                        "--input defaults to <dataset>/reference/, --truth "
+                        "to <dataset>/truth.parquet, and --output-dir to "
+                        "<runs>/<dataset_id>__<tag>__<ts>/ (sibling of "
+                        "datasets/).")
 
 
 def _add_jobs(p: argparse.ArgumentParser) -> None:
@@ -597,13 +817,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_truth = sub.add_parser(
         "truth", help="Run BatDetect2 over every WAV and cache detections.")
-    p_truth.add_argument("--input", required=True,
-                         help="Directory of input WAVs (walked recursively).")
+    _add_dataset_flag(p_truth)
+    p_truth.add_argument("--input", default=None,
+                         help="Directory of input WAVs (walked recursively). "
+                              "Filled from --dataset if omitted.")
     p_truth.add_argument("--output", default=None,
-                         help="Manifest path (default: <output-dir>/truth_manifest.parquet).")
-    p_truth.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR),
-                         help="Where truth_manifest.parquet lands "
-                              "(default: %(default)s).")
+                         help="Manifest path (default: <dataset>/truth.parquet "
+                              "if --dataset, else <output-dir>/truth_manifest.parquet).")
+    p_truth.add_argument("--output-dir", default=None,
+                         help="Where truth_manifest.parquet lands when "
+                              "--dataset and --output are not set "
+                              "(default: validation_out/).")
     p_truth.add_argument("--force", action="store_true",
                          help="Recompute even if the manifest already exists.")
     p_truth.add_argument("--detection-threshold", type=float,
@@ -619,9 +843,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_replay = sub.add_parser(
         "replay",
         help="Run echobox-replay over every WAV; emit per-clip manifest.")
-    p_replay.add_argument("--input",  required=True)
+    _add_dataset_flag(p_replay)
+    p_replay.add_argument("--input",  default=None,
+                          help="WAV dir (filled from --dataset if omitted).")
     p_replay.add_argument("--output", default=None)
-    p_replay.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
+    p_replay.add_argument("--output-dir", default=None,
+                          help="Run output dir (auto-derived under runs/ "
+                               "when --dataset is set).")
     p_replay.add_argument("--force", action="store_true")
     p_replay.add_argument("--limit", type=int, default=None,
                           help="Process only the first N WAVs (fast smoke).")
@@ -631,19 +859,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_score = sub.add_parser(
         "score", help="Compare truth vs replay; emit report + CSVs.")
-    p_score.add_argument("--truth",  required=True,
-                         help="Path to truth_manifest.parquet.")
+    _add_dataset_flag(p_score)
+    p_score.add_argument("--truth",  default=None,
+                         help="Path to truth_manifest.parquet "
+                              "(filled from --dataset if omitted).")
     p_score.add_argument("--replay", required=True,
                          help="Path to replay_manifest.parquet.")
-    p_score.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
+    p_score.add_argument("--output-dir", default=None)
     p_score.add_argument("--label", default="",
                          help="Config label rendered into the report title.")
     p_score.set_defaults(func=cmd_score)
 
     p_all = sub.add_parser(
         "all", help="Run truth → replay → score end to end for one config.")
-    p_all.add_argument("--input", required=True)
-    p_all.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
+    _add_dataset_flag(p_all)
+    p_all.add_argument("--input", default=None,
+                       help="WAV dir (filled from --dataset if omitted).")
+    p_all.add_argument("--output-dir", default=None,
+                       help="Run output dir (auto-derived under runs/ "
+                            "when --dataset is set).")
     p_all.add_argument("--force", action="store_true")
     p_all.add_argument("--detection-threshold", type=float, default=0.5)
     p_all.add_argument("--device", default="auto",
@@ -656,8 +890,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_sweep = sub.add_parser(
         "sweep",
         help="Run the plan's baseline + shorter configs and diff them.")
-    p_sweep.add_argument("--input", required=True)
-    p_sweep.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
+    _add_dataset_flag(p_sweep)
+    p_sweep.add_argument("--input", default=None,
+                         help="WAV dir (filled from --dataset if omitted).")
+    p_sweep.add_argument("--output-dir", default=None,
+                         help="Sweep root (auto-derived under runs/ "
+                              "when --dataset is set).")
     p_sweep.add_argument("--force", action="store_true")
     p_sweep.add_argument("--detection-threshold", type=float, default=0.5)
     p_sweep.add_argument("--device", default="auto",
@@ -675,7 +913,7 @@ def build_parser() -> argparse.ArgumentParser:
                              help="Sweep run root — must contain "
                                   "truth_manifest.parquet + a replay_manifest.parquet "
                                   "written by an instrumented (v2) build.")
-    p_followup2.add_argument("--config-label", default="baseline",
+    p_followup2.add_argument("--config-label", default="shipping",
                              help="Label stamped into the report title.")
     p_followup2.set_defaults(func=cmd_followup2)
 
@@ -683,12 +921,12 @@ def build_parser() -> argparse.ArgumentParser:
         "followup",
         help="Auditor follow-up: per-file/per-pass recall + cricket-FP profile. "
              "No replay or truth re-run — reads existing manifests + sidecars.")
-    p_followup.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR),
+    p_followup.add_argument("--output-dir", default=None,
                             help="The sweep root that contains truth_manifest.parquet "
-                                 "+ baseline/ + shorter/. Same value passed to 'sweep'.")
+                                 "+ shipping/ + shorter/. Same value passed to 'sweep'.")
     p_followup.add_argument("--configs", nargs="+",
-                            default=["baseline", "shorter"],
-                            help="Config subdirs to process. Default: baseline shorter.")
+                            default=["shipping", "shorter"],
+                            help="Config subdirs to process. Default: shipping shorter.")
     p_followup.add_argument("--tn-sample-n", type=int, default=200,
                             help="Sample this many TN clips for the feature "
                                  "distribution comparison (default: %(default)s).")
@@ -702,6 +940,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[list] = None) -> int:
     args = build_parser().parse_args(argv)
+    _apply_dataset_defaults(args)
+    # After dataset defaults, an unset --output-dir falls back to either
+    # the derived run dir or the historical validation_out/.
+    if hasattr(args, "output_dir") and args.output_dir is None:
+        args.output_dir = str(_resolve_output_dir(args))
     return args.func(args)
 
 

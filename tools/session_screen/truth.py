@@ -90,26 +90,31 @@ def _run_one(wav_path: Path, api, model, config, device,
     failure so a post-mortem doesn't have to reproduce the crash — the
     per-row error string alone (``IndexError: list index out of range``)
     tells you nothing about where in BatDetect2 it fired.
+
+    The row's ``file`` field stores the WAV **basename** — score.py
+    joins truth ↔ replay by basename, so the parquet content matches the
+    join key and stays valid if the dataset is later moved on disk.
     """
-    file_str = str(wav_path)
+    file_key = wav_path.name
+    display  = str(wav_path)
     try:
         result = api.process_file(
-            file_str, model=model, config=config, device=device)
+            display, model=model, config=config, device=device)
     except Exception as e:
         if error_log is not None:
             import traceback as _tb                                     # noqa: WPS433
             with open(error_log, "a") as f:
-                f.write(f"\n===== {file_str} =====\n")
+                f.write(f"\n===== {display} =====\n")
                 _tb.print_exc(file=f)
         return TruthRow(
-            file=file_str, duration_s=0.0, bat_present=False,
+            file=file_key, duration_s=0.0, bat_present=False,
             n_detections=0, top_species="", top_confidence=0.0,
             detections_json="[]",
             resample_hz=int(api.TARGET_SAMPLERATE_HZ),
             model_hash=model_hash,
             error=f"{type(e).__name__}: {e}",
         )
-    return _shape_result(file_str, result, api, model_hash)
+    return _shape_result(file_key, result, api, model_hash)
 
 
 def _shape_result(file_str: str, result: dict, api, model_hash: str) -> TruthRow:
