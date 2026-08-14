@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <ctime>
@@ -61,13 +60,20 @@ std::uint64_t framesForMs(std::uint32_t ms, int sampleRate) {
     return static_cast<std::uint64_t>(ms) * static_cast<std::uint64_t>(sampleRate) / 1000ULL;
 }
 
-// Near-miss margin around the primary sweep-shape gate threshold. Events
-// whose 10-dB bandwidth sits within ± this many kHz of the tunable
-// min_bandwidth_khz qualify as "boundary" near-misses under
-// SaveRejectedMode::Boundary. Fixed at construction time (not a tunable)
-// because it purely controls what we OBSERVE, not what we decide: the
-// gate's own decision has already been made when we consult this.
-constexpr float kBoundaryBandwidthMarginKhz = 0.30f;
+// Near-miss margin on the SNR arm of the confident-reject rule. That rule
+// rejects iff trigger_snr < noise_snr_max AND trigger_flatness >
+// noise_flatness_min AND band_index <= noise_band_max, so SNR is the axis on
+// which "only just failed" is meaningful: an event landing within this much
+// BELOW noise_snr_max would have been kept had it been slightly louder.
+// Units are the detector's linear SNR (band magnitude / noise floor), NOT
+// dB. 2.0 is sized against the knob's own documented sensitivity: raising
+// noise_snr_max by 3.0 (12 -> 15) trades ~2 pp per-call recall for ~6 pp
+// more non-bat removed, so a 2.0-wide window brackets roughly the events a
+// plausible retune would flip, while keeping boundary mode far more
+// selective than "all". Fixed at compile time (not a tunable) because it
+// purely controls what we OBSERVE, not what we decide: the gate's own
+// decision has already been made when we consult this.
+constexpr float kBoundarySnrMargin = 2.0f;
 
 // UTC ISO-8601 with millisecond precision. Matches the log timestamp format
 // so a sidecar's capture_ts and a [dsp.bed] log line can be cross-correlated
@@ -102,39 +108,26 @@ const char* modeName(SaveRejectedMode m) {
     return "off";
 }
 
-// Attribute the rejection to the specific gate clause using the event
-// features we already have + the current tunable value. Mirrors the
-// two-way split the detector prints at close time
-// (BandEnergyDetector: sweepBatLike ? "temporal" : "sweep").
-// "unknown" covers pathological cases: no events in the payload (spurious
-// trigger that never opened a real event), or missing tunable metadata.
-std::string classifyRejection(const SidecarPayload& payload,
-                              const IDetectorStateProvider& detector) {
+// Attribute the rejection to the clause that actually caused it. Since the
+// gate replacement there are exactly two causes, and EventFeatures already
+// separates them without consulting any tunable: veto_applied is set iff the
+// temporal repetition-rate guard flipped a keep into a reject, so any other
+// gate_rejected event was dropped by the confident-reject noise rule.
+// Mirrors the split BandEnergyDetector prints at event close
+// (veto_applied ? "temporal" : "noise"), so a sidecar's rejected_reason and
+// the corresponding [dsp.bed] log line always agree.
+// "unknown" covers the pathological case: no events in the payload (a
+// spurious trigger that never opened a real event).
+std::string classifyRejection(const SidecarPayload& payload) {
     if (payload.events.empty()) return "unknown";
-    double minBw = 0.0;
-    bool haveTunable = false;
-    {
-        std::vector<TunableValue> tv;
-        if (detector.currentTunables(tv)) {
-            for (const auto& t : tv) {
-                if (t.key == "min_bandwidth_khz") {
-                    minBw = t.value;
-                    haveTunable = true;
-                    break;
-                }
-            }
-        }
-    }
-    if (!haveTunable) return "unknown";
 
-    // Any rejected event whose bandwidth failed the sweep-shape gate
-    // marks the whole clip as "sweep"-attributable; otherwise the
-    // temporal repetition-rate guard was the sole downgrader.
+    // The temporal guard is the more specific cause — it only fires on an
+    // event the noise rule had already decided to keep — so if it flipped
+    // any rejected event in this clip, that is what the clip is about.
     for (const auto& e : payload.events) {
-        if (!e.gate_rejected) continue;
-        if (static_cast<double>(e.bandwidth_khz) < minBw) return "sweep";
+        if (e.gate_rejected && e.veto_applied) return "temporal";
     }
-    return "temporal";
+    return "noise";
 }
 } // namespace
 
@@ -348,7 +341,7 @@ void Recorder::endRecording() {
     // Cricket-filter gate: discard clips whose window saw no bat-like
     // event. The detector publishes its kept-events counter through the DSP
     // snapshot; if it hasn't advanced since beginRecording() then every event
-    // during this clip was rejected by the sweep gate (or no event fired at
+    // during this clip was rejected by the cricket gate (or no event fired at
     // all — a spurious trigger). Reading the snapshot AFTER the silence
     // timeout has elapsed means any event still open at the start of this
     // call has definitively closed and stamped the counter (guaranteed
@@ -474,28 +467,33 @@ bool Recorder::shouldSaveRejected(const SidecarPayload& payload) {
             return d(m_rng) == 0;
         }
         case SaveRejectedMode::Boundary: {
-            // Near-miss iff any rejected event's 10-dB bandwidth sits
-            // within kBoundaryBandwidthMarginKhz of the sweep-shape gate's
-            // primary threshold. Skips a boundary-mode write when we
-            // can't query the tunable (older plugin: fall through to
-            // "all", since the operator explicitly asked us to observe).
+            // Near-miss iff any rejected event's trigger SNR sits in
+            // [noise_snr_max - kBoundarySnrMargin, noise_snr_max) — the band
+            // where the confident-reject rule's SNR clause only just held,
+            // so a marginally louder call would have been kept. A rejected
+            // event at or above noise_snr_max cannot have failed that clause
+            // at all (the temporal guard is what dropped it), so it is not a
+            // near-miss on this axis and does not qualify. Falls through to
+            // "all" when the tunable can't be queried (older plugin), since
+            // the operator explicitly asked us to observe rejects.
             std::vector<TunableValue> tv;
-            double minBw = 0.0;
+            double snrMax = 0.0;
             bool have = false;
             if (m_detector.currentTunables(tv)) {
                 for (const auto& t : tv) {
-                    if (t.key == "min_bandwidth_khz") {
-                        minBw  = t.value;
+                    if (t.key == "noise_snr_max") {
+                        snrMax = t.value;
                         have   = true;
                         break;
                     }
                 }
             }
             if (!have) return true;
+            const double snrLo = snrMax - static_cast<double>(kBoundarySnrMargin);
             for (const auto& e : payload.events) {
                 if (!e.gate_rejected) continue;
-                const double d = std::fabs(static_cast<double>(e.bandwidth_khz) - minBw);
-                if (d <= static_cast<double>(kBoundaryBandwidthMarginKhz)) {
+                const double snr = static_cast<double>(e.trigger_snr);
+                if (snr >= snrLo && snr < snrMax) {
                     return true;
                 }
             }
@@ -588,7 +586,7 @@ bool Recorder::saveRejectedClip(const SidecarPayload& payload) {
         meta.algorithm       = m_detector.algorithmName();
         meta.boot_iso8601    = formatIso8601Utc(m_cfg.bootWall);
         meta.capture_iso8601 = formatIso8601Utc(m_eventStartWall);
-        meta.rejected_reason = classifyRejection(payload, m_detector);
+        meta.rejected_reason = classifyRejection(payload);
         meta.rejected_mode   = modeName(m_cfg.saveRejected);
 
         std::vector<TunableValue> tunables;
@@ -605,7 +603,7 @@ bool Recorder::saveRejectedClip(const SidecarPayload& payload) {
     LS_DEBUG("recorder",
              "REJECTED_SAVED file=%s reason=%s mode=%s",
              rejPath.filename().string().c_str(),
-             classifyRejection(payload, m_detector).c_str(),
+             classifyRejection(payload).c_str(),
              modeName(m_cfg.saveRejected));
     return true;
 }
