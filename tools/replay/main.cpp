@@ -19,6 +19,7 @@
 #include "WavFileAudioSource.hpp"
 #include "SessionHeader.hpp"
 #include "RunManifest.hpp"
+#include "VirtualClock.hpp"
 
 #include "app/Config.hpp"
 #include "app/ConfigValidator.hpp"
@@ -57,6 +58,20 @@ using echobox::app::Config;
 namespace {
 
 constexpr std::size_t kCaptureChunkFrames = 4096;
+
+/// Wall instant that replay's virtual time zero maps to.
+///
+/// Deliberately a fixed constant (the Unix epoch) rather than "now": the
+/// recorder stamps this into every WAV filename and into the sidecars'
+/// capture_iso8601, so anything derived from the launch time would make
+/// two replays of the same corpus differ on disk. With this epoch a clip
+/// filename reads as the offset into the replayed stream — 19700101_
+/// 000321450.wav is the clip that starts 3 m 21.450 s in — which is
+/// also a useful signal that the timestamp describes replay time and not
+/// when the audio was captured. Nothing downstream parses it as a date:
+/// tools/session_screen/replay.py recovers a clip's true source time from
+/// the sidecar's device.frames_processed counter, not from the filename.
+constexpr std::chrono::system_clock::time_point kVirtualWallEpoch{};
 
 void printHelp() {
     std::puts(
@@ -338,6 +353,217 @@ std::size_t preRollCapacitySamples(const Config& cfg) {
     return static_cast<std::size_t>(ms * cfg.sampleRate / 1000ULL) * cfg.channels;
 }
 
+/**
+ * @brief Feeds the pipeline one recorder poll interval of audio at a time,
+ *        handing the recorder thread a turn after each one.
+ *
+ * This is the driver half of the protocol in VirtualClock.hpp. Each tick:
+ *
+ *  1. wait for the recorder to finish its previous poll and park;
+ *  2. push exactly one poll interval of audio into the pre-roll buffer and
+ *     the DSP ring;
+ *  3. wait for the DSP thread to consume all of it;
+ *  4. advance virtual time by one poll interval, which wakes the recorder
+ *     for exactly one poll.
+ *
+ * Steps 1 and 3 are what turn "faster than real time" into "faster than
+ * real time *and* identical to real time". Without 3 the recorder can poll
+ * a detector snapshot that lags the audio by an unpredictable number of
+ * hops; without 1 the feeder can write pre-roll samples underneath a poll
+ * that is already in flight.
+ *
+ * Nothing here paces against wall time — the run goes exactly as fast as
+ * the host can do the FFTs.
+ *
+ * ### Why step 3 is exact and not merely "close enough"
+ *
+ * DspPipeline::loop pops one sample at a time and runs the FFT + tracker +
+ * publish inline, immediately after the pop that completes a hop. So the
+ * moment the ring goes empty having been fed @c F samples, every hop that
+ * ended at sample index @c F-2 or earlier has definitely been published —
+ * popping sample @c F-1 is ordered after that work. The one ambiguous case
+ * is a hop ending exactly at @c F-1: it may or may not have been published
+ * yet, and *which* varies run to run.
+ *
+ * So the feeder simply never ends a tick on a hop boundary: if the tick's
+ * frame target is a multiple of @c hopSize it feeds one extra sample. Then
+ * "ring empty" always means "published exactly @c floor(F/hop) hops", which
+ * is exactly what a real device would have published at that instant —
+ * no more (the samples do not exist yet) and no fewer. The leftover case is
+ * the end of the corpus, where the total frame count is whatever it is;
+ * that is handled by @c flushFinalHop().
+ */
+class LockstepFeeder {
+public:
+    LockstepFeeder(echobox::replay::WavFileAudioSource& source,
+                   LockFreeRingBuffer<float>& ring,
+                   echobox::recorder::PreRollBuffer& preRoll,
+                   echobox::dsp::DspPipeline& dsp,
+                   echobox::replay::VirtualClock& clock,
+                   int sampleRate, std::size_t hopSize,
+                   std::uint32_t pollIntervalMs)
+        : m_source(source), m_ring(ring), m_preRoll(preRoll), m_dsp(dsp),
+          m_clock(clock),
+          m_sampleRate(static_cast<std::uint64_t>(sampleRate)),
+          m_hop(hopSize ? hopSize : 1),
+          m_pollMs(pollIntervalMs ? pollIntervalMs : 1) {
+        // One tick's worth, plus the hop-alignment sample. Reserved once so
+        // the per-tick path never allocates.
+        m_tick.reserve(static_cast<std::size_t>(
+            m_sampleRate * m_pollMs / 1000ULL) + 2u);
+    }
+
+    /// Feed the whole corpus. Returns the number of frames fed.
+    std::uint64_t run() {
+        std::uint64_t fed = 0;
+        for (;;) {
+            m_clock.waitUntilRecorderIdle();
+
+            ++m_tick_index;
+            std::uint64_t target = framesAtTick(m_tick_index);
+            // Never end a tick on a hop boundary — see the class comment.
+            if (target % m_hop == 0) ++target;
+
+            const bool more = feedUpTo(target, fed);
+            waitDspCaughtUp();
+
+            if (!more) {
+                flushFinalHop(fed);
+                m_clock.advanceTo(nsAtTick(m_tick_index));
+                return fed;
+            }
+            m_clock.advanceTo(nsAtTick(m_tick_index));
+        }
+    }
+
+    /**
+     * @brief Let virtual time run on for @p ms with no further audio.
+     *
+     * The deterministic replacement for the old @c sleep_for(drainMs): it
+     * gives the recorder exactly the same number of polls every run, so an
+     * in-progress WAV closes on its silence timeout at the same virtual
+     * instant rather than "whenever the sleep happened to expire".
+     */
+    void drain(std::uint32_t ms) {
+        const std::uint64_t ticks = (ms + m_pollMs - 1) / m_pollMs;
+        for (std::uint64_t i = 0; i < ticks; ++i) {
+            m_clock.waitUntilRecorderIdle();
+            m_clock.advanceTo(nsAtTick(++m_tick_index));
+        }
+    }
+
+private:
+    /// Total frames a real device would have captured by the end of tick
+    /// @p k. Integer maths from an absolute tick index, so the audio and
+    /// the clock cannot drift apart over a ten-hour corpus.
+    std::uint64_t framesAtTick(std::uint64_t k) const {
+        return k * m_sampleRate * m_pollMs / 1000ULL;
+    }
+
+    std::chrono::nanoseconds nsAtTick(std::uint64_t k) const {
+        return std::chrono::nanoseconds(
+            static_cast<std::chrono::nanoseconds::rep>(k * m_pollMs * 1'000'000ULL));
+    }
+
+    /// Pull one sample from the source, crossing file boundaries. Returns
+    /// false at end of corpus.
+    bool nextSample(std::int16_t& out) {
+        while (m_stagePos == m_stageLen) {
+            const int got = m_source.read(std::span<std::int16_t>(m_stage));
+            if (got < 0) return false;   // never happens today; IAudioSource
+                                         // documents it, so honour it.
+            if (got == 0) {
+                if (m_source.finished()) return false;
+                continue;                // between-file rollover
+            }
+            m_stageLen = static_cast<std::size_t>(got);
+            m_stagePos = 0;
+        }
+        out = m_stage[m_stagePos++];
+        return true;
+    }
+
+    /// Feed audio until @p fed reaches @p target. Returns false at EOF.
+    bool feedUpTo(std::uint64_t target, std::uint64_t& fed) {
+        m_tick.clear();
+        bool more = true;
+        while (fed + m_tick.size() < target) {
+            std::int16_t s;
+            if (!nextSample(s)) { more = false; break; }
+            m_tick.push_back(s);
+        }
+        if (!m_tick.empty()) {
+            // Pre-roll first: the recorder is parked, so ordering within a
+            // tick is invisible to it, but keeping the same order the audio
+            // thread uses on the device costs nothing.
+            m_preRoll.write(std::span<const std::int16_t>(m_tick.data(),
+                                                          m_tick.size()));
+            for (const std::int16_t v : m_tick) {
+                pushSample(static_cast<float>(v) * kInvScale);
+            }
+            fed += m_tick.size();
+        }
+        return more;
+    }
+
+    /// Drop-free push: back off until the DSP thread makes room.
+    void pushSample(float v) {
+        while (!m_ring.push(v)) {
+            m_dsp.notifyInput();
+            std::this_thread::yield();
+        }
+    }
+
+    /// Block until the DSP thread has consumed every sample pushed so far.
+    void waitDspCaughtUp() {
+        m_dsp.notifyInput();
+        std::size_t spins = 0;
+        while (m_ring.available_read() != 0) {
+            // available_read() is exact when read from the producer side
+            // with no push in flight: it compares our own head against the
+            // consumer's published tail.
+            if ((++spins & 0xFFu) == 0) m_dsp.notifyInput();
+            std::this_thread::yield();
+        }
+    }
+
+    /**
+     * @brief Resolve the one hop the ring-empty rule cannot cover.
+     *
+     * At the end of the corpus the total frame count is whatever the input
+     * happens to be, so it may land exactly on a hop boundary — the case
+     * the per-tick alignment nudge normally avoids. Push a single sample
+     * the tracker can never see (the hop accumulator restarts at zero after
+     * a completed hop, so one sample cannot complete another) and wait for
+     * the DSP to pop it; that pop is ordered after the publish we are
+     * waiting for. Not written to the pre-roll, so no audio is altered.
+     */
+    void flushFinalHop(std::uint64_t fed) {
+        if (fed == 0 || fed % m_hop != 0) return;
+        pushSample(0.0f);
+        waitDspCaughtUp();
+    }
+
+    static constexpr float kInvScale = 1.0f / 32768.0f;
+
+    echobox::replay::WavFileAudioSource& m_source;
+    LockFreeRingBuffer<float>&           m_ring;
+    echobox::recorder::PreRollBuffer&    m_preRoll;
+    echobox::dsp::DspPipeline&           m_dsp;
+    echobox::replay::VirtualClock&       m_clock;
+
+    const std::uint64_t m_sampleRate;
+    const std::size_t   m_hop;
+    const std::uint64_t m_pollMs;
+
+    std::array<std::int16_t, kCaptureChunkFrames> m_stage{};
+    std::size_t m_stageLen{0};
+    std::size_t m_stagePos{0};
+
+    std::vector<std::int16_t> m_tick;
+    std::uint64_t             m_tick_index{0};
+};
+
 void scanPlugins() {
 #ifdef ECHOBOX_DYNAMIC_PLUGINS
     const auto algoPath = PathUtils::getExecutableDir() / "algorithms";
@@ -554,6 +780,17 @@ int main(int argc, char** argv) {
     // is low" governor would only get in the way of exhaustive scoring.
     rcfg.saveRejectedMinDiskMb  = 0;
 
+    // Virtual time. Everything the recorder reads as a clock now comes from
+    // the audio: the silence timeout, the poll cadence, the WAV filename
+    // stamp and the sidecars' boot/capture timestamps. Without this the
+    // silenceMs window is measured in host wall time while maxLengthMs is
+    // measured in audio frames, and the two drift apart by whatever factor
+    // the machine happens to be running at — the defect this tool was
+    // reported for. See tools/replay/VirtualClock.hpp.
+    echobox::replay::VirtualClock vclock(kVirtualWallEpoch);
+    rcfg.clock    = &vclock;
+    rcfg.bootWall = kVirtualWallEpoch;
+
     echobox::recorder::Recorder recorder(rcfg, preRoll, dsp);
 
     try {
@@ -577,54 +814,33 @@ int main(int argc, char** argv) {
     std::fflush(stdout);
 
     // Capture loop. Differences from Application::captureLoop:
-    //  - EOF from the source is not fatal; we break instead of
+    //  - EOF from the source is not fatal; we stop instead of
     //    requestExit()+ERROR.
     //  - The push into the DSP ring backpressures (spin+yield) instead of
     //    dropping, so the pipeline is drop-free by construction — the
     //    whole point of replay.
-    std::array<std::int16_t, kCaptureChunkFrames> intBuf{};
-    std::array<float, kCaptureChunkFrames>        floatBuf{};
-    constexpr float kInvScale = 1.0f / 32768.0f;
+    //  - The feed is paced in recorder poll intervals of *audio* and
+    //    interlocked with the DSP and recorder threads, so the run is
+    //    deterministic and matches what a real-time device would have
+    //    observed. See LockstepFeeder above.
+    LockstepFeeder feeder(source, dspRing, preRoll, dsp, vclock,
+                          cli.cfg.sampleRate, cli.cfg.hopSize,
+                          rcfg.pollIntervalMs);
+    const std::uint64_t framesFed = feeder.run();
 
-    std::uint64_t framesFed = 0;
-    while (true) {
-        int got = source.read(std::span<std::int16_t>(intBuf));
-        if (got < 0) break; // WavFileAudioSource never returns <0 today, but
-                            // keep the guard aligned with IAudioSource's
-                            // documented contract.
-        if (got == 0) {
-            if (source.finished()) break;
-            // Between-file rollover: give the DSP a nudge and try again.
-            dsp.notifyInput();
-            continue;
-        }
-
-        const std::size_t n = static_cast<std::size_t>(got);
-        preRoll.write(std::span<const std::int16_t>(intBuf.data(), n));
-        for (std::size_t i = 0; i < n; ++i) {
-            floatBuf[i] = static_cast<float>(intBuf[i]) * kInvScale;
-        }
-        // Drop-free push: back off until the DSP thread makes room. This is
-        // the entire mechanism that turns "faster-than-real-time" from
-        // "faster and lossier" into "faster and complete".
-        for (std::size_t i = 0; i < n; ++i) {
-            while (!dspRing.push(floatBuf[i])) {
-                dsp.notifyInput();
-                std::this_thread::yield();
-            }
-        }
-        dsp.notifyInput();
-        framesFed += n;
-    }
-
-    // Drain: give the DSP a moment to consume the tail of the ring, and the
-    // recorder a hangover window to close any in-progress WAV cleanly. The
-    // recorder's poll cadence + silenceMs bound how long "in-progress"
-    // survives after the last active hop; 2x silenceMs + a small margin is
-    // enough in practice.
+    // Drain: let the recorder see enough virtual quiet to close any WAV
+    // still open when the corpus ran out. Same budget the old wall-clock
+    // sleep used (2x silenceMs + margin), but spent in virtual time, so the
+    // recorder gets exactly the same number of polls on every run instead
+    // of however many a real sleep happened to allow.
     const auto drainMs = std::max<std::uint32_t>(500, rcfg.silenceMs * 2 + 200);
-    std::this_thread::sleep_for(std::chrono::milliseconds(drainMs));
+    feeder.drain(drainMs);
 
+    // Release the barrier BEFORE stopping the recorder: its thread is
+    // parked waiting for audio that will never arrive, and Recorder::stop()
+    // joins it. After release, sleepFor() degrades to a real sleep so the
+    // loop notices m_running went false and exits.
+    vclock.release();
     recorder.stop();
     dsp.stop();
     source.close();

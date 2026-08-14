@@ -25,19 +25,21 @@ add_library(ls_replay_wav STATIC
     WavFileAudioSource.cpp
     SessionHeader.cpp
     RunManifest.cpp
+    VirtualClock.cpp
 )
 target_include_directories(ls_replay_wav
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}
     PRIVATE ${SNDFILE_INCLUDE_DIRS}
 )
 target_link_libraries(ls_replay_wav
-    PUBLIC  ls_audio ls_app ls_logging
+    PUBLIC  ls_audio ls_app ls_logging ls_recorder
     PRIVATE ${SNDFILE_LIBRARIES}
 )
 target_sources(ls_replay_wav PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/WavFileAudioSource.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHeader.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RunManifest.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/VirtualClock.hpp
 )
 
 add_executable(echobox-replay
