@@ -30,6 +30,13 @@ namespace {
 // `peakBin` with a half-power half-width of `halfWidthBins` bins.
 // Used to produce dominant-frame magnitude snapshots whose 10-dB bandwidth
 // the helper can walk in a predictable way.
+//
+// NOTE: computeSweepShape's 5th argument is `anchorBin` — the walk's origin
+// AND the source of its reference magnitude (see the A1 fix). Pass the same
+// bin the Gaussian is centred on, i.e. what the detector would supply as the
+// winning sub-band's dominant bin. Passing anything else measures the decay
+// tail from an off-peak origin and reports a meaningless width (0 when the
+// tail has underflowed to zero).
 std::vector<float> gaussianPeak(std::size_t numBins, std::size_t peakBin,
                                 float halfWidthBins, float peakMag) {
     std::vector<float> mags(numBins, 0.0f);
@@ -54,7 +61,7 @@ TEST_CASE("computeSweepShape: smooth ascending FM sweep", "[sweep][shape]") {
     const std::size_t dom[] = {100, 104, 108, 112, 116, 120, 124, 128, 132, 140};
     const auto mags = gaussianPeak(2049, 140, 2.0f, 1.0f);  // narrow peak
     SweepShape s = BandEnergyDetector::computeSweepShape(
-        dom, 10, mags.data(), mags.size(), 1.0f, 0, 2049, 100.0f);
+        dom, 10, mags.data(), mags.size(), 140, 0, 2049, 100.0f);
     CHECK_THAT(s.drift_khz,     WithinAbs(4.0f, 1e-4f));
     CHECK_THAT(s.path_ratio,    WithinAbs(1.0f, 1e-4f));
     CHECK_THAT(s.mono_fraction, WithinAbs(1.0f, 1e-4f));
@@ -70,7 +77,7 @@ TEST_CASE("computeSweepShape: harmonic hopping rejects the sweep clause",
     const std::size_t dom[] = {100, 200, 100, 200, 100, 200, 100, 200};
     const auto mags = gaussianPeak(2049, 100, 1.0f, 1.0f);
     SweepShape s = BandEnergyDetector::computeSweepShape(
-        dom, 8, mags.data(), mags.size(), 1.0f, 0, 2049, 100.0f);
+        dom, 8, mags.data(), mags.size(), 100, 0, 2049, 100.0f);
     CHECK(s.path_ratio > 1.6f);
     CHECK(s.mono_fraction <= 0.6f);
 }
@@ -78,12 +85,14 @@ TEST_CASE("computeSweepShape: harmonic hopping rejects the sweep clause",
 
 TEST_CASE("computeSweepShape: narrowband flat fails the bandwidth clause",
           "[sweep][shape]") {
-    // Dominant bin doesn't move. Peak in the magnitude snapshot is narrow
-    // (≈ 0.5 bins half-width at 100 Hz/bin => ~0.1 kHz 10-dB BW).
+    // Dominant bin doesn't move. Peak in the magnitude snapshot is narrower
+    // than one bin (0.5 bins half-width), so both immediate neighbours are
+    // already below refMag/sqrt(10) and the walk terminates at the anchor
+    // itself => 0 bins wide.
     const std::size_t dom[] = {100, 100, 100, 100, 100, 100};
     const auto mags = gaussianPeak(2049, 100, 0.5f, 1.0f);
     SweepShape s = BandEnergyDetector::computeSweepShape(
-        dom, 6, mags.data(), mags.size(), 1.0f, 0, 2049, 100.0f);
+        dom, 6, mags.data(), mags.size(), 100, 0, 2049, 100.0f);
     CHECK_THAT(s.drift_khz, WithinAbs(0.0f, 1e-6f));
     CHECK(s.bandwidth_khz < 1.1f);
 }
@@ -97,7 +106,7 @@ TEST_CASE("computeSweepShape: broadband flat passes the bandwidth clause",
     const std::size_t dom[] = {100, 100, 100, 100, 100, 100};
     const auto mags = gaussianPeak(2049, 100, 12.0f, 1.0f);
     SweepShape s = BandEnergyDetector::computeSweepShape(
-        dom, 6, mags.data(), mags.size(), 1.0f, 0, 2049, 100.0f);
+        dom, 6, mags.data(), mags.size(), 100, 0, 2049, 100.0f);
     CHECK(s.bandwidth_khz >= 1.1f);
 }
 
@@ -114,7 +123,7 @@ TEST_CASE("computeSweepShape: mid-bandwidth low-drift stays above the "
     const std::size_t dom[] = {300, 301, 302, 303, 304, 305};
     const auto mags = gaussianPeak(2049, 305, 7.5f, 1.0f);
     SweepShape s = BandEnergyDetector::computeSweepShape(
-        dom, 6, mags.data(), mags.size(), 1.0f, 0, 2049, 100.0f);
+        dom, 6, mags.data(), mags.size(), 305, 0, 2049, 100.0f);
     CHECK(s.bandwidth_khz >= 0.9f);
     CHECK(s.drift_khz < 8.0f);
 }
@@ -124,7 +133,7 @@ TEST_CASE("computeSweepShape: empty ring is safe and returns zeros",
           "[sweep][shape][edge]") {
     const auto mags = gaussianPeak(2049, 100, 1.0f, 1.0f);
     SweepShape s = BandEnergyDetector::computeSweepShape(
-        nullptr, 0, mags.data(), mags.size(), 1.0f, 0, 2049, 100.0f);
+        nullptr, 0, mags.data(), mags.size(), 100, 0, 2049, 100.0f);
     CHECK(s.bandwidth_khz == 0.0f);
     CHECK(s.drift_khz     == 0.0f);
     CHECK(s.path_ratio    == 0.0f);

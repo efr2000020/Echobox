@@ -210,7 +210,9 @@ TEST_CASE("writeSidecar produces a parseable JSON next to the WAV",
     std::stringstream ss; ss << f.rdbuf();
     const std::string body = ss.str();
 
-    REQUIRE(body.find("\"format_version\": 1") != std::string::npos);
+    // Bumped to 2 in 0.3.0-rc1 when the six decision-path diagnostic
+    // fields (sweep_bat_like, veto_applied, rep_rate_hz, ...) were added.
+    REQUIRE(body.find("\"format_version\": 2") != std::string::npos);
     REQUIRE(body.find("\"algorithm\": \"BandEnergyDetector\"") != std::string::npos);
     REQUIRE(body.find("\"max_flatness\":") != std::string::npos);
     REQUIRE(body.find("\"trigger_snr\":") != std::string::npos);

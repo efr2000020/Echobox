@@ -188,9 +188,15 @@ TEST_CASE("tunable manifest carries the temporal-guard keys",
     // the corpus are bat feeding buzzes and CF species that must be
     // spared. The veto therefore fires on a CV *band*, not a floor.
     // See BandEnergyDetector.hpp for the full rationale.
-    double v = 0.0;
+    //
+    // The guard itself ships OFF (0.3.0-rc1): on the Pipistrellus
+    // reference corpus, leaving it on discarded ~2500 real bat calls per
+    // night that the primary sweep-shape gate had already accepted. The
+    // band bounds below stay meaningful because CF-heavy sites turn the
+    // guard back on with rep_guard_enabled=1.
+    double v = -1.0;
     REQUIRE(det.getTunable("rep_guard_enabled", &v));
-    CHECK(v == 1.0);
+    CHECK(v == 0.0);
     REQUIRE(det.getTunable("rep_rate_min_hz", &v));
     CHECK_THAT(static_cast<float>(v), WithinAbs(1.0f, 1e-4f));
     REQUIRE(det.getTunable("rep_rate_max_hz", &v));

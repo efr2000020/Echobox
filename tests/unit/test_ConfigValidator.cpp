@@ -128,22 +128,25 @@ TEST_CASE("ConfigValidator: silence exceeds hangover invariant "
     cfg.preRollMs   = 50;
     cfg.maxLengthMs = 5000;
 
-    SECTION("filter on, silence at 40 ms floor is valid") {
+    // Floor is ceil(8 * frame_ms) + poll + safety = ceil(8 * 1.333) + 1 + 4
+    // = 16 ms at the shipped 384 kHz / hop-512. Was 40 ms before A6 cut the
+    // arbitrary 24 ms padding in the 0.4.0 short-clip round.
+    SECTION("filter on, silence at 16 ms floor is valid") {
         cfg.cricketFilter = true;
-        cfg.silenceMs     = 40;
+        cfg.silenceMs     = 16;
         CHECK(validateConfig(cfg).empty());
     }
 
-    SECTION("filter on, silence one below 40 ms floor is rejected") {
+    SECTION("filter on, silence one below 16 ms floor is rejected") {
         cfg.cricketFilter = true;
-        cfg.silenceMs     = 39;
+        cfg.silenceMs     = 15;
         auto errors = validateConfig(cfg);
         REQUIRE_FALSE(errors.empty());
         bool foundFlag  = false;
         bool namesFloor = false;
         for (const auto& e : errors) {
             if (e.find("--silence-ms") != std::string::npos) foundFlag  = true;
-            if (e.find("40ms")         != std::string::npos) namesFloor = true;
+            if (e.find("16ms")         != std::string::npos) namesFloor = true;
         }
         CHECK(foundFlag);
         CHECK(namesFloor);
@@ -159,13 +162,23 @@ TEST_CASE("ConfigValidator: silence exceeds hangover invariant "
 TEST_CASE("ConfigValidator: shipped short-clip defaults validate cleanly",
           "[config]") {
     // Regression guard: the defaults in Config.hpp must satisfy every
-    // cross-flag invariant, including the derived silence floor and the
-    // preroll+silence recording budget under the 200 ms cap.
+    // cross-flag invariant, including the derived 16 ms silence floor and
+    // the preroll+silence recording budget under the 40 ms cap.
     Config cfg;
-    CHECK(cfg.preRollMs   == 50u);
-    CHECK(cfg.silenceMs   == 50u);
-    CHECK(cfg.maxLengthMs == 200u);
+    CHECK(cfg.preRollMs   == 10u);
+    CHECK(cfg.silenceMs   == 20u);
+    CHECK(cfg.maxLengthMs == 40u);
     CHECK(validateConfig(cfg).empty());
+
+    // Product constraint: produced clips stay as short as possible and
+    // never exceed 50 ms end to end. maxLengthMs is the end-to-end cap
+    // (pre-roll + active + trailing silence), so this single bound is
+    // what keeps the shipped geometry inside the ceiling. Detector
+    // sensitivity retunes (band_snr_threshold, max_flatness) change how
+    // OFTEN clips open, never how LONG they are — this guard fails if a
+    // future round tries to buy recall by lengthening clips instead.
+    CHECK(cfg.maxLengthMs <= 50u);
+    CHECK(cfg.maxLengthMs >= cfg.preRollMs + cfg.silenceMs);
 }
 
 TEST_CASE("ConfigValidator: preroll+silence budget under short-clip defaults",
