@@ -183,41 +183,60 @@ def _resolve_output_dir(args: argparse.Namespace) -> Path:
 # --- CLI-configurable replay knobs -------------------------------------------
 #
 # Three named presets:
-#   - shipping — mirrors src/app/Config.hpp as of 0.4.0. This is what
-#     the field device actually runs; use it to measure device-relevant
-#     behaviour.
-#   - legacy   — the pre-0.4.0 long-clip geometry (50/50/200). Kept so
-#     old reports remain reproducible. Was called "baseline" until
-#     2026-08.
-#   - shorter  — historical intermediate config (20/40/200), retained
-#     for continuity with earlier sweeps.
+#   - shipping — mirrors src/app/Config.hpp. This is what the field
+#     device actually runs; use it to measure device-relevant behaviour.
+#     Geometry 10/20/40 (0.4.0) + snr_threshold 8.0 (recall retune).
+#   - legacy   — the pre-0.4.0 long-clip geometry (50/50/200) at
+#     snr_threshold 12.0. Kept so old reports remain reproducible. Was
+#     called "baseline" until 2026-08.
+#   - shorter  — historical intermediate config (20/40/200) at
+#     snr_threshold 12.0, retained for continuity with earlier sweeps.
+#
+# legacy and shorter are frozen history: they pin every knob they care
+# about so a change to a shipping default never silently rewrites them.
 #
 # ``sweep`` compares the two most decision-relevant configs today:
 # shipping vs shorter. Explicit --preroll-ms / --silence-ms / --tunable
 # flags still override anything a preset sets.
 
 def _plan_shipping():
-    """Mirror the current shipping Config.hpp (0.4.0 short-clip)."""
+    """Mirror the current shipping Config.hpp (0.4.0 short-clip).
+
+    snr_threshold tracks Config::snrThreshold, which moved 12.0 -> 8.0 in
+    the per-call recall retune. max_flatness (0.65 -> 0.80 in the same
+    round) is not a CLI flag, so it arrives via the replay binary's
+    compiled detector defaults.
+    """
     from . import replay as _replay
     return _replay.ReplayConfig(
         preroll_ms=10, silence_ms=20,
-        max_length_ms=40, min_length_ms=0, cricket_filter=True)
+        max_length_ms=40, min_length_ms=0, cricket_filter=True,
+        snr_threshold=8.0)
 
 
 def _plan_legacy():
-    """Pre-0.4.0 long-clip geometry (was 'baseline' until 2026-08)."""
+    """Pre-0.4.0 long-clip geometry (was 'baseline' until 2026-08).
+
+    Frozen: snr_threshold pinned at the historical 12.0 so old reports
+    stay reproducible when the shipping default moves.
+    """
     from . import replay as _replay
     return _replay.ReplayConfig(
         preroll_ms=50, silence_ms=50,
-        max_length_ms=200, min_length_ms=0, cricket_filter=True)
+        max_length_ms=200, min_length_ms=0, cricket_filter=True,
+        snr_threshold=12.0)
 
 
 def _plan_shorter():
-    """Historical intermediate config; retained for continuity."""
+    """Historical intermediate config; retained for continuity.
+
+    Frozen at the historical snr_threshold 12.0, same as ``legacy``.
+    """
     from . import replay as _replay
     return _replay.ReplayConfig(
         preroll_ms=20, silence_ms=40,
-        max_length_ms=200, min_length_ms=0, cricket_filter=True)
+        max_length_ms=200, min_length_ms=0, cricket_filter=True,
+        snr_threshold=12.0)
 
 
 # Named-preset registry — the single source of truth for --config choices.

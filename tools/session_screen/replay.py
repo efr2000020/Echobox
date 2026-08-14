@@ -64,6 +64,17 @@ class ReplayConfig:
     ``validate --config shipping`` to reproduce that. Fields that don't
     affect the join (algorithm plugin name, ring capacity, etc.) live
     inside the C++ tool's own defaults.
+
+    ``snr_threshold`` below is likewise the legacy value (12.0). The
+    shipping default moved to 8.0 in the per-call recall retune, so every
+    preset in ``validate.py`` now pins this field explicitly rather than
+    inheriting it — the presets are meant to be frozen historical
+    configs, and inheriting a moving default would silently rewrite them.
+
+    Detector knobs that are NOT passed as explicit CLI flags (notably
+    ``max_flatness``) are not mirrored here at all: they come from the
+    compiled defaults in the replay binary, so every preset tracks
+    whatever the detector was built with.
     """
     sample_rate:    int   = 384_000
     fft_size:       int   = 4096

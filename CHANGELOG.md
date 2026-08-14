@@ -1,5 +1,80 @@
 # Changelog
 
+## Unreleased
+
+### Detector retune for per-call recall
+
+Two shipped detector defaults moved. Both were measured on the
+deterministic offline harness (production DSP driven frame by frame
+with no recorder and no threads, so the numbers are sample-accurate
+and reproducible), with the cricket gate disabled, over 24 stratified
+bat-positive files per session, scored per-call against BatDetect2:
+
+- `max_flatness` **0.65 → 0.80**
+- `band_snr_threshold` **12.0 → 8.0** (`--snr-threshold`)
+
+Detector-level per-call recall, session_01 / session_02:
+
+| config | recall | detector duty |
+|---|---:|---:|
+| snr 12, flat 0.65 — previous ship | 85.88 % / 90.77 % | 13.8 / 14.3 % |
+| snr 12, flat 0.80 | 91.66 % / 94.04 % | 14.8 / 15.0 % |
+| **snr 8, flat 0.80 — new ship** | **97.43 % / 97.93 %** | **19.1 / 19.0 %** |
+
+`max_flatness` was free: the entire effect lands in the 0.65 → 0.80
+step, and 0.90 and 1.00 (bound off) measure identically to 0.80 — no
+real bat frame in this corpus has spectral flatness above 0.80. The old
+0.65 ceiling was cutting into the bat population while buying no
+broadband rejection that 0.80 doesn't already buy.
+
+`band_snr_threshold` is the real trade: −4 on the threshold buys
++5.8 / +3.9 pp of recall and costs +4.3 / +4.0 pp of duty cycle. Below
+8 the recall curve saturates (~98 % at snr 6) while duty keeps rising.
+
+**Storage impact — read this before deploying.** Detector duty cycle
+rises from **~14 % to ~19 %**. The target device is a solar-powered
+Raspberry Pi Zero 2 W, and duty cycle is roughly proportional to bytes
+written per night, so expect **more clips and more bytes per night** —
+on the order of a third more recorded audio. This is a deliberate
+recall-for-storage trade, not a free win. Sites that are tight on SD
+card or battery can pass `--snr-threshold 12.0` to get the old
+sensitivity back; the flag is unchanged and well understood.
+
+Clip length is unaffected: the shipped recorder geometry stays
+`10 / 20 / 40 ms` (pre-roll / silence / max length), inside the 50 ms
+end-to-end product ceiling. These knobs change how *often* the detector
+opens an event, never how *long* a clip runs.
+
+This resolves the `max_flatness = 0.65` item filed under 0.4.0's known
+limitations. The 0.4.0 sweep had measured the gain per-pass and judged
+it below the commit threshold; measuring per-call on a larger corpus
+shows the effect is substantially bigger than that round could see.
+
+Also updated to match: the tunable-registry defaults, the
+`quiet` / `balanced` / `noisy` preset bundles (`balanced` is documented
+as "Echobox defaults" and now reproduces them exactly; `quiet` drops to
+snr 6.0 so the ladder keeps three distinct rungs), `--snr-threshold`
+help text, `README.md`, `DSP_PIPELINE.md`, and the `shipping` preset in
+`tools/session_screen`. The `legacy` and `shorter` screening presets are
+frozen history and now pin `snr_threshold` explicitly at 12.0 so a
+future default change cannot silently rewrite them.
+
+**Scope note.** These are *detector-level* numbers. End-to-end recall
+with the cricket gate on remains ~30 %, because the gate rejects ~82 %
+of detector events — that is a separate, known work package and no
+amount of base-detector tuning moves it. Expect this change to be
+largely invisible in end-to-end figures until the gate is addressed.
+
+### Test suite
+
+Repaired five unit tests that had been red since the 0.3.0-rc1 / 0.4.0
+rounds changed shipped defaults without updating the assertions (the
+pre-A6 40 ms silence floor, the pre-0.4.0 clip geometry, sidecar
+`format_version`, the rep-guard default, and `computeSweepShape` calls
+that passed a value positionally into the `anchorBin` parameter A1
+introduced). No production code was involved. `ctest` is 60/60 green,
+and the short-clip test now explicitly guards the 50 ms clip ceiling.
+
 ## 0.4.0 — 2026-08-09
 
 The short-clip release: cricket-gate correctness fixes + a much

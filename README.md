@@ -93,7 +93,7 @@ Run `./Echobox --help` to see the full list.
 | `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `40`   |
 | `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
 | `--freq-hi-hz <n>`    | Top of the frequency range to listen for (cannot exceed Nyquist of your mic's `--sample-rate`) | `192000`       |
-| `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `12.0`         |
+| `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `8.0`          |
 | `--cricket-filter on\|off` | Reject cricket-like signals before they become WAVs (see [Cricket filter](#cricket-filter) below) | `on` |
 
 Lengths above are end-to-end (pre-roll + detected activity + silence-after).
@@ -149,15 +149,24 @@ strict and only loud unambiguous calls survive.
 
 | Setting     | When to use                                                                  |
 | ----------- | ---------------------------------------------------------------------------- |
-| `8.0`       | Low-noise sites (sheltered garden, rural attic). Maximum recall; tolerates more false positives in exchange for catching faint distant calls. |
-| `12.0`      | Default. Suits a typical unattended deployment.                              |
+| `6.0`       | Very quiet sites where you want every last faint call and can afford the storage. Recall gain over `8.0` is small (the curve has flattened by here) but the extra recording is not. |
+| `8.0`       | Default. Catches ~97 % of the calls a reference classifier finds, at a detector duty cycle of ~19 %. |
+| `12.0`      | Previous default. Noticeably deafer to faint, distant calls (~86–91 % on the same corpus) but writes about a quarter less audio. |
 | `18.0`      | Windy, suburban, near-roadway, or rustling-foliage sites. Strict; only loud unambiguous calls survive. Use this if you see lots of false positives. |
+
+**The trade-off is storage.** Lowering this threshold makes the
+detector open more events, so it writes more clips and more bytes per
+night. The default moved from `12.0` to `8.0` because the recall gain
+was large (roughly +6 percentage points of per-call recall) and the
+extra recording was affordable on the reference deployment — but if
+your unit is tight on SD card or battery, `12.0` is a reasonable and
+well-understood setting to go back to.
 
 Examples:
 
 ```bash
 ./run.sh --device plughw:CARD=UltraMic384K --snr-threshold 18.0
-./run.sh --device plughw:CARD=UltraMic384K --snr-threshold 8.0
+./run.sh --device plughw:CARD=UltraMic384K --snr-threshold 6.0
 ```
 ---
 

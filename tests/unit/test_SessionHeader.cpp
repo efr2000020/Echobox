@@ -104,9 +104,9 @@ TEST_CASE("applySessionHeader: overrides only present fields", "[replay]") {
 
     Config cfg; // starts at shipping defaults
     // Pick a couple of shipping-vs-header divergences to sanity-check.
-    REQUIRE(cfg.preRollMs == 50u);       // shipping default
+    REQUIRE(cfg.preRollMs == 10u);       // shipping default
     REQUIRE(cfg.freqLoHz  == 20000);     // shipping default
-    REQUIRE(cfg.snrThreshold == 12.0f);  // shipping default
+    REQUIRE(cfg.snrThreshold == 8.0f);   // shipping default
 
     const std::size_t n = applySessionHeader(h, cfg);
     CHECK(n >= 13);                       // 13 fields in the flat config

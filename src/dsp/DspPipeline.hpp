@@ -51,8 +51,10 @@ struct DspPipelineConfig {
     ///
     /// @note The default below must track @c Config::snrThreshold and the
     ///       @c BandEnergyDetector tunable default — they are linked by
-    ///       intent, not by build-time wiring.
-    float        snrThreshold{12.0f};
+    ///       intent, not by build-time wiring. Lowered 12.0 -> 8.0 in the
+    ///       per-call recall retune; see BandEnergyDetector.hpp for the
+    ///       measured sweep behind the value.
+    float        snrThreshold{8.0f};
     /// Cricket filter: forwarded to the tracker as the
     /// @c sweep_gate_enabled tunable at start-time. The recorder's
     /// @c cricketDiscard half of the same filter lives in @c RecorderConfig;

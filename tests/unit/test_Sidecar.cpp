@@ -62,9 +62,9 @@ void emitFakeEvent(BandEnergyDetector& det, std::size_t nBins,
     DetectorState state{};
     Annotation    ann{};
     // 10 hot frames: a few bins around bin 300 (~28 kHz at sr=384k/fft=4096)
-    // jump three orders of magnitude above the floor — peaky enough to trip
-    // max_flatness=0.65 (low geomean contribution vs the bright peak), and
-    // inside band 1 (20–45 kHz) of the configured detection window.
+    // jump three orders of magnitude above the floor — peaky enough to sit
+    // under max_flatness=0.80 (low geomean contribution vs the bright
+    // peak), and inside band 1 (20–45 kHz) of the detection window.
     for (int i = 0; i < 10; ++i, ++frame) {
         for (auto& v : mags) v = bg(rng);
         for (std::size_t b = 300; b < 310 && b < nBins; ++b) {
@@ -187,9 +187,11 @@ TEST_CASE("writeSidecar produces a parseable JSON next to the WAV",
     meta.boot_iso8601    = "2026-06-05T18:00:00.000Z";
     meta.capture_iso8601 = "2026-06-05T18:05:30.123Z";
 
+    // Illustrative payload for the serialiser, written to look like the
+    // shipping defaults so the fixture doesn't read as a config nobody runs.
     std::vector<TunableValue> tunables{
-        {"band_snr_threshold", 12.0,  false},
-        {"max_flatness",        0.65, false},
+        {"band_snr_threshold",  8.0,  false},
+        {"max_flatness",        0.80, false},
         {"min_active_frames",   2.0,  true},
     };
 

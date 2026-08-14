@@ -849,11 +849,11 @@ std::span<const TunableInfo> BandEnergyDetector::listTunables() const {
     // the validator's C API and Python wrapper pass these strings across the
     // FFI boundary unchanged. Lives in .rodata; zero per-call cost.
     static constexpr TunableInfo kTunables[] = {
-        {"band_snr_threshold",   TunableType::Float, 12.0,  0.0,    200.0,
+        {"band_snr_threshold",   TunableType::Float, 8.0,   0.0,    200.0,
          "Top-K mean band SNR above which a frame counts as hot."},
         {"min_flatness",         TunableType::Float, 0.10,  0.0,    1.0,
          "Spectral-flatness lower bound (rejects pure tones)."},
-        {"max_flatness",         TunableType::Float, 0.65,  0.0,    1.0,
+        {"max_flatness",         TunableType::Float, 0.80,  0.0,    1.0,
          "Spectral-flatness upper bound (rejects broadband noise)."},
         {"top_k",                TunableType::Int,   8.0,   1.0,    64.0,
          "Number of brightest bins per band averaged for the SNR statistic."},
@@ -922,17 +922,35 @@ struct PresetEntry {
     double      value;
 };
 
+// The ladder is anchored on `balanced`, which must always reproduce the
+// compiled defaults exactly — it is documented as "Echobox defaults" and
+// an operator who applies it expects a no-op. When the shipped defaults
+// moved to snr 8.0 / flat 0.80 they took `balanced` with them, which in
+// turn pushed `quiet` down a step so the ladder keeps three distinct
+// rungs rather than collapsing into "default, default-ish, strict".
 constexpr PresetEntry kQuietBundle[] = {
-    {"band_snr_threshold",  8.0},
+    // One step more sensitive than the default on every axis. snr 6.0 is
+    // where the recall curve saturates (~98 % / ~98 % per-call, vs 97.4 /
+    // 97.9 at snr 8) while duty keeps climbing — worth it only at a site
+    // quiet enough to afford the bytes. min_active_frames 1 adds a
+    // measured +1.0 pp recall for +0.9 pp duty and raises FP risk, which
+    // is the trade this preset exists to make.
+    {"band_snr_threshold",  6.0},
     {"max_flatness",        0.80},
     {"min_active_frames",   1.0},
 };
 constexpr PresetEntry kBalancedBundle[] = {
-    {"band_snr_threshold", 12.0},
-    {"max_flatness",        0.65},
+    // Must mirror the compiled defaults in BandEnergyDetector.hpp.
+    {"band_snr_threshold",  8.0},
+    {"max_flatness",        0.80},
     {"min_active_frames",   2.0},
 };
 constexpr PresetEntry kNoisyBundle[] = {
+    // Deliberately far stricter than the default: at snr ~20 per-call
+    // recall drops to 80.8 / 85.1 % but duty falls to ~11 %. A site with
+    // wind or road noise spends its byte budget on false positives
+    // otherwise. max_flatness 0.60 stays below the 0.80 default because
+    // broadband rejection is exactly what a noisy site needs most.
     {"band_snr_threshold", 18.0},
     {"max_flatness",        0.60},
     {"min_active_frames",   3.0},

@@ -187,10 +187,49 @@ private:
     float m_minAbsFloor       = 1e-6f;
 
     int   m_topK              = 8;
-    float m_bandSnrThreshold  = 12.0f;
+    // Top-K mean band SNR a frame must clear to count as hot. The primary
+    // sensitivity knob, and monotone across the whole measured range.
+    // Deterministic offline harness (production DSP, no recorder, no
+    // threads), gate disabled, 24 stratified bat-positive files per
+    // session, per-call recall against BatDetect2 proxy truth:
+    //
+    //   snr 20, flat 0.95   80.80 % / 85.10 %   duty 10.9 / 11.1 %
+    //   snr 16, flat 0.95   86.24 % / 89.92 %   duty 12.5 / 12.8 %
+    //   snr 12, flat 0.80   91.66 % / 94.04 %   duty 14.8 / 15.0 %
+    //   snr  8, flat 0.80   97.43 % / 97.93 %   duty 19.1 / 19.0 %
+    //                                    (session_01 / session_02)
+    //
+    // Lowered 12.0 -> 8.0: +5.8 / +3.9 pp per-call recall for +4.3 / +4.0
+    // pp detector duty cycle. Below 8 the curve saturates (~98 % at snr 6)
+    // while duty keeps climbing, so 8.0 is the last step that still buys
+    // recall per byte. Duty cycle is the cost side of this knob — it sets
+    // how much audio the recorder is asked to write per night, which on a
+    // solar-powered Pi Zero 2 W is the binding constraint. Anything that
+    // raises this also has to be affordable in MB/night.
+    float m_bandSnrThreshold  = 8.0f;
 
     float m_minFlatness       = 0.10f;
-    float m_maxFlatness       = 0.65f;
+    // Spectral-flatness upper bound; rejects broadband transients (clicks,
+    // rustling, mechanical impacts) that lift every bin's SNR at once.
+    // Same harness as above, holding snr at 12:
+    //
+    //   flat 0.65           85.88 % / 90.77 %   duty 13.8 / 14.3 %
+    //   flat 0.80           91.66 % / 94.04 %   duty 14.8 / 15.0 %
+    //   flat 0.90           91.66 % / 94.04 %   duty 14.8 / 15.0 %
+    //   flat 1.00 (off)     91.67 % / 94.04 %   duty 14.8 / 15.0 %
+    //
+    // Raised 0.65 -> 0.80: the entire effect lands in that one step, and
+    // 0.90 / 1.00 measure identically to 0.80 — no real bat frame in this
+    // corpus has flatness above 0.80. So 0.65 was cutting into the bat
+    // population while buying no rejection that 0.80 doesn't already buy.
+    //
+    // The bound is kept rather than removed because its job is to reject
+    // broadband transients (clicks, rustling, mechanical impacts) that
+    // this Pipistrellus-only reference corpus happens not to contain.
+    // The corpus can show that 0.80 costs no recall; it cannot show the
+    // bound is unnecessary. Turning it off entirely (1.00) moved recall
+    // by 0.01 pp — one call in 8622 — which is evidence for neither.
+    float m_maxFlatness       = 0.80f;
 
     int   m_warmupFramesLimit = 40;
     int   m_minActiveFrames   = 2;

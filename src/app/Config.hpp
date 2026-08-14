@@ -44,8 +44,15 @@ struct Config {
     // default below must track BandEnergyDetector's compiled default so a user
     // who never passes --snr-threshold sees identical behavior to before this
     // flag existed; the two defaults are linked by ConfigValidator-style note,
-    // not by build-time wiring, so update both together.
-    float           snrThreshold{12.0f};
+    // not by build-time wiring, so update both together. DspPipelineConfig
+    // carries a third copy of the same number — update all three.
+    //
+    // Lowered 12.0 -> 8.0 alongside max_flatness 0.65 -> 0.80: detector-level
+    // per-call recall 85.9 / 90.8 % -> 97.4 / 97.9 % (session_01 /
+    // session_02) at a detector duty cycle of ~14 % -> ~19 %. The duty rise
+    // is the cost: more clips and more bytes per night on a solar-powered
+    // Pi Zero 2 W. See BandEnergyDetector.hpp for the full sweep.
+    float           snrThreshold{8.0f};
 
     // --- Recorder ---
     std::filesystem::path outputDir{"./recordings"};
