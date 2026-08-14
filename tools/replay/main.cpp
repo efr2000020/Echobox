@@ -94,12 +94,12 @@ void printHelp() {
         "  --hop-size <int>          (default: 512)\n"
         "  --freq-lo-hz <int>        (default: 20000)\n"
         "  --freq-hi-hz <int>        (default: 192000)\n"
-        "  --snr-threshold <float>   (default: 12.0)\n"
+        "  --snr-threshold <float>   (default: 8.0)\n"
         "  --sample-rate <hz>        Expected rate of every file (default: 384000)\n"
-        "  --preroll-ms <int>        (default: 50)\n"
-        "  --silence-ms <int>        (default: 50)\n"
+        "  --preroll-ms <int>        (default: 10)\n"
+        "  --silence-ms <int>        (default: 20)\n"
         "  --min-length-ms <int>     (default: 0)\n"
-        "  --max-length-ms <int>     (default: 200; 0 = no cap)\n"
+        "  --max-length-ms <int>     (default: 40; 0 = no cap)\n"
         "  --cricket-filter on|off   (default: on) — required 'on' to get anything rejected\n"
         "\n"
         "Rejected-capture sink:\n"
@@ -107,6 +107,16 @@ void printHelp() {
         "  --save-rejected-sample-n <int>            (default: 500)\n"
         "  --save-rejected-max-per-hour <int>        (default: 0 = unlimited for replay)\n"
         "\n"
+        "\n"
+        "Logging (off by default — replay writes no logs unless asked):\n"
+        "  --log-level off|debug|info|warn|error   (default: off)\n"
+        "                            debug re-enables the detector's per-event\n"
+        "                            [dsp.bed] trace and the recorder's\n"
+        "                            RECORDING_OPEN/SAVED/DISCARDED lines, which\n"
+        "                            is how you recover what a replay run decided\n"
+        "                            and why.\n"
+        "  --log-dir <path>          Where the log file goes (default: ./logs)\n"
+        "  --console-log on|off      Also tee the log to stderr (default: off)\n"
         "\n"
         "Diagnostic tracker-tunable override (repeatable):\n"
         "  --tunable KEY=VALUE       Forwarded to the loaded plugin via\n"
@@ -302,6 +312,26 @@ int parseCli(int argc, char** argv, ReplayCli& out) {
             if (!parseArg(s, out.cfg.saveRejectedMaxPerHour)) {
                 std::fprintf(stderr, "error: invalid --save-rejected-max-per-hour\n"); return 2;
             }
+        }
+        else if (a == "--log-level") {
+            // The code below has always been ready for this ("logger silent
+            // unless the user opts in via --log-level") but the parser never
+            // read the flag, so a replay run had no way to surface the
+            // detector's per-event [dsp.bed] trace. Reuse the shipping
+            // parser so the accepted spellings can't drift apart.
+            auto s = req("--log-level");
+            if (!echobox::logging::parseLevel(s.c_str(), out.cfg.logLevel)) {
+                std::fprintf(stderr,
+                             "error: --log-level must be off|debug|info|warn|error\n");
+                return 2;
+            }
+        }
+        else if (a == "--log-dir") out.cfg.logDir = req("--log-dir");
+        else if (a == "--console-log") {
+            auto s = req("--console-log");
+            if      (s == "on"  || s == "1") out.cfg.consoleLog = true;
+            else if (s == "off" || s == "0") out.cfg.consoleLog = false;
+            else { std::fprintf(stderr, "error: --console-log must be on|off\n"); return 2; }
         }
         else if (a == "--tunable") {
             // KEY=VALUE. Split on the first '='. VALUE is parsed as
@@ -655,10 +685,9 @@ int main(int argc, char** argv) {
         std::puts("         is discarded, so no clips will land in rejected/.");
     }
 
-    // Optional log start-up (silent by default; user can flip --log-level
-    // via env or a future flag if they need it). Keeping this branch here
-    // rather than always-on mirrors Application::run's discipline: no
-    // implicit disk I/O.
+    // Optional log start-up. Silent unless the user opted in via
+    // --log-level; keeping this branch here rather than always-on mirrors
+    // Application::run's discipline: no implicit disk I/O.
     if (cli.cfg.logLevel != echobox::logging::LogLevel::Off) {
         echobox::logging::LoggerConfig logCfg;
         logCfg.dir      = cli.cfg.logDir;
