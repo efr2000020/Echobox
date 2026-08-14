@@ -60,7 +60,7 @@ public:
     std::uint64_t totalEventsSinceBoot() const override;
 
     /**
-     * @brief Wait-free counter of events kept by the sweep gate since boot.
+     * @brief Wait-free counter of events kept by the noise gate since boot.
      *
      * Read by the DSP pipeline every publish() cycle and propagated to the
      * recorder through @c DetectorStateSnapshot::batLikeEvents. The recorder
@@ -74,13 +74,19 @@ public:
     std::uint64_t batLikeEventsSinceBoot() const override {
         return m_batLikeEventsSinceBoot.load(std::memory_order_relaxed);
     }
-    /// Counter of events rejected by the sweep gate. Debugging convenience;
+    /// Counter of events rejected by the noise gate. Debugging convenience;
     /// wait-free like @c batLikeEventsSinceBoot().
     std::uint64_t rejectedEventsSinceBoot() const {
         return m_rejectedEventsSinceBoot.load(std::memory_order_relaxed);
     }
 
-    // --- Sweep-shape gate helper ---
+    // --- Sweep-shape feature helper (diagnostics) ---
+    // These four features no longer decide anything: they were measured
+    // non-discriminative on the field corpus (AUC 0.37-0.56, see the
+    // m_noiseRejectEnabled block below) and the verdict built on them was
+    // retired. They are still computed once per event and written to the
+    // sidecar, because offline tooling reasons about them and because a
+    // future gate redesign needs them recoverable from shipped captures.
     // Exposed publicly so the unit tests can drive it directly without
     // standing up the whole detector. Inputs come from the per-event ring
     // populated inside processFrame(); it is a pure function of its args.
@@ -235,20 +241,77 @@ private:
     int   m_minActiveFrames   = 2;
     int   m_hangoverFrames    = 8;
 
-    // --- Sweep-shape gate (cricket false-positive rejection) ---
-    // Master switch: 1 = gate active. When 0, both outState.active and the
-    // closed-event Annotation are byte-identical to what the detector would
-    // emit with no gate at all, so an operator can turn the gate off with
-    // a single tunable if a deployment site produces bat calls the gate
-    // can't characterise.
+    // --- Confident-reject noise gate (cricket / false-positive rejection) ---
+    // Master switch: 1 = the reject rule is armed. When 0, both
+    // outState.active and the closed-event Annotation are byte-identical to
+    // what the detector would emit with no gate at all, so an operator can
+    // turn the whole filter off with a single tunable.
     //
-    // Bandwidth threshold at 0.9 kHz preserves 25/25 clean-corpus recall
-    // (including NYCLEI 3/3 and NYCNOC 2/2). The in-band bandwidth walk
-    // is measured on the winning-band's dominant frame; CF/QCF species
-    // (e.g. Nyctalus noctula) sit close to this floor, so raising it
-    // costs recall.
-    int   m_sweepGateEnabled  = 1;
-    float m_minBandwidthKhz   = 0.9f;   // bat-like if 10-dB BW >= this
+    // DIRECTION. This gate rejects only what it can positively identify as
+    // NOT a bat, and keeps everything it is unsure about. Its predecessor
+    // (the sweep-shape gate) did the opposite — it kept only what it could
+    // confirm was a bat — and that cost 63 pp of per-call recall, because
+    // the four sweep features carry no signal for the species in this
+    // corpus. Measured rank-order separation between bat-positive and
+    // non-bat detector events (AUC; 0.5 = chance), 82 491 labelled events:
+    //
+    //     bandwidth_khz  0.556      trigger_snr       0.781
+    //     drift_khz      0.518      trigger_flatness  0.262 (inverted 0.738)
+    //     path_ratio     0.467      lo_hz / band      0.252 (inverted 0.748)
+    //     mono_fraction  0.366 (inverted)
+    //
+    // Only the right-hand column separates, and none of it was used by the
+    // old verdict. The three features below are exactly that column.
+    //
+    // THE RULE. Reject an event iff ALL of:
+    //     trigger_snr      <  m_noiseSnrMax        (weak)
+    //     trigger_flatness >  m_noiseFlatnessMin   (broadband)
+    //     band_index       <= m_noiseBandMax       (low, 20-45 kHz)
+    // Conjunction, not disjunction: any one feature looking bat-like is
+    // enough to keep the event. All three are read at event OPEN (see
+    // m_noiseRejectThisEvent) — there is no close-time-only term, which is
+    // why this gate needs no provisional/binding split.
+    //
+    // DEFAULTS. 120-file probe per session, per-call recall against
+    // BatDetect2 proxy truth, at the shipped snr 8 / flat 0.80 detector:
+    //
+    //     rule                                s01      s02    non-bat removed
+    //     gate OFF                          98.38 %  99.06 %      0 %  /  0 %
+    //     old sweep gate                    37.49 %  35.87 %   79.6 % / 76.2 %
+    //     snr<12 & flat>0.55 & band1        96.04 %  97.66 %   41.4 % / 25.6 %
+    //     snr<15 & flat>0.55 & band1        94.14 %  96.50 %   47.1 % / 29.7 %
+    //     band1 & snr<15                    94.07 %  96.45 %   54.4 % / 34.2 %
+    //
+    // 12 / 0.55 / 1 is the recommended row: worst-case 96.0 % recall — a
+    // 1-2 pp cost against gate-off, versus the old gate's 63 pp — while
+    // removing a quarter to two-fifths of non-bat clips. The more
+    // aggressive rows are reachable at runtime, without a rebuild, for a
+    // site that would rather spend recall on bytes.
+    //
+    // WHAT THIS FILTER IS. Validated as a WEAK-BROADBAND-TRIGGER filter,
+    // not as a proven tonal-cricket rejector. The non-bat population on
+    // these two nights has *high* spectral flatness (median 0.63) — it is
+    // broadband noise admitted by lowering band_snr_threshold to 8, not
+    // tonal cricket harmonics. Neither session_01 nor session_02 contains
+    // a cricket-dominated stretch, so this corpus cannot demonstrate
+    // tonal-cricket rejection either way. Validating that needs a night
+    // where crickets actually dominate.
+    // See private_docs/audits/01_per_call_recall_audit.md §7b.
+    int   m_noiseRejectEnabled = 1;
+    float m_noiseSnrMax        = 12.0f;  // reject only below this trigger SNR
+    float m_noiseFlatnessMin   = 0.55f;  //   AND above this spectral flatness
+    int   m_noiseBandMax       = 1;      //   AND at or below this sub-band (1-based)
+
+    // --- Sweep-shape features: DIAGNOSTICS ONLY ---
+    // The four sweep features are still computed and written to the sidecar
+    // (offline tooling in tools/session_screen reasons about them, and the
+    // recorder's --save-rejected boundary mode reads min_bandwidth_khz out
+    // of the tunable manifest), and sweep_bat_like still records what the
+    // retired verdict WOULD have said so gate-redesign A/Bs stay possible
+    // from a shipped sidecar. Nothing here decides anything any more,
+    // except that m_sweepDriftKhz / m_sweepPathRatioMax / m_sweepMonoFracMin
+    // are also the "clear bat" bypass of the temporal rep-guard below.
+    float m_minBandwidthKhz   = 0.9f;   // 10-dB BW the retired verdict wanted
     float m_sweepDriftKhz     = 8.0f;   // OR a smooth sweep of this much drift
     float m_sweepPathRatioMax = 1.6f;   //    that doesn't hop (low travel/range)
     float m_sweepMonoFracMin  = 0.7f;   //    and runs mostly in one direction
@@ -260,7 +323,6 @@ private:
     // most recent N frames — a long event is bat-like under existing heuristics
     // and is not the gate's primary concern.
     static constexpr std::size_t SWEEP_RING_CAP        = 64;
-    static constexpr std::size_t GATE_DECISION_FRAMES  = 6; // ~8 ms at 750 fps
     std::size_t        m_domBinRing[SWEEP_RING_CAP];
     float              m_domMagRing[SWEEP_RING_CAP];
     std::size_t        m_domRingCount;       // valid entries (caps at SWEEP_RING_CAP)
@@ -277,39 +339,33 @@ private:
     std::size_t        m_dominantBandLoBin;
     std::size_t        m_dominantBandHiBin;
 
-    // Per-event gate state — split into two distinct verdicts:
-    //   - @c m_provisionalSuppressed drives @c outState.active (the
-    //     recorder's fast-drop leading edge). Set by the periodic
-    //     provisional gate on partial-event data; can flip either way
-    //     during the event as new evidence arrives.
-    //   - @c m_gateRejected is the BINDING close-time verdict. It
-    //     drives the emitted @c Annotation and the batLike / rejected
-    //     event counters the recorder polls at endRecording. Set only
-    //     at event close, from the full-event ring.
-    // The two are deliberately separate: a provisional reject taken at
-    // ~8 ms in (6 hot frames) runs on the loudest frame seen so far —
-    // early in an event that is a partially-windowed, attenuated frame,
-    // an unreliable basis for a binding verdict. The close-time block
-    // must re-examine the full event unconditionally.
+    // Per-event verdict — ONE verdict, taken once, at event open.
     //
-    // @c m_framesSinceLastProvisionalEval counts hot frames appended to
-    // the dominant-bin ring since the last provisional evaluation. The
-    // provisional block fires whenever this reaches GATE_DECISION_FRAMES
-    // — the initial fire is natural (starts at 0, ticks up one per hot
-    // frame, hits 6 exactly when the ring has 6 hot frames) and every
-    // subsequent fire runs on GATE_DECISION_FRAMES of newly-appended
-    // ring data. See A3: the previous one-shot latch let a cricket
-    // pulse train + 10.7 ms hangover merge into one long suppressed
-    // event that swallowed any bat call arriving inside it.
-    bool        m_provisionalSuppressed        = false;
-    bool        m_gateRejected                 = false;
-    std::size_t m_framesSinceLastProvisionalEval = 0;
-    // Sidecar diagnostic — true iff this event was rejected by the
-    // 6-frame provisional gate (line ~536) as opposed to the full
-    // close-time check. Read once at event close, then reset. Not on
-    // the RT hot path; touched from the audio thread only, no locking
-    // needed.
-    bool m_provisionalRejectedThisEvent = false;
+    // All three reject features (trigger SNR, trigger flatness, band
+    // index) are final the instant the event opens; none of them improves
+    // with more of the event in hand. So there is nothing for a
+    // close-time re-evaluation to learn, and the provisional/binding
+    // split the sweep gate needed does not exist here.
+    //
+    // That split is deliberately gone rather than merely unused. It
+    // existed because a sweep-shape verdict taken at ~8 ms ran on a
+    // partially-windowed, attenuated snapshot frame and could not be
+    // trusted, so a second, binding pass had to re-examine the full
+    // event — and keeping two verdicts in sync produced three separate
+    // correctness bugs in the 0.4.0 cycle (A2: the provisional flag
+    // vetoed the close-time gate; A3: it latched, so one wrong reject at
+    // 8 ms suppressed the rest of the event including any bat call
+    // inside it; A7: the sidecar mislabelled re-opened events). All
+    // three were bugs in the machinery, not in the thresholds.
+    //
+    // Consequence for @c outState.active: the filter no longer touches
+    // it. A rejected event is recorded normally and then dropped by the
+    // recorder at endRecording, via the batLike counter contract below
+    // (§12 of DSP_PIPELINE.md). Same bytes on the card either way — the
+    // clip is deleted, not kept — and it means the shipped behaviour is
+    // exactly the per-clip behaviour §7b.6 measured, rather than a
+    // fast-drop variant whose clip geometry was never measured.
+    bool m_noiseRejectThisEvent = false;
 
     // --- Temporal repetition-rate guard ---
     // Cross-event onset ring: the discriminating signature only emerges

@@ -98,35 +98,40 @@ struct Config {
     std::uint32_t         heartbeatSec{60};
 
     // Cricket filter master switch. One flag gates BOTH halves:
-    //   * detector's sweep_gate_enabled sweep-shape gate + temporal guard;
+    //   * detector's noise_reject_enabled confident-reject gate
+    //     (+ the temporal rep-guard, which is separately off by default);
     //   * recorder's cricketDiscard "no bat-like event" post-hoc drop.
     // On enables both; off disables both → the recorder behaves as if no
     // filter existed.
     //
-    // Flipped true -> false. The sweep-shape gate rejects ~82 % of all
-    // detector events, and most of what it rejects is real bats, not
-    // crickets. End-to-end per-call recall against BatDetect2 proxy
-    // truth, two full field nights, gate ON vs OFF:
+    // Flipped back false -> true, now that the gate behind it is a
+    // different gate. The old sweep-shape verdict kept only what it could
+    // confirm was a bat, over four features measured non-discriminative
+    // on this corpus (AUC 0.37-0.56) — it cost 63 pp of per-call recall.
+    // The replacement rejects only what it can confirm is NOT a bat
+    // (weak AND broadband AND low-band), over the three features that do
+    // separate. Per-call recall against BatDetect2 proxy truth,
+    // 120-file probe per session:
     //
-    //     session_02   25.7 %  ->  98.7 %
-    //     session_01   26.6 %  ->  98.6 %
+    //                      session_01   session_02   non-bat removed
+    //     filter OFF          98.38 %      99.06 %        0 %
+    //     old sweep gate      37.49 %      35.87 %      ~78 %
+    //     new rule (this)     96.04 %      97.66 %    41.4 % / 25.6 %
     //
-    // The product target is >= 90 %, so the gate as built is the entire
-    // gap: no amount of detector tuning reaches the target with it on.
-    // Shipping it off is the only configuration that meets the target
-    // today. Cost: ~5x the clips and ~4-6.6 GB/night (inside the 6-8 GB
-    // envelope), plus a file-count problem on the SD card that is
-    // tracked separately.
+    // The product target is >= 90 %; the new rule clears it on both
+    // nights with ~6 pp of margin, for a 1-2 pp cost against filter-off.
+    // That is a trade worth making — cricket/noise rejection is a
+    // product requirement and unfiltered nights cost ~5x the clips.
     //
-    // This default is INTERIM, not a verdict on crickets. Cricket
-    // false positives are real and still cost storage at a noisy site;
-    // what is broken is this gate's discrimination, and a redesign is a
-    // separate work package. Operators at cricket-heavy sites can put
-    // the current gate back with --cricket-filter on and trade recall
-    // for bytes knowingly. Expect this default to flip back once the
-    // redesigned gate can be shown not to cost recall.
-    // See private_docs/audits/01_per_call_recall_audit.md §7a.
-    bool                  cricketFilter{false};
+    // Scope of the claim: this is validated as a WEAK-BROADBAND-TRIGGER
+    // filter. The non-bat population on these two nights is broadband
+    // noise (median flatness 0.63) admitted by the snr 8 retune, not
+    // tonal cricket harmonics, and neither night contains a
+    // cricket-dominated stretch. A site with real cricket pressure can
+    // tighten noise_snr_max / noise_flatness_min / noise_band_max at
+    // runtime, or turn the whole thing off with --cricket-filter off.
+    // See private_docs/audits/01_per_call_recall_audit.md §7b.
+    bool                  cricketFilter{true};
 
     // --- Rejected-capture observability ---
     // Selects which cricket-discarded clips get preserved (into

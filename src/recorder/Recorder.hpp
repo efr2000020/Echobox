@@ -81,19 +81,23 @@ struct RecorderConfig {
     bool                  writeSidecar{true};
     /// Discard clips whose window saw no bat-like event (i.e. every
     /// detector event during the clip was gate-rejected). Together with
-    /// the detector's @c sweep_gate_enabled tunable, this is the recorder
-    /// half of the cricket filter — a pure-cricket recording is written
+    /// the detector's @c noise_reject_enabled tunable, this is the recorder
+    /// half of the cricket filter — a pure-noise recording is written
     /// to a temp WAV, then aborted at close instead of finalised. Wired
     /// to the @c --cricket-filter CLI flag; disabling both halves with
     /// that one switch restores the behaviour of the pre-gate recorder.
     ///
+    /// This half now carries the whole filter: since the confident-reject
+    /// gate replaced the sweep-shape verdict, the detector no longer
+    /// suppresses @c DetectorState::active at all, so a rejected event is
+    /// recorded normally and dropped here on the counter test.
+    ///
     /// Default mirrors the shipping @c echobox::app::Config::cricketFilter,
-    /// which flipped to false when the gate was measured rejecting most
-    /// real bats (26 % vs 99 % per-call recall; see Config.hpp). Keep the
-    /// two in lock-step so a RecorderConfig built ex-nihilo matches what
-    /// the field unit does. Interim — expect both to flip back once the
-    /// gate is redesigned.
-    bool                  cricketDiscard{false};
+    /// which flipped back to true once the new rule brought the recall
+    /// cost down from 63 pp to ~1-2 pp (see Config.hpp). Keep the two in
+    /// lock-step so a RecorderConfig built ex-nihilo matches what the
+    /// field unit does.
+    bool                  cricketDiscard{true};
 
     // --- Rejected-capture observability ---
     // When @c saveRejected is not @c Off, a clip that would be cricket-

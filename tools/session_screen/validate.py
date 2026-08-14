@@ -186,7 +186,7 @@ def _resolve_output_dir(args: argparse.Namespace) -> Path:
 #   - shipping — mirrors src/app/Config.hpp. This is what the field
 #     device actually runs; use it to measure device-relevant behaviour.
 #     Geometry 10/20/40 (0.4.0) + snr_threshold 8.0 (recall retune) +
-#     cricket_filter OFF (the gate cost more recall than it saved bytes).
+#     cricket_filter ON (back on, over the confident-reject gate).
 #   - legacy   — the pre-0.4.0 long-clip geometry (50/50/200) at
 #     snr_threshold 12.0. Kept so old reports remain reproducible. Was
 #     called "baseline" until 2026-08.
@@ -208,17 +208,18 @@ def _plan_shipping():
     round) is not a CLI flag, so it arrives via the replay binary's
     compiled detector defaults.
 
-    cricket_filter tracks Config::cricketFilter, which flipped to False:
-    the sweep-shape gate rejected ~82 % of detector events including most
-    real bats (per-call recall 26 % on / 99 % off, both field nights), so
-    the gate-off arm is what ships while the gate is redesigned. Unlike
-    ``legacy`` / ``shorter``, this preset is NOT frozen — it is meant to
-    move whenever Config.hpp moves.
+    cricket_filter tracks Config::cricketFilter, which flipped back to
+    True once the sweep-shape verdict was replaced by the confident-reject
+    rule (reject only weak AND broadband AND 20-45 kHz triggers). The old
+    gate cost 63 pp of per-call recall; the new one costs 1-2 pp
+    (96.04 % / 97.66 % against 98.38 % / 99.06 % filter-off) while removing
+    41.4 % / 25.6 % of non-bat clips. Unlike ``legacy`` / ``shorter``, this
+    preset is NOT frozen — it is meant to move whenever Config.hpp moves.
     """
     from . import replay as _replay
     return _replay.ReplayConfig(
         preroll_ms=10, silence_ms=20,
-        max_length_ms=40, min_length_ms=0, cricket_filter=False,
+        max_length_ms=40, min_length_ms=0, cricket_filter=True,
         snr_threshold=8.0)
 
 

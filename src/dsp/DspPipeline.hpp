@@ -56,21 +56,21 @@ struct DspPipelineConfig {
     ///       measured sweep behind the value.
     float        snrThreshold{8.0f};
     /// Cricket filter: forwarded to the tracker as the
-    /// @c sweep_gate_enabled tunable at start-time. The recorder's
+    /// @c noise_reject_enabled tunable at start-time. The recorder's
     /// @c cricketDiscard half of the same filter lives in @c RecorderConfig;
     /// @c Application::run flips both from one CLI flag. Trackers that
     /// don't expose the tunable ignore this silently (a plain warn logged
     /// in start()).
     ///
-    /// @note Default mirrors @c Config::cricketFilter, which flipped to
-    ///       false when the gate was measured rejecting most real bats
-    ///       (26 % vs 99 % per-call recall); see Config.hpp for the
-    ///       measurement and the interim framing. Update the two together.
-    bool         cricketFilter{false};
+    /// @note Default mirrors @c Config::cricketFilter, which flipped back
+    ///       to true once the recall-destroying sweep-shape verdict was
+    ///       replaced by the confident-reject rule (~1-2 pp per-call
+    ///       recall, not 63); see Config.hpp. Update the two together.
+    bool         cricketFilter{true};
 
     /// Diagnostic tracker-tunable overrides applied at the end of
     /// @c start(), immediately after the built-in setTunable() calls
-    /// (@c band_snr_threshold, @c sweep_gate_enabled, @c hop_size_samples)
+    /// (@c band_snr_threshold, @c noise_reject_enabled, @c hop_size_samples)
     /// and *before* the worker thread is spawned. The pre-spawn timing
     /// eliminates any race between the main thread's write and the
     /// worker's first read. Used by the workstation-only

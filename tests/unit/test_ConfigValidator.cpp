@@ -170,20 +170,20 @@ TEST_CASE("ConfigValidator: shipped short-clip defaults validate cleanly",
     CHECK(cfg.maxLengthMs == 40u);
     CHECK(validateConfig(cfg).empty());
 
-    // The cricket filter ships OFF: the sweep-shape gate was measured
-    // rejecting most real bats (26 % vs 99 % per-call recall over two
-    // field nights), which capped end-to-end recall far below the 90 %
-    // product target. Interim, pending the gate redesign — if a future
-    // round flips this back, it should be a deliberate edit here too.
-    CHECK(cfg.cricketFilter == false);
+    // The cricket filter ships ON again. It shipped off for one release
+    // while the sweep-shape gate — which rejected most real bats, 26 %
+    // vs 99 % per-call recall over two field nights — was replaced by the
+    // confident-reject rule, whose measured cost is 1-2 pp (96.0 / 97.7 %
+    // against 98.4 / 99.1 % filter-off). If a future round flips this
+    // again, it should be a deliberate edit here too.
+    CHECK(cfg.cricketFilter == true);
 
     // The default geometry must stay legal for an operator who turns the
-    // filter back on with --cricket-filter on. Without this the silence
-    // floor above goes untested at the shipped defaults, because the
-    // check short-circuits whenever the filter is off.
-    Config withFilter = cfg;
-    withFilter.cricketFilter = true;
-    CHECK(validateConfig(withFilter).empty());
+    // filter off with --cricket-filter off. The silence floor only binds
+    // when the filter is on, so the off arm exercises the other branch.
+    Config noFilter = cfg;
+    noFilter.cricketFilter = false;
+    CHECK(validateConfig(noFilter).empty());
 
     // Product constraint: produced clips stay as short as possible and
     // never exceed 50 ms end to end. maxLengthMs is the end-to-end cap

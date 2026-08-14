@@ -178,7 +178,7 @@ int Application::run() {
     rcfg.minLengthMs = m_cfg.minLengthMs;
     rcfg.maxLengthMs = m_cfg.maxLengthMs;
     // Cricket filter: one CLI flag flips both halves. Detector-side lands
-    // via DspPipelineConfig.cricketFilter → sweep_gate_enabled tunable
+    // via DspPipelineConfig.cricketFilter → noise_reject_enabled tunable
     // above; recorder-side is the post-hoc no-bat-like-event discard here.
     rcfg.cricketDiscard = m_cfg.cricketFilter;
     // Rejected-capture observability. Off = byte-identical to pre-feature

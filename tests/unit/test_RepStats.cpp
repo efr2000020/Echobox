@@ -95,16 +95,31 @@ TEST_CASE("processFrame: temporal veto still fires after the onset ring "
 
     BandEnergyDetector det;
     det.configure(sampleRate, fftSize, 20000.0f, 192000.0f);
-    REQUIRE(det.setTunable("sweep_gate_enabled", 1.0));
-    REQUIRE(det.setTunable("rep_guard_enabled",  1.0));
-    // Encourage the sweep gate to accept — we want to exercise the temporal
-    // path, not the sweep path.
-    REQUIRE(det.setTunable("min_bandwidth_khz",  0.5));
+    REQUIRE(det.setTunable("noise_reject_enabled", 1.0));
+    REQUIRE(det.setTunable("rep_guard_enabled",    1.0));
+    // The synthetic events below are loud (SNR >> noise_snr_max), so the
+    // confident-reject rule keeps them all and every rejection observed
+    // here has to have come from the temporal path — which is the point
+    // of this test.
 
     // Feed a low-amplitude broadband warmup so the noise floor converges,
-    // then a metronomic sequence of 30 narrowband events spaced ~100 frames
-    // apart (13.3 Hz — inside the cricket rate band). >16 events forces a
-    // wrap through ONSET_RING_CAP.
+    // then 30 narrowband events — >16, so the onset ring wraps through
+    // ONSET_RING_CAP.
+    //
+    // Onset spacing ALTERNATES 40 / 200 frames rather than being perfectly
+    // even. That is deliberate and it is what the guard is calibrated for:
+    // the veto fires on the MIDDLE of the CV(IDI) axis, [rep_cv_min 0.50,
+    // rep_cv_max 1.30]. A perfectly even train has CV = 0 and is
+    // explicitly NOT vetoed — that case is a Pipistrellus feeding buzz.
+    // Alternating gaps give mean 114.7 frames (6.5 Hz, inside the 1-20 Hz
+    // rate band) and CV ~0.70, which is inside the veto band.
+    //
+    // Until the confident-reject gate replaced the sweep-shape verdict,
+    // this fixture used even 100-frame spacing and still passed — because
+    // its 0.375 kHz events were being rejected by the sweep gate's
+    // bandwidth clause, not by the temporal guard at all. The A4 ring-order
+    // regression this test exists for was therefore not actually being
+    // exercised. Hence the veto_applied assertion at the bottom.
     std::mt19937 rng(0xBEEF);
     std::uniform_real_distribution<float> bg(1e-4f, 1e-3f);
     std::vector<float> mags(nBins);
@@ -118,13 +133,15 @@ TEST_CASE("processFrame: temporal veto still fires after the onset ring "
 
     int emitted = 0;
     for (int e = 0; e < 30; ++e) {
-        // 4 hot frames per event, then 96 silent — 100 frames spacing.
+        // 4 hot frames per event, then 36 or 196 silent — onset-to-onset
+        // spacing alternates 40 / 200 frames.
         for (int i = 0; i < 4; ++i, ++frame) {
             for (auto& v : mags) v = bg(rng);
             for (std::size_t b = 300; b < 305 && b < nBins; ++b) mags[b] = 0.5f;
             if (det.processFrame(mags, frame, state, ann)) ++emitted;
         }
-        for (int i = 0; i < 96; ++i, ++frame) {
+        const int gap = (e % 2 == 0) ? 36 : 196;
+        for (int i = 0; i < gap; ++i, ++frame) {
             for (auto& v : mags) v = bg(rng);
             if (det.processFrame(mags, frame, state, ann)) ++emitted;
         }
@@ -136,13 +153,20 @@ TEST_CASE("processFrame: temporal veto still fires after the onset ring "
     ::SidecarPayload payload;
     REQUIRE(det.drainSidecarPayload(payload));
     int rejected = 0;
+    int vetoed   = 0;
     for (const auto& e : payload.events) {
         if (e.gate_rejected) ++rejected;
+        if (e.veto_applied)  ++vetoed;
     }
     // If the bug reappears, `emitted` will be ~30 (every event kept) and
     // `rejected` will be tiny (only the first 16 events could ever veto).
     // With the ring-order fix, most of the 30 events get vetoed.
     CHECK(rejected > 10);
+    // Every rejection here must be the temporal guard's doing: these events
+    // are loud (SNR >> noise_snr_max), so the confident-reject rule keeps
+    // all of them. Without this the test can pass on some other path, which
+    // is exactly how the A4 regression went unexercised before.
+    CHECK(vetoed == rejected);
 }
 
 

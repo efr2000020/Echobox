@@ -86,16 +86,17 @@ void DspPipeline::start() {
                 m_cfg.algorithm.c_str());
     }
 
-    // Cricket filter: flip the tracker's sweep-shape gate to match the
-    // operator's --cricket-filter setting. Trackers that don't ship the
-    // knob log a debug notice and continue — that's fine, the recorder's
-    // cricketDiscard half will end up as a no-op too (no bat-like counter
-    // ever increments to compare against, but no discard-on-empty either,
-    // because a plain tracker's @c batLikeEventsSinceBoot default =
-    // totalEventsSinceBoot() ie. always changes when an event closes).
-    if (!m_tracker->setTunable("sweep_gate_enabled",
+    // Cricket filter: flip the tracker's confident-reject noise gate to
+    // match the operator's --cricket-filter setting. Trackers that don't
+    // ship the knob log a debug notice and continue — that's fine, the
+    // recorder's cricketDiscard half will end up as a no-op too (no
+    // bat-like counter ever increments to compare against, but no
+    // discard-on-empty either, because a plain tracker's
+    // @c batLikeEventsSinceBoot default = totalEventsSinceBoot() ie.
+    // always changes when an event closes).
+    if (!m_tracker->setTunable("noise_reject_enabled",
                                m_cfg.cricketFilter ? 1.0 : 0.0)) {
-        LS_DEBUG("dsp", "tracker '%s' does not accept sweep_gate_enabled; "
+        LS_DEBUG("dsp", "tracker '%s' does not accept noise_reject_enabled; "
                         "--cricket-filter has no detector-side effect",
                  m_cfg.algorithm.c_str());
     }

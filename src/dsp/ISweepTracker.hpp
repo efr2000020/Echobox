@@ -33,7 +33,10 @@ struct Annotation {
 // mono_fraction, gate_rejected) is populated by detectors that implement
 // the cricket false-positive gate; default-zero is meaningful for older
 // detectors that don't (the validator treats all-zero sweep features as
-// "not computed").
+// "not computed"). Note that in BandEnergyDetector the four sweep-shape
+// features are DIAGNOSTICS as of the confident-reject gate — they are
+// still computed and emitted, but gate_rejected is decided from
+// trigger_snr / trigger_flatness / band_index instead.
 //
 // Plain old data; EventFeatures is NOT mirrored in the validator C API today —
 // it travels device-to-validator via the JSON sidecar, not the C FFI struct.
@@ -52,13 +55,13 @@ struct EventFeatures {
     float    drift_khz;         // dominant-bin frequency excursion over the event
     float    path_ratio;        // sum(|Δbin|) / max(1, range); ~1 sweep, ~2 hopping
     float    mono_fraction;     // max(#up,#down) / (#up+#down)
-    bool     gate_rejected;     // reserved for a future in-detector gate; today always false
+    bool     gate_rejected;     // the binding verdict: detector dropped this event
     // --- decision-path diagnostics (populated by BandEnergyDetector; older
     //     detectors leave these zero. Observability only — filter behaviour
     //     is unchanged whether these are populated or not.) ---
-    bool     sweep_bat_like;    // OR clause result (path A OR path B) at final gate check
-    bool     veto_applied;      // temporal rep-guard flipped an OR-passing event to reject
-    bool     provisional_rejected;  // 6-frame provisional gate rejected before full close
+    bool     sweep_bat_like;    // what the RETIRED sweep-shape verdict would have said
+    bool     veto_applied;      // temporal rep-guard flipped a keep into a reject
+    bool     provisional_rejected;  // RETIRED with the two-tier split; always false now
     float    rep_rate_hz;       // onset ring's estimated rate at gate-decision time
     float    rep_cv;            // onset ring's CV(IDI) at gate-decision time
     uint16_t rep_n_onsets;      // onset ring occupancy at gate-decision time
