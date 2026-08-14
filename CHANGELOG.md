@@ -2,6 +2,63 @@
 
 ## Unreleased
 
+### Replay harness is deterministic and device-faithful
+
+`echobox-replay` fed the pipeline as fast as the CPU allowed (20-30x
+real time), but `Recorder` drove its state machine off
+`std::chrono::steady_clock`: the poll cadence and the `silenceMs` idle
+timeout were wall-clock while `maxLengthMs` was counted in audio
+frames. In replay those two clocks were decoupled by a load-dependent
+factor, so the tool was non-deterministic and did not reproduce device
+behaviour. Three identical single-file replays, same binary, same
+flags, produced **635 / 650 / 650** clips.
+
+- `Recorder` takes an optional injected time source
+  (`src/recorder/RecorderClock.hpp`). Everything time-derived now goes
+  through it: the poll sleep, the `silenceMs` timeout, the
+  `RECORDING_SAVED` elapsed trace, the rejected-sink hourly governor,
+  and the wall stamp behind recording filenames and the sidecars'
+  `capture_iso8601` / `boot_iso8601`.
+- `echobox-replay` supplies a virtual clock advanced by samples fed
+  (`tools/replay/VirtualClock.hpp`), interlocked with the DSP and
+  recorder threads so the recorder observes exactly the snapshot
+  sequence a real-time device would. Same three runs now produce
+  **998 / 998 / 998** clips with byte-identical WAVs and sidecars. The
+  final drain is virtual too, replacing a `sleep_for`.
+- Replay is still far faster than real time — unchanged at ~20-30x on
+  the reference machine. The lockstep costs no measurable throughput
+  because the run is FFT-bound, not sleep-bound.
+- Clip counts rise versus older replay runs: the silence timeout now
+  actually fires instead of being swamped, so clips close on silence
+  rather than always on `maxLengthMs`. **Replay numbers from before
+  this change are not comparable to numbers after it.**
+
+**The field build is unaffected.** The seam sits behind the
+`ECHOBOX_RECORDER_CLOCK_INJECTION` compile-time gate, set only when the
+unit tests or the replay tool are built, so the shipping translation
+unit has no `RecorderConfig::clock` member and no dispatch branch.
+Verified by building `deploy/bin/Echobox` at the same commit with and
+without the change: identical instruction count (44 365) and identical
+section sizes to the byte, with the whole disassembly differing by one
+mirrored-but-equivalent compare that GCC chose on its own
+(`cmp %rax,%rdx; jg` vs `cmp %rdx,%rax; jl`).
+
+### `echobox-replay`: `--log-level`, `--log-dir`, `--console-log`
+
+The tool's comments already claimed the logger was "silent unless the
+user opts in via `--log-level`", but the CLI parser never read the
+flag, so a replay run had no way to recover the detector's per-event
+`[dsp.bed]` trace or the recorder's `RECORDING_OPEN/SAVED/DISCARDED`
+lines. Wired up, reusing the shipping `logging::parseLevel` so the
+accepted spellings cannot drift from `Echobox`'s. Default is still
+`off` — no implicit disk I/O.
+
+`printHelp()` also quoted four pre-0.4.0 defaults that no longer
+matched the binary (`--snr-threshold 12.0`, `--preroll-ms 50`,
+`--silence-ms 50`, `--max-length-ms 200`); they now read 8.0 / 10 / 20
+/ 40. Same stale `--snr-threshold` value fixed in `TOOLING.md` §5.
+
+
 ### Detector retune for per-call recall
 
 Two shipped detector defaults moved. Both were measured on the

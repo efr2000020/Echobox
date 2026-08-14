@@ -188,6 +188,22 @@ BatDetect2 as a proxy for truth. Runs the shipping `DspPipeline +
 Recorder` under `echobox-replay`, so what it measures is what a real
 device would produce (modulo x86 vs ARM).
 
+**Replay is deterministic** (since 2026-08-14). It used to feed the
+pipeline as fast as the CPU allowed while the recorder measured
+`--silence-ms` against the wall clock, so the same input gave a
+different answer every run — 635 / 650 / 650 clips over three runs of
+one 60 s file — and a 20 ms silence window became hundreds of ms of
+audio, which meant clip boundaries were set by `--max-length-ms` alone.
+`echobox-replay` now drives the recorder from a virtual clock advanced
+by samples fed, in lockstep with the DSP thread, so byte-identical
+input gives byte-identical output. Two consequences worth knowing:
+
+- A/B deltas below ~5 % are now meaningful. Before this, they were
+  inside the run-to-run noise floor, so any tuning conclusion drawn
+  from a pre-2026-08-14 replay run is worth re-measuring.
+- Clip counts went **up** versus old replay runs (the silence timeout
+  actually fires now). Do not compare a new run against an old one.
+
 **Prereqs (in order):**
 1. Python venv with `tools/session_screen/requirements.txt` installed
    (see §0).
@@ -376,7 +392,7 @@ the customer runs with no flags, this is the effective invocation
     --hop-size 512 \
     --freq-lo-hz 20000 \
     --freq-hi-hz 192000 \
-    --snr-threshold 12.0 \
+    --snr-threshold 8.0 \
     --output-dir ./recordings \
     --preroll-ms 10 \
     --silence-ms 20 \
