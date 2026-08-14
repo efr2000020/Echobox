@@ -397,7 +397,7 @@ the customer runs with no flags, this is the effective invocation:
     --silence-ms 20 \
     --min-length-ms 0 \
     --max-length-ms 40 \
-    --cricket-filter off \
+    --cricket-filter on \
     --save-rejected off \
     --save-rejected-sample-n 500 \
     --save-rejected-max-per-hour 200 \

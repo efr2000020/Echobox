@@ -1,63 +1,102 @@
 # Changelog
 
-## Unreleased
+## 2.0.0-rc1 — 2026-08-14
 
-### Cricket filter now ships OFF by default
+> **Numbering note.** This follows the released **1.0.0** and is the
+> first release candidate for **v2**. The `0.3.0-rc1` and `0.4.0`
+> entries below were development milestones cut between the two on
+> `feat/v2-cricket-gate`; they were never tagged or released. Read them
+> as the road to this candidate, not as versions preceding 1.0.0.
 
-`--cricket-filter` defaults to `off`. The flag still gates both halves
-of the filter (the detector's `sweep_gate_enabled` sweep-shape gate and
-the recorder's `cricketDiscard` post-hoc drop); only the default moved.
+Per-call recall against BatDetect2 proxy truth goes from **31.5 %
+measured on the device** to **97.3 % / 98.1 %** across two full field
+nights, with cricket filtering on. Three changes get it there: the
+validation harness was fixed (it was not measuring the device at all),
+two detector defaults were retuned, and the cricket gate was replaced.
 
-The sweep-shape gate was measured rejecting **~82 % of all detector
-events**, and most of what it rejected was real bats. End-to-end
-per-call recall against BatDetect2 proxy truth, two full field nights,
-same binary, gate on vs off:
+### Cricket gate replaced with a confident-reject noise filter
 
-| session | gate ON | gate OFF |
+The sweep-shape gate was evaluated as a classifier for the first time
+and does not work. Rank-order separation between bat-positive and
+non-bat detector events (AUC; 0.5 = chance):
+
+| the gate's features | AUC | features it ignored | AUC |
+|---|---:|---|---:|
+| `bandwidth_khz` | 0.556 | `trigger_snr` | **0.781** |
+| `drift_khz` | 0.518 | `band_index` | 0.252 → **0.748** inverted |
+| `path_ratio` | 0.467 | `trigger_flatness` | 0.262 → **0.738** inverted |
+| `mono_fraction` | 0.366 | | |
+
+All four features it decided on are non-discriminative here; two are
+inverted, meaning non-bat events scored *more* sweep-like than bats.
+Most likely cause: Pipistrellus energy peaks on the narrowband QCF tail,
+not the FM downsweep the gate was designed around.
+
+The error was directional. The old gate **kept only what it could
+confirm was a bat**, so anything uncharacterisable was destroyed —
+−63 pp of per-call recall to remove ~76 % of non-bat clips, roughly 18
+real bat events lost per non-bat event removed. The replacement
+**rejects only what it can confirm is not a bat**:
+
+```
+reject iff  trigger_snr < 12  AND  trigger_flatness > 0.55  AND  band_index == 1
+            (weak)                 (broadband)                   (20–45 kHz)
+```
+
+Full corpus, both nights, filter ON:
+
+| | session_01 | session_02 |
 |---|---:|---:|
-| session_02 (2026-08-07) | 25.74 % | **98.69 %** |
-| session_01 (2026-08-03) | 26.62 % | **98.56 %** |
+| per-call recall | **97.3 %** | **98.1 %** |
+| vs filter off | −1.1 pp | −1.3 pp |
+| non-bat clips removed | 26.9 % | 26.3 % |
+| clip purity | 88.5 → 91.1 % | 88.7 → 91.2 % |
 
-The product target is ≥ 90 %. With the gate on, no setting of any other
-knob gets close — the gate *is* the gap. The gate-off arm meets the
-target with margin and the two nights agree to within 0.2 pp.
+Against the retired gate's 37.5 % / 35.9 % on the same corpus.
 
-**Cost.** ~5× the clips (150 k–241 k per night, vs 30 k–51 k), 4.0–6.6 GB
-of audio per night against the 6–8 GB envelope, and recorder duty
-14.7–24.3 %. Also a filesystem problem the previous 14 k-clip regime
-never exposed: ~300 k–480 k files per night once sidecars are counted,
-which is real inode and directory-listing pressure on a Pi Zero 2 W.
-That needs a container format or per-hour sharding and is tracked
-separately — it is not a recall problem.
+Thresholds are runtime tunables (`noise_reject_enabled`,
+`noise_snr_max`, `noise_flatness_min`, `noise_band_max`) so a
+cricket-heavy site can tighten toward ~54 % rejection for ~4 pp of
+recall. `sweep_gate_enabled` is gone; `--cricket-filter` now drives
+`noise_reject_enabled` and ships **on**. The four sweep features are
+still computed and written to the sidecar as diagnostics, and still
+drive the rep-guard's `clearBat` bypass — a keep-only path, where a
+weak feature is harmless.
 
-**This is an interim default.** Cricket false positives are real and
-still cost storage at a noisy site; what is broken is this gate's
-discrimination between a cricket chirp and a bat call. A redesign is a
-separate work package, and this default is expected to flip back once
-the new gate can be shown not to cost recall. Operators at
-cricket-heavy sites can restore today's behaviour with
-`--cricket-filter on` — the flag, the gate, and every tunable behind it
-are unchanged.
+The two-tier provisional/close-time split is removed. Its inputs are all
+final at event open, so a second evaluation could add nothing — and
+three correctness bugs (A2, A3, A7) had lived in that machinery.
+`outState.active` is now the raw detector state; the filter never
+suppresses it, so the recorder writes each clip in full and the discard
+happens once, at `endRecording()`.
 
-Nothing else in the shipped configuration moved: `snr_threshold` 8.0 /
-`max_flatness` 0.80 from the retune below, and the 0.4.0 short-clip
-geometry (10 / 20 / 0 / 40 ms), are all as they were.
+**Scope of the claim.** On both reference nights the non-bat population
+is weak *broadband* noise (flatness median 0.63), not tonal cricket
+harmonics — much of it admitted by lowering `band_snr_threshold` to 8.
+This is validated as a **weak-broadband-trigger filter**. Neither night
+contains a cricket-dominated stretch, so a tonal-cricket branch was
+deliberately not attempted: tuning one against absent data is exactly
+how the retired gate failed. It needs a cricket-heavy field recording.
 
-Two knock-on effects worth knowing:
+**Open question.** `noise_snr_max` re-thresholds the same top-K SNR
+statistic `band_snr_threshold` already uses, one aggregation later, so
+"snr 8 + filter" may be doing little that "snr 12, no filter" would not.
+The two differ in principle — frame-level vs event-level — but that has
+not been measured. Treat the SNR arm as unproven; the flatness and band
+arms carry the independent information.
 
-- `--save-rejected` now requires an explicit `--cricket-filter on`.
-  It always did — with the filter off nothing is ever cricket-discarded,
-  so `rejected/` would stay empty — but that combination used to be
-  reachable by default and now fails validation at startup with a
-  message naming the flag to add.
-- The `--silence-ms` floor in `ConfigValidator` (16 ms at 384 kHz /
-  hop-512, guarding the discard counter-race) is dormant on the default
-  configuration, since nothing reads the counter. It is deliberately
-  unchanged and still fires for anyone passing `--cricket-filter on`.
-  The shipped `--silence-ms 20` clears it either way, so turning the
-  filter back on needs no other flag.
+**Cost.** ~5× the clips of the pre-0.5.0 regime (150 k–241 k per night),
+4.0–6.6 GB of audio per night, recorder duty 14.7–24.3 %. With sidecars
+that is ~300 k–480 k files per night, which is real inode and
+directory-listing pressure on a Pi Zero 2 W; per-hour sharding or a
+container format is tracked separately and is not a recall problem.
 
-Measurements: `private_docs/audits/01_per_call_recall_audit.md` §7a.
+Note `--save-rejected` requires `--cricket-filter on`. It always did —
+with the filter off nothing is cricket-discarded, so `rejected/` stays
+empty — and this now fails validation at startup with a message naming
+the flag, rather than silently producing nothing.
+
+Measurements: `private_docs/audits/01_per_call_recall_audit.md` §7b.
 
 ### Replay harness is deterministic and device-faithful
 
