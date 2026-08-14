@@ -98,6 +98,33 @@ the flag, rather than silently producing nothing.
 
 Measurements: `private_docs/audits/01_per_call_recall_audit.md` §7b.
 
+### Rejected-clip observability re-anchored on the live rule
+
+Two helpers in `Recorder.cpp` were still reasoning about the retired
+sweep gate after it was replaced.
+
+- **`--save-rejected boundary`** selected near-misses by comparing an
+  event's `bandwidth_khz` against `min_bandwidth_khz` — a threshold that
+  no longer rejects anything, so the mode was anchored on a dead axis.
+  It now reads `noise_snr_max` and keeps a rejected event whose
+  `trigger_snr` lands in `[noise_snr_max - 2.0, noise_snr_max)`: the
+  band where the reject rule's SNR clause only just held, so a
+  marginally louder call would have been kept. The window is one-sided
+  — an event at or above `noise_snr_max` cannot have failed that clause
+  at all. Note the margin is in the detector's **linear** SNR (band
+  magnitude / noise floor), not dB.
+- **`rejected_reason`** in the sidecar could report `"sweep"`, a cause
+  that can no longer occur. It now classifies on `veto_applied`:
+  `"temporal"` for the rep-guard, `"noise"` for the confident-reject
+  rule, matching what `BandEnergyDetector` already prints at event
+  close. `"noise"` is a new value for anything reading that field —
+  `tools/session_screen/rejected.py` and `manifest.py` pass it through
+  unchanged, but their comments still list the old set.
+
+Known cosmetic gap: the `min_bandwidth_khz` tunable's own help text
+(surfaced as the GUI tooltip) still claims the recorder's boundary mode
+reads it. Not fixed here.
+
 ### Replay harness is deterministic and device-faithful
 
 `echobox-replay` fed the pipeline as fast as the CPU allowed (20-30x
