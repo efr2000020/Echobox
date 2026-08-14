@@ -836,6 +836,18 @@ int main(int argc, char** argv) {
     // no post-start work needed here.
     recorder.start();
 
+    // Barrier safety net. The recorder thread now parks on the virtual
+    // clock waiting for audio, so anything that escapes the feed loop
+    // without releasing it (a mid-corpus sndfile error is the realistic
+    // case) would leave ~Recorder's stop() joining a thread that can never
+    // wake — a hang instead of an error. Declared after `recorder` so it
+    // is destroyed before it, i.e. released before the join. release() is
+    // idempotent, so the explicit call on the happy path still stands.
+    struct ClockGuard {
+        echobox::replay::VirtualClock& clock;
+        ~ClockGuard() { clock.release(); }
+    } clockGuard{vclock};
+
     std::printf("Replaying %zu file(s) from '%s' → '%s'\n",
                 source.fileCount(),
                 cli.input.string().c_str(),
