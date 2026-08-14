@@ -88,13 +88,13 @@ Run `./Echobox --help` to see the full list.
 | `--device <name>`     | Which microphone to listen to                             | `default`      |
 | `--output-dir <p>`    | Where recordings are saved                                | `./recordings` |
 | `--preroll-ms <n>`    | How much audio to keep from *before* each call (ms)       | `10`           |
-| `--silence-ms <n>`    | Quiet time after a call before the recording closes (ms). With `--cricket-filter on` it must be ≥ a derived floor (~16 ms at 384 kHz / hop-512); `--cricket-filter off` removes the floor. | `20`           |
+| `--silence-ms <n>`    | Quiet time after a call before the recording closes (ms). If you also pass `--cricket-filter on` it must be ≥ a derived floor (~16 ms at 384 kHz / hop-512); the default `20` already clears it. | `20`           |
 | `--min-length-ms <n>` | Drop any recording shorter than this (`0` = off)          | `0`            |
 | `--max-length-ms <n>` | Close a recording as soon as it reaches this length (`0` = no cap) | `40`   |
 | `--freq-lo-hz <n>`    | Bottom of the frequency range to listen for               | `20000`        |
 | `--freq-hi-hz <n>`    | Top of the frequency range to listen for (cannot exceed Nyquist of your mic's `--sample-rate`) | `192000`       |
 | `--snr-threshold <x>` | SNR a frame must clear to count as a detection (see below) | `8.0`          |
-| `--cricket-filter on\|off` | Reject cricket-like signals before they become WAVs (see [Cricket filter](#cricket-filter) below) | `on` |
+| `--cricket-filter on\|off` | Reject cricket-like signals before they become WAVs. Off by default — it currently rejects most real bats too (see [Cricket filter](#cricket-filter) below) | `off` |
 
 Lengths above are end-to-end (pre-roll + detected activity + silence-after).
 Echobox refuses to start if `--max-length-ms` is smaller than
@@ -111,19 +111,23 @@ is the currency that matters — the 40 ms cap cuts overnight storage
 by roughly half against the previous 200 ms cap while measurably
 improving presence recall on the reference corpus.
 
-The cricket-filter decision still runs on live FFT frames, so shorter
-clips do not weaken it. Three behaviours to be aware of:
+Two behaviours to be aware of:
 
 1. A multi-call bat pass becomes **several one-call clips** instead of a
-   single grouped WAV — presence is still preserved because the surviving
-   bat-like event yields at least one clip.
-2. A cricket sequence that used to become one long rejected clip now
-   becomes **several short rejected clips** (still discarded by the
-   gate; visible only if you turn on `--save-rejected`). Total clip
-   count on `rejected/` is larger; total bytes are smaller.
-3. `--cricket-filter off` disables the on-device cricket rejection, so
-   expect more files on the SD card / downstream classifier when running
-   with the filter off.
+   single grouped WAV — presence is still preserved because each call
+   yields its own clip.
+2. Because the cricket filter now ships **off** (see below), nothing is
+   rejected on-device: expect a lot of files on the SD card, including
+   cricket clips, and plan the downstream classifier pass accordingly.
+   Roughly 150 k–240 k clips per night were recorded on the two
+   reference sessions, at 4.0–6.6 GB.
+
+If you turn the filter back on with `--cricket-filter on`, its decision
+still runs on live FFT frames, so shorter clips do not weaken it — a
+cricket sequence that used to become one long rejected clip becomes
+several short rejected clips instead (visible only with
+`--save-rejected`). Total rejected clip count is larger; total bytes are
+smaller.
 
 ### Long-pass profile (opt-in)
 
@@ -173,9 +177,10 @@ Examples:
 ## Cricket filter
 
 Sites with active crickets can easily fill an SD card with cricket
-recordings before bats show up. Echobox recognises the shape of a
-cricket chirp — narrow bandwidth, a metronomic repetition pattern — and
-rejects it in two places:
+recordings before bats show up. Echobox ships a filter that looks for
+the shape of a cricket chirp — narrow bandwidth, a metronomic
+repetition pattern. **It is off by default; read the next section
+before turning it on.** When enabled it rejects in two places:
 
 - The **detector** downgrades cricket-shaped events during frame
   processing, so they never open a recording in the first place.
@@ -183,17 +188,33 @@ rejects it in two places:
   so an isolated event that survives the detector still gets dropped
   before it becomes a WAV.
 
-The filter is **on by default** and requires no configuration.
+### The filter is currently **off by default**
 
-If a deployment site produces bat calls the filter can't recognise, turn
-it off — one flag disables both halves:
+It used to ship on. It was then measured against a reference classifier
+on two full field nights, and it turned out to reject about 82 % of
+everything the detector found — most of it real bats, not crickets:
+
+| | filter on | filter off |
+| --- | ---: | ---: |
+| Night 1 — calls captured | 26.6 % | **98.6 %** |
+| Night 2 — calls captured | 25.7 % | **98.7 %** |
+
+Missing three out of four bat calls is not a trade worth any amount of
+saved storage, so the filter is off until the gate can be rebuilt to
+tell crickets from bats reliably. **This is an interim default, not a
+claim that crickets aren't a problem** — they still are, and at a noisy
+site they will fill your card.
+
+If your site has heavy cricket activity and you would rather lose calls
+than storage, turn the filter back on — one flag enables both halves:
 
 ```bash
-./run.sh --device plughw:CARD=UltraMic384K --cricket-filter off
+./run.sh --device plughw:CARD=UltraMic384K --cricket-filter on
 ```
 
-With `--cricket-filter off` the recorder behaves as if the filter were
-never present.
+Go in knowing the recall cost above. `--save-rejected` also needs
+`--cricket-filter on`, since with the filter off nothing is ever
+rejected and `rejected/` would stay empty.
 
 ### Temporal rep-guard (advanced) — OFF by default as of 0.3.0-rc1
 

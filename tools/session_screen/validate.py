@@ -185,7 +185,8 @@ def _resolve_output_dir(args: argparse.Namespace) -> Path:
 # Three named presets:
 #   - shipping — mirrors src/app/Config.hpp. This is what the field
 #     device actually runs; use it to measure device-relevant behaviour.
-#     Geometry 10/20/40 (0.4.0) + snr_threshold 8.0 (recall retune).
+#     Geometry 10/20/40 (0.4.0) + snr_threshold 8.0 (recall retune) +
+#     cricket_filter OFF (the gate cost more recall than it saved bytes).
 #   - legacy   — the pre-0.4.0 long-clip geometry (50/50/200) at
 #     snr_threshold 12.0. Kept so old reports remain reproducible. Was
 #     called "baseline" until 2026-08.
@@ -206,11 +207,18 @@ def _plan_shipping():
     the per-call recall retune. max_flatness (0.65 -> 0.80 in the same
     round) is not a CLI flag, so it arrives via the replay binary's
     compiled detector defaults.
+
+    cricket_filter tracks Config::cricketFilter, which flipped to False:
+    the sweep-shape gate rejected ~82 % of detector events including most
+    real bats (per-call recall 26 % on / 99 % off, both field nights), so
+    the gate-off arm is what ships while the gate is redesigned. Unlike
+    ``legacy`` / ``shorter``, this preset is NOT frozen — it is meant to
+    move whenever Config.hpp moves.
     """
     from . import replay as _replay
     return _replay.ReplayConfig(
         preroll_ms=10, silence_ms=20,
-        max_length_ms=40, min_length_ms=0, cricket_filter=True,
+        max_length_ms=40, min_length_ms=0, cricket_filter=False,
         snr_threshold=8.0)
 
 

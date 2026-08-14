@@ -97,14 +97,36 @@ struct Config {
     // disables.
     std::uint32_t         heartbeatSec{60};
 
-    // Cricket filter master switch. On (default) enables BOTH halves of
-    // the filter under a single flag:
+    // Cricket filter master switch. One flag gates BOTH halves:
     //   * detector's sweep_gate_enabled sweep-shape gate + temporal guard;
     //   * recorder's cricketDiscard "no bat-like event" post-hoc drop.
-    // Off disables both → recorder behaves as if no filter existed. The
-    // field escape hatch: if a deployment site produces bat calls the
-    // gate can't characterise, one flag turns the whole filter off.
-    bool                  cricketFilter{true};
+    // On enables both; off disables both → the recorder behaves as if no
+    // filter existed.
+    //
+    // Flipped true -> false. The sweep-shape gate rejects ~82 % of all
+    // detector events, and most of what it rejects is real bats, not
+    // crickets. End-to-end per-call recall against BatDetect2 proxy
+    // truth, two full field nights, gate ON vs OFF:
+    //
+    //     session_02   25.7 %  ->  98.7 %
+    //     session_01   26.6 %  ->  98.6 %
+    //
+    // The product target is >= 90 %, so the gate as built is the entire
+    // gap: no amount of detector tuning reaches the target with it on.
+    // Shipping it off is the only configuration that meets the target
+    // today. Cost: ~5x the clips and ~4-6.6 GB/night (inside the 6-8 GB
+    // envelope), plus a file-count problem on the SD card that is
+    // tracked separately.
+    //
+    // This default is INTERIM, not a verdict on crickets. Cricket
+    // false positives are real and still cost storage at a noisy site;
+    // what is broken is this gate's discrimination, and a redesign is a
+    // separate work package. Operators at cricket-heavy sites can put
+    // the current gate back with --cricket-filter on and trade recall
+    // for bytes knowingly. Expect this default to flip back once the
+    // redesigned gate can be shown not to cost recall.
+    // See private_docs/audits/01_per_call_recall_audit.md §7a.
+    bool                  cricketFilter{false};
 
     // --- Rejected-capture observability ---
     // Selects which cricket-discarded clips get preserved (into

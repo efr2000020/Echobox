@@ -61,7 +61,12 @@ struct DspPipelineConfig {
     /// @c Application::run flips both from one CLI flag. Trackers that
     /// don't expose the tunable ignore this silently (a plain warn logged
     /// in start()).
-    bool         cricketFilter{true};
+    ///
+    /// @note Default mirrors @c Config::cricketFilter, which flipped to
+    ///       false when the gate was measured rejecting most real bats
+    ///       (26 % vs 99 % per-call recall); see Config.hpp for the
+    ///       measurement and the interim framing. Update the two together.
+    bool         cricketFilter{false};
 
     /// Diagnostic tracker-tunable overrides applied at the end of
     /// @c start(), immediately after the built-in setTunable() calls

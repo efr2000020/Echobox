@@ -86,7 +86,14 @@ struct RecorderConfig {
     /// to a temp WAV, then aborted at close instead of finalised. Wired
     /// to the @c --cricket-filter CLI flag; disabling both halves with
     /// that one switch restores the behaviour of the pre-gate recorder.
-    bool                  cricketDiscard{true};
+    ///
+    /// Default mirrors the shipping @c echobox::app::Config::cricketFilter,
+    /// which flipped to false when the gate was measured rejecting most
+    /// real bats (26 % vs 99 % per-call recall; see Config.hpp). Keep the
+    /// two in lock-step so a RecorderConfig built ex-nihilo matches what
+    /// the field unit does. Interim — expect both to flip back once the
+    /// gate is redesigned.
+    bool                  cricketDiscard{false};
 
     // --- Rejected-capture observability ---
     // When @c saveRejected is not @c Off, a clip that would be cricket-

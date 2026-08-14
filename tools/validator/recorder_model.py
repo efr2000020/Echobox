@@ -45,19 +45,25 @@ from .dsp import HOP, load_wav_float
 class RecorderModelConfig:
     """Frame-domain mirror of the production ``RecorderConfig``.
 
-    Defaults match ``src/app/Config.hpp`` so a run with ``RecorderModelConfig()``
-    predicts the shipping unit's behaviour on the same recording. R2v3 ships
-    short-clip defaults (one clip per bat call, hard-capped at 200 ms) with
-    the cricket filter on by default; the long-pass profile is available as
-    an explicit override (``preroll_ms=1000, silence_ms=2000, max_length_ms=5000``).
+    .. warning::
+       These defaults are the **R2v3-era** geometry (50/50/200, cricket
+       filter on). They no longer match ``src/app/Config.hpp``, which
+       ships 10/20/40 since the 0.4.0 short-clip release and
+       ``cricketFilter = false`` since the per-call recall audit. Pass an
+       explicit ``RecorderModelConfig(...)`` if you want to predict what
+       the current shipping unit does; a bare ``RecorderModelConfig()``
+       predicts the historical one. The long-pass profile remains an
+       explicit override (``preroll_ms=1000, silence_ms=2000,
+       max_length_ms=5000``).
     """
     preroll_ms:   int  = 50
     silence_ms:   int  = 50
     min_length_ms: int = 0
     max_length_ms: int = 200     # 0 = uncapped
     # Cricket-filter deferred discard: drop clips whose window saw no
-    # bat-like event. Off models `--cricket-filter off` (the field
-    # escape hatch); on models the shipping default.
+    # bat-like event. False models `--cricket-filter off`, which is what
+    # the unit now ships; True models the historical on-by-default gate
+    # and is what this frozen R2v3 config keeps.
     cricket_discard: bool = True
 
 

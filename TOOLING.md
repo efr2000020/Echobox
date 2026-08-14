@@ -379,9 +379,8 @@ Order-of-operations rule of thumb:
 
 ## 5. Fully-explicit shipping-defaults launch
 
-For the record — every option spelled out with its 0.4.0 default. If
-the customer runs with no flags, this is the effective invocation
-(modulo `--save-rejected off` in that case):
+For the record — every option spelled out with its current default. If
+the customer runs with no flags, this is the effective invocation:
 
 ```bash
 ./deploy/bin/Echobox \
@@ -398,8 +397,8 @@ the customer runs with no flags, this is the effective invocation
     --silence-ms 20 \
     --min-length-ms 0 \
     --max-length-ms 40 \
-    --cricket-filter on \
-    --save-rejected boundary \
+    --cricket-filter off \
+    --save-rejected off \
     --save-rejected-sample-n 500 \
     --save-rejected-max-per-hour 200 \
     --log-dir ./logs \

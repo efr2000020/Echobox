@@ -2,6 +2,63 @@
 
 ## Unreleased
 
+### Cricket filter now ships OFF by default
+
+`--cricket-filter` defaults to `off`. The flag still gates both halves
+of the filter (the detector's `sweep_gate_enabled` sweep-shape gate and
+the recorder's `cricketDiscard` post-hoc drop); only the default moved.
+
+The sweep-shape gate was measured rejecting **~82 % of all detector
+events**, and most of what it rejected was real bats. End-to-end
+per-call recall against BatDetect2 proxy truth, two full field nights,
+same binary, gate on vs off:
+
+| session | gate ON | gate OFF |
+|---|---:|---:|
+| session_02 (2026-08-07) | 25.74 % | **98.69 %** |
+| session_01 (2026-08-03) | 26.62 % | **98.56 %** |
+
+The product target is ≥ 90 %. With the gate on, no setting of any other
+knob gets close — the gate *is* the gap. The gate-off arm meets the
+target with margin and the two nights agree to within 0.2 pp.
+
+**Cost.** ~5× the clips (150 k–241 k per night, vs 30 k–51 k), 4.0–6.6 GB
+of audio per night against the 6–8 GB envelope, and recorder duty
+14.7–24.3 %. Also a filesystem problem the previous 14 k-clip regime
+never exposed: ~300 k–480 k files per night once sidecars are counted,
+which is real inode and directory-listing pressure on a Pi Zero 2 W.
+That needs a container format or per-hour sharding and is tracked
+separately — it is not a recall problem.
+
+**This is an interim default.** Cricket false positives are real and
+still cost storage at a noisy site; what is broken is this gate's
+discrimination between a cricket chirp and a bat call. A redesign is a
+separate work package, and this default is expected to flip back once
+the new gate can be shown not to cost recall. Operators at
+cricket-heavy sites can restore today's behaviour with
+`--cricket-filter on` — the flag, the gate, and every tunable behind it
+are unchanged.
+
+Nothing else in the shipped configuration moved: `snr_threshold` 8.0 /
+`max_flatness` 0.80 from the retune below, and the 0.4.0 short-clip
+geometry (10 / 20 / 0 / 40 ms), are all as they were.
+
+Two knock-on effects worth knowing:
+
+- `--save-rejected` now requires an explicit `--cricket-filter on`.
+  It always did — with the filter off nothing is ever cricket-discarded,
+  so `rejected/` would stay empty — but that combination used to be
+  reachable by default and now fails validation at startup with a
+  message naming the flag to add.
+- The `--silence-ms` floor in `ConfigValidator` (16 ms at 384 kHz /
+  hop-512, guarding the discard counter-race) is dormant on the default
+  configuration, since nothing reads the counter. It is deliberately
+  unchanged and still fires for anyone passing `--cricket-filter on`.
+  The shipped `--silence-ms 20` clears it either way, so turning the
+  filter back on needs no other flag.
+
+Measurements: `private_docs/audits/01_per_call_recall_audit.md` §7a.
+
 ### Replay harness is deterministic and device-faithful
 
 `echobox-replay` fed the pipeline as fast as the CPU allowed (20-30x

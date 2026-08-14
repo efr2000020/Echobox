@@ -60,6 +60,15 @@ std::optional<std::string> checkLengthOrder(const Config& cfg) {
 // that fires inside the silence window. With the filter OFF nothing
 // reads the counter — no race, no floor. With it on we derive the floor
 // from the actual settle budget instead of a flat conservative pad.
+//
+// Since Config::cricketFilter defaults to false, this check is now
+// dormant on the shipped configuration — the counter is never read, so
+// there is genuinely nothing to guard. Deliberately NOT weakened: it
+// still fires for the operator who passes --cricket-filter on, which is
+// precisely when the race becomes reachable again, and it is the reason
+// they cannot pair that flag with a sub-floor --silence-ms. The shipped
+// 20 ms clears the 16 ms floor either way, so turning the filter back on
+// needs no other flag.
 std::optional<std::string> checkSilenceExceedsHangover(const Config& cfg) {
     if (!cfg.cricketFilter) return std::nullopt;
 
@@ -90,7 +99,8 @@ std::optional<std::string> checkSilenceExceedsHangover(const Config& cfg) {
              + ") must be at least " + std::to_string(kMinSilenceMs)
              + "ms while --cricket-filter is on, so the discard counter read at "
                "recording close cannot race an event still closing "
-               "(set --cricket-filter off to remove this floor)";
+               "(the filter is off by default and imposes no floor; this "
+               "applies because --cricket-filter on was requested)";
     }
     return std::nullopt;
 }
@@ -104,12 +114,17 @@ std::optional<std::string> checkSilenceExceedsHangover(const Config& cfg) {
 // is off the recorder never enters the discard branch, so no clip would
 // ever be routed to the rejected sink. Surface the misconfiguration
 // instead of silently doing nothing.
+//
+// Now that the filter defaults OFF, --save-rejected on its own is an
+// error rather than the working combination it used to be, so the
+// message spells out the extra flag the operator now has to pass.
 std::optional<std::string> checkSaveRejectedRequiresFilter(const Config& cfg) {
     if (cfg.saveRejected == Config::SaveRejectedMode::Off) return std::nullopt;
     if (!cfg.cricketFilter) {
         return "--save-rejected requires --cricket-filter on (with the filter "
                "off, no clip is ever cricket-discarded and nothing would ever "
-               "be written to rejected/)";
+               "be written to rejected/); the filter is off by default now, so "
+               "pass --cricket-filter on alongside --save-rejected";
     }
     return std::nullopt;
 }
