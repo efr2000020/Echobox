@@ -22,13 +22,16 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using echobox::recorder::DetectorStateSnapshot;
@@ -572,3 +575,271 @@ TEST_CASE("Recorder keeps every clip when cricketDiscard is off",
 
     fs::remove_all(outputDir);
 }
+
+
+// --- Injected-clock tests -------------------------------------------------
+//
+// These pin the seam added for echobox-replay (src/recorder/RecorderClock.hpp).
+// The defect they guard against: the recorder's silenceMs timeout and poll
+// cadence were read from steady_clock while maxLengthMs was counted in audio
+// frames, so any harness that does not run at exactly 1x real time decouples
+// the two. Replay ran 20-30x fast and produced 635 / 650 / 650 clips over
+// three runs of the same 60 s input.
+//
+// The tests below are compiled only where the seam is (see
+// src/recorder/CMakeLists.txt); the field build has no RecorderConfig::clock
+// member at all.
+
+#ifdef ECHOBOX_RECORDER_CLOCK_INJECTION
+
+namespace {
+
+// Scripted time source implementing the same turn-taking protocol as
+// echobox::replay::VirtualClock, kept local so tests/unit does not depend on
+// the replay tool being built. The driver (test thread) and the recorder
+// thread strictly alternate: tick() blocks until the recorder has finished
+// its previous poll, then releases exactly one more.
+class ScriptedClock : public echobox::recorder::IRecorderClock {
+public:
+    std::chrono::steady_clock::time_point now() const override {
+        std::lock_guard<std::mutex> lk(m_mut);
+        return std::chrono::steady_clock::time_point(std::chrono::nanoseconds(m_ns));
+    }
+    std::chrono::system_clock::time_point wallNow() const override {
+        std::lock_guard<std::mutex> lk(m_mut);
+        // Epoch deliberately left at system_clock's zero: a filename built
+        // from this can never be confused with one built from "now", which
+        // is what the reproducibility check below relies on.
+        return std::chrono::system_clock::time_point{} + std::chrono::nanoseconds(m_ns);
+    }
+    void sleepFor(std::chrono::milliseconds d) override {
+        std::unique_lock<std::mutex> lk(m_mut);
+        if (m_released) {
+            lk.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            return;
+        }
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(d).count();
+        if (ns == 0) ns = 1;
+        m_wakeNs = m_ns + ns;
+        m_parked = true;
+        m_cvDriver.notify_all();
+        m_cvRec.wait(lk, [this] { return m_released || m_ns >= m_wakeNs; });
+        m_parked = false;
+    }
+
+    /// Hand the recorder exactly one poll, @p d of virtual time later.
+    void tick(std::chrono::milliseconds d) {
+        {
+            std::unique_lock<std::mutex> lk(m_mut);
+            // "Parked for a future time" — not merely "parked" — so we
+            // cannot race ahead in the window between notifying and the
+            // recorder actually waking.
+            m_cvDriver.wait(lk, [this] {
+                return m_released || (m_parked && m_wakeNs > m_ns);
+            });
+            m_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(d).count();
+        }
+        m_cvRec.notify_all();
+    }
+
+    void tickFor(std::chrono::milliseconds total, std::chrono::milliseconds step) {
+        for (auto t = std::chrono::milliseconds(0); t < total; t += step) tick(step);
+    }
+
+    /// Unblock permanently so Recorder::stop() can join its thread.
+    void release() {
+        {
+            std::lock_guard<std::mutex> lk(m_mut);
+            m_released = true;
+        }
+        m_cvRec.notify_all();
+        m_cvDriver.notify_all();
+    }
+
+private:
+    mutable std::mutex      m_mut;
+    std::condition_variable m_cvRec;
+    std::condition_variable m_cvDriver;
+    std::int64_t m_ns{0};
+    std::int64_t m_wakeNs{0};
+    bool m_parked{false};
+    bool m_released{false};
+};
+
+// Finalized clips only. countWavs() also matches the in-progress
+// "<stem>.partial.wav" temp file, which is exactly what a mid-recording
+// assertion must not count.
+int countFinalWavs(const fs::path& dir) {
+    int n = 0;
+    if (!fs::exists(dir)) return 0;
+    for (const auto& e : fs::recursive_directory_iterator(dir)) {
+        if (!e.is_regular_file()) continue;
+        const auto name = e.path().filename().string();
+        if (e.path().extension() != ".wav") continue;
+        if (name.find(".partial.") != std::string::npos) continue;
+        ++n;
+    }
+    return n;
+}
+
+// One scripted event under an injected clock: active for `activeFor` of
+// virtual time, then quiet for `silentFor`. Returns the number of WAVs left
+// on disk. Nothing here sleeps on wall time.
+int runScriptedEvent(const fs::path& outputDir,
+                     std::chrono::milliseconds activeFor,
+                     std::chrono::milliseconds silentFor,
+                     std::uint32_t silenceMs) {
+    PreRollBuffer pr(48000);
+    feedPreRoll(pr, 32000);
+
+    FakeProvider provider;
+    ScriptedClock clock;
+
+    RecorderConfig cfg;
+    cfg.outputDir      = outputDir;
+    cfg.sampleRate     = 48000;
+    cfg.channels       = 1;
+    cfg.preRollMs      = 100;
+    cfg.silenceMs      = silenceMs;
+    cfg.minLengthMs    = 0;
+    cfg.maxLengthMs    = 0;          // uncapped: isolate the silence timeout
+    cfg.pollIntervalMs = 1;
+    cfg.writeSidecar   = false;
+    cfg.cricketDiscard = false;
+    cfg.clock          = &clock;
+
+    Recorder rec(cfg, pr, provider);
+    rec.start();
+
+    constexpr auto kStep = std::chrono::milliseconds(10);
+    provider.set_active(true);
+    clock.tickFor(activeFor, kStep);
+    provider.set_active(false);
+    clock.tickFor(silentFor, kStep);
+
+    clock.release();
+    rec.stop();
+    return countWavs(outputDir);
+}
+
+} // namespace
+
+
+TEST_CASE("Recorder silence timeout runs on injected time, not wall time",
+          "[recorder][clock]") {
+    // A 3 s silence window that the recorder must measure in *its* clock.
+    // If it still read steady_clock this test would need 3 s of real time
+    // to close the WAV; driven virtually it closes in milliseconds, and the
+    // wall-clock assertion below is what proves the difference.
+    const auto outputDir = makeTempOutputDir("clock-virtual");
+    const auto t0 = std::chrono::steady_clock::now();
+
+    const int wavs = runScriptedEvent(outputDir,
+                                      std::chrono::milliseconds(100),
+                                      std::chrono::milliseconds(3200),
+                                      /*silenceMs=*/3000);
+
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - t0);
+
+    CHECK(wavs == 1);
+    // 3.3 s of virtual time in well under a second of real time. Generous
+    // bound: the point is the order of magnitude, not a latency budget.
+    CHECK(elapsed < std::chrono::milliseconds(1500));
+
+    fs::remove_all(outputDir);
+}
+
+
+TEST_CASE("Recorder does not close before the injected silence window elapses",
+          "[recorder][clock]") {
+    // The other half of the contract: virtual time must be *required*, not
+    // merely sufficient. Stopping 500 ms of virtual time short of the
+    // window leaves the recording open, so the only WAV on disk is the one
+    // the shutdown flush writes — never a silence-timeout close.
+    const auto outputDir = makeTempOutputDir("clock-early");
+
+    PreRollBuffer pr(48000);
+    feedPreRoll(pr, 32000);
+
+    FakeProvider provider;
+    ScriptedClock clock;
+
+    RecorderConfig cfg;
+    cfg.outputDir      = outputDir;
+    cfg.sampleRate     = 48000;
+    cfg.channels       = 1;
+    cfg.preRollMs      = 100;
+    cfg.silenceMs      = 1000;
+    cfg.minLengthMs    = 0;
+    cfg.maxLengthMs    = 0;
+    cfg.pollIntervalMs = 1;
+    cfg.writeSidecar   = false;
+    cfg.cricketDiscard = false;
+    cfg.clock          = &clock;
+
+    Recorder rec(cfg, pr, provider);
+    rec.start();
+
+    provider.set_active(true);
+    clock.tickFor(std::chrono::milliseconds(100), std::chrono::milliseconds(10));
+    provider.set_active(false);
+    clock.tickFor(std::chrono::milliseconds(500), std::chrono::milliseconds(10));
+
+    // 500 ms of virtual quiet against a 1000 ms window: still open, so
+    // only the .partial temp file exists — no finalized clip.
+    CHECK(countFinalWavs(outputDir) == 0);
+
+    clock.release();
+    rec.stop();
+
+    fs::remove_all(outputDir);
+}
+
+
+TEST_CASE("Recorder output is reproducible under a scripted clock",
+          "[recorder][clock][determinism]") {
+    // The acceptance criterion the replay harness needs: identical input +
+    // identical scripted time ⇒ identical files, by name and by size. Under
+    // the old wall-clock recorder the same corpus produced a different clip
+    // count on every run.
+    std::vector<std::vector<std::pair<std::string, std::uintmax_t>>> runs;
+    std::vector<fs::path> dirs;
+
+    for (int i = 0; i < 3; ++i) {
+        const auto dir = makeTempOutputDir("clock-repeat-" + std::to_string(i));
+        dirs.push_back(dir);
+        CHECK(runScriptedEvent(dir,
+                               std::chrono::milliseconds(100),
+                               std::chrono::milliseconds(400),
+                               /*silenceMs=*/200) == 1);
+
+        std::vector<std::pair<std::string, std::uintmax_t>> files;
+        for (const auto& e : fs::recursive_directory_iterator(dir)) {
+            if (!e.is_regular_file()) continue;
+            // Record the path relative to the run dir (which carries a
+            // unique tag) plus the size, so the comparison covers the
+            // wall-clock-derived filename as well as the audio length.
+            files.emplace_back(fs::relative(e.path(), dir).string(),
+                               e.file_size());
+        }
+        std::sort(files.begin(), files.end());
+        runs.push_back(std::move(files));
+    }
+
+    CHECK(runs[0] == runs[1]);
+    CHECK(runs[0] == runs[2]);
+    REQUIRE(runs[0].size() == 1);
+
+    // The filename must come from the injected wall clock, not the host's.
+    // The scripted epoch is system_clock's zero, so the date directory is
+    // 1969-12-31 or 1970-01-01 depending on the host time zone — either
+    // way it cannot be today. If wallNow() injection regresses, this fails.
+    const auto dateDir = fs::path(runs[0][0].first).parent_path().string();
+    CHECK(dateDir.rfind("19", 0) == 0);
+
+    for (const auto& d : dirs) fs::remove_all(d);
+}
+
+#endif // ECHOBOX_RECORDER_CLOCK_INJECTION

@@ -29,6 +29,34 @@ namespace echobox::recorder {
 namespace {
 constexpr std::size_t kDrainChunkSamples = 4096;
 
+// --- Clock policies for Recorder::pollLoop -------------------------------
+//
+// Duck-typed policies (now() + sleepFor()), selected once per run by
+// Recorder::loop(). The field build only ever instantiates
+// pollLoop<SteadyClock>, whose members are static and trivially inlined:
+// the emitted poll loop calls steady_clock::now() and
+// this_thread::sleep_for directly, with no vtable and no branch, which is
+// exactly what the pre-seam recorder did. InjectedClock does not exist at
+// all unless ECHOBOX_RECORDER_CLOCK_INJECTION is set — see
+// RecorderClock.hpp.
+
+struct SteadyClock {
+    static std::chrono::steady_clock::time_point now() noexcept {
+        return std::chrono::steady_clock::now();
+    }
+    static void sleepFor(std::chrono::milliseconds d) {
+        std::this_thread::sleep_for(d);
+    }
+};
+
+#ifdef ECHOBOX_RECORDER_CLOCK_INJECTION
+struct InjectedClock {
+    IRecorderClock* c;
+    std::chrono::steady_clock::time_point now() const { return c->now(); }
+    void sleepFor(std::chrono::milliseconds d) const { c->sleepFor(d); }
+};
+#endif
+
 std::uint64_t framesForMs(std::uint32_t ms, int sampleRate) {
     return static_cast<std::uint64_t>(ms) * static_cast<std::uint64_t>(sampleRate) / 1000ULL;
 }
@@ -136,6 +164,22 @@ void Recorder::stop() {
 }
 
 void Recorder::loop() {
+    // The one and only read of the injected-clock pointer on the hot path:
+    // it picks a pollLoop instantiation for the whole run, so the poll body
+    // itself carries no branch. In the field build the #ifdef removes this
+    // entirely and loop() is just pollLoop<SteadyClock>, inlined — see
+    // RecorderClock.hpp.
+#ifdef ECHOBOX_RECORDER_CLOCK_INJECTION
+    if (m_cfg.clock) {
+        pollLoop(InjectedClock{m_cfg.clock});
+        return;
+    }
+#endif
+    pollLoop(SteadyClock{});
+}
+
+template <class Clock>
+void Recorder::pollLoop(Clock clk) {
     const auto pollInterval = std::chrono::milliseconds(m_cfg.pollIntervalMs);
     const auto silence      = std::chrono::milliseconds(m_cfg.silenceMs);
 
@@ -156,22 +200,28 @@ void Recorder::loop() {
             // appendLiveAudio() flips m_state back to Idle if the max-length
             // cap closed the file — re-check before processing the detector
             // snapshot so we don't double-end an already-closed recording.
+            // Deliberately re-polls without sleeping: a max-length close on
+            // a still-active event should reopen on the very next iteration,
+            // not one poll interval later. Under an injected clock this
+            // costs nothing either — the harness's barrier simply lets the
+            // recorder take a second iteration at the same virtual instant,
+            // which is exactly what the device does at the same wall instant.
             if (m_state == State::Idle) {
                 continue;
             }
             if (s.active) {
-                m_lastActiveTime = std::chrono::steady_clock::now();
+                m_lastActiveTime = clk.now();
                 if (s.loHz > 0.0f) m_eventLoHz = std::min(m_eventLoHz, s.loHz);
                 if (s.hiHz > 0.0f) m_eventHiHz = std::max(m_eventHiHz, s.hiHz);
             } else {
-                const auto idle = std::chrono::steady_clock::now() - m_lastActiveTime;
+                const auto idle = clk.now() - m_lastActiveTime;
                 if (idle >= silence) {
                     endRecording();
                 }
             }
         }
 
-        std::this_thread::sleep_for(pollInterval);
+        clk.sleepFor(pollInterval);
     }
 
     // On shutdown, flush any in-progress recording so we don't lose it.
@@ -183,8 +233,8 @@ void Recorder::loop() {
 }
 
 void Recorder::beginRecording(const DetectorStateSnapshot& s) {
-    m_eventStartWall   = std::chrono::system_clock::now();
-    m_eventStartSteady = std::chrono::steady_clock::now();
+    m_eventStartWall   = nowWall();
+    m_eventStartSteady = nowSteady();
     m_lastActiveTime   = m_eventStartSteady;
     m_eventLoHz        = s.loHz > 0.0f ? s.loHz : 0.0f;
     m_eventHiHz        = s.hiHz > 0.0f ? s.hiHz : 0.0f;
@@ -360,7 +410,7 @@ void Recorder::endRecording() {
     // RECORDING_SAVED trace at DEBUG; the operator-facing summary is the
     // events_kept counter in the HEARTBEAT line + the WAVs on disk.
     const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - m_eventStartSteady).count();
+        nowSteady() - m_eventStartSteady).count();
     LS_DEBUG("recorder", "RECORDING_SAVED file=%s frames=%llu duration=%ums elapsed=%lldms band=%.1f-%.1fkHz",
              finalPath.filename().string().c_str(),
              static_cast<unsigned long long>(frames), durationMs,
@@ -461,7 +511,7 @@ bool Recorder::rejectedGovernorAllows() {
         // Still perform the low-disk check so a runaway local run doesn't
         // silently fill the boot volume.
     } else {
-        const auto now       = std::chrono::steady_clock::now();
+        const auto now       = nowSteady();
         const auto oneHourAgo = now - std::chrono::hours(1);
         while (!m_rejectedWriteTimes.empty()
                && m_rejectedWriteTimes.front() < oneHourAgo) {
@@ -504,7 +554,7 @@ bool Recorder::rejectedGovernorAllows() {
 
 void Recorder::recordRejectedWrite() {
     ++m_rejectedWrittenTotal;
-    m_rejectedWriteTimes.push_back(std::chrono::steady_clock::now());
+    m_rejectedWriteTimes.push_back(nowSteady());
 }
 
 bool Recorder::saveRejectedClip(const SidecarPayload& payload) {

@@ -9,6 +9,7 @@
 #include "DetectorStateProvider.hpp"
 #include "FilenameBuilder.hpp"
 #include "PreRollBuffer.hpp"
+#include "RecorderClock.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -104,6 +105,23 @@ struct RecorderConfig {
     /// @c 0 disables the check. Bounds any risk of the observability sink
     /// filling the SD card faster than the operator can rotate it.
     std::uint32_t         saveRejectedMinDiskMb{100};
+
+#ifdef ECHOBOX_RECORDER_CLOCK_INJECTION
+    /// Optional injected time source. @c nullptr means "read
+    /// @c steady_clock and really sleep", i.e. exactly what the recorder
+    /// did before the seam existed. Non-null is for off-tree harnesses
+    /// that must decouple the recorder's notion of elapsed time from wall
+    /// time; see @c RecorderClock.hpp for why that seam has to live in
+    /// @c src/, and @c tools/replay/VirtualClock.hpp for the production
+    /// implementation.
+    ///
+    /// Absent entirely from the field build — the whole member is behind
+    /// the @c ECHOBOX_RECORDER_CLOCK_INJECTION gate, which only the unit
+    /// tests and @c echobox-replay turn on.
+    ///
+    /// Not owned. Lifetime must outlive the Recorder.
+    IRecorderClock*       clock{nullptr};
+#endif
 };
 
 /**
@@ -145,6 +163,36 @@ private:
     enum class State { Idle, Active };
 
     void loop();
+
+    /// The actual poll loop, templated on a duck-typed clock policy
+    /// (@c now() + @c sleepFor()). @c loop() picks the instantiation once
+    /// per run from @c RecorderConfig::clock, so the poll body itself has
+    /// no branch and no indirection: the field build resolves to the
+    /// stateless steady-clock policy and inlines through to the same
+    /// @c steady_clock::now() / @c sleep_for the pre-seam recorder called.
+    /// See RecorderClock.hpp.
+    template <class Clock>
+    void pollLoop(Clock clk);
+
+    // Cold-path time reads — once per recording, next to a WAV open or a
+    // close+rename, so the null check against RecorderConfig::clock is
+    // free in practice and does not need the template treatment the poll
+    // loop gets. Defined inline here (rather than in the .cpp) so the
+    // field build, where the #ifdef leaves nothing but the bare now()
+    // call, folds them away instead of emitting two new out-of-line
+    // symbols the pre-seam object file did not have.
+    std::chrono::steady_clock::time_point nowSteady() const {
+#ifdef ECHOBOX_RECORDER_CLOCK_INJECTION
+        if (m_cfg.clock) return m_cfg.clock->now();
+#endif
+        return std::chrono::steady_clock::now();
+    }
+    std::chrono::system_clock::time_point nowWall() const {
+#ifdef ECHOBOX_RECORDER_CLOCK_INJECTION
+        if (m_cfg.clock) return m_cfg.clock->wallNow();
+#endif
+        return std::chrono::system_clock::now();
+    }
 
     void beginRecording(const DetectorStateSnapshot& s);
     void appendLiveAudio();
