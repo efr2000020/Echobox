@@ -270,17 +270,56 @@ int Application::run() {
                 ::echobox::collection::ContinuousWriter>(
                 cwCfg, *m_referenceRing, m_sampleClock);
         }
-        // Stream B pre-roll: 8 seconds — comfortably wider than any clip
-        // window we ask for, and sized so a cricket-heavy burst can back
-        // the writer thread up for several seconds without a job aging out
-        // of the ring (a 2 s ring silently lost ~3% of events over a 9.7 h
-        // field session). At 384 kHz mono int16 that is ~6 MB, cheap
-        // against the Pi Zero 2 W's 512 MB. Independent of the Stream A
-        // ring; the two are fed in lockstep from the capture loop so the
-        // §3 byte-identity check diffs matching sample ranges.
+        // Stream B pre-roll: 45 seconds. The number has moved twice, for
+        // different reasons each time, so the whole progression is recorded
+        // here rather than just the current value:
+        //
+        //   2 s  — the original. Silently lost ~3% of events over a 9.7 h
+        //          field session and damaged one of the two reference
+        //          corpora. Every one of those losses was a genuine "aged
+        //          out of preroll": the window really had been overwritten.
+        //   8 s  — the reaction to that, and it did fix ageing-out. A 145 s
+        //          live loopback run at the densest corpus rate logged zero
+        //          aged-out drops at 8 s.
+        //   45 s — headroom against SD-card stalls, not a bug fix. See below.
+        //
+        // What 8 s did NOT fix was a 1.8% clip loss (32 of 1790) in that same
+        // loopback run, because the ring was never the cause. All 32 were
+        // logged "still incomplete at clip time", none "aged out", and the
+        // shortfall was always <= 4096 samples — exactly one capture batch.
+        // That was a readiness-check bug in EventClipWriter, which waited on
+        // the sample clock while reading from this ring; captureLoop advances
+        // the clock (step 1b below) two statements before it mirrors the same
+        // batch in (step 1d), so the clock leads this ring by up to a batch.
+        // It is fixed in EventClipWriter by gating on the ring's own
+        // writeCount. Enlarging the ring would not have moved that number by
+        // a single clip — which is the point of writing this down: the next
+        // person who sees Stream B drops should check WHICH warning fired
+        // before reaching for this constant.
+        //
+        // Why 45 s anyway: this ring's real job is to survive a writer stall,
+        // and on a Pi Zero 2 W the only stall big enough to matter is the SD
+        // card pausing for internal garbage collection. Stream B sustains
+        // ~2.1 MB/s of clip writes at the densest corpus rate (12.3 clips/s x
+        // ~172 kB/clip, both measured) on top of Stream A's 768 kB/s, and a
+        // cheap card can stall for seconds under that load. 45 s covers a
+        // ~30 s stall plus ~15 s of catch-up drain afterwards.
+        //
+        // Cost: 45 x 384000 x 2 = 34 560 000 B = 34.6 MB, against 512 MB
+        // total (~496 MB after the headless GPU split, ~445 MB once a Lite
+        // userland is up). With Stream A's 8 s ring at 6.1 MB the overlay's
+        // audio residency is 40.7 MB — ~9% of what the unit has to spend; the
+        // DSP ring (262 kB) and the recorder's 10 ms pre-roll (7.7 kB) round
+        // to nothing beside it. 60 s was the other candidate and is rejected
+        // deliberately: the extra 11.5 MB comes out of page cache, and page
+        // cache is what absorbs the write bursts that cause the stalls this
+        // ring exists to survive. Past ~45 s it buys stall tolerance by
+        // making stalls more likely. Independent of the Stream A ring; the
+        // two are fed in lockstep from the capture loop so the §3
+        // byte-identity check diffs matching sample ranges.
         if (m_cfg.collection.streams.streamB) {
             const std::size_t bufSamples =
-                static_cast<std::size_t>(m_cfg.sampleRate) * 8;
+                static_cast<std::size_t>(m_cfg.sampleRate) * 45;
             m_collectionPreRoll =
                 std::make_unique<recorder::PreRollBuffer>(bufSamples);
         }
@@ -341,8 +380,12 @@ int Application::run() {
             ::echobox::collection::EventPollerConfig epCfg;
             epCfg.hopSize    = m_cfg.hopSize;
             epCfg.sampleRate = m_cfg.sampleRate;
+            // Periodic noise-floor trace rides this thread's existing timer.
+            // 0 turns it off without disturbing event polling.
+            epCfg.noiseFloorInterval = std::chrono::seconds(
+                m_cfg.collection.noiseFloorIntervalSec);
             m_eventPoller = std::make_unique<::echobox::collection::EventPoller>(
-                epCfg, *m_dsp, *m_decisionLog);
+                epCfg, *m_dsp, *m_decisionLog, m_sampleClock);
             if (m_eventClipWriter) m_eventPoller->setClipWriter(m_eventClipWriter.get());
 
             m_decisionForwarder =
@@ -514,10 +557,21 @@ void Application::captureLoop() {
         //     enabled flag, so a shipping unit with the overlay off pays
         //     one predictable branch on an immutable member and never
         //     executes the atomic RMW. Advancing it here — in the same
-        //     statement group as the pre-roll write above, on the same
-        //     batch — is what makes SampleClock::now() and
-        //     PreRollBuffer::writeCount() equal by construction, which
-        //     every downstream alignment depends on.
+        //     statement group as the pre-roll writes, on the same batch —
+        //     is what keeps SampleClock::now() and
+        //     PreRollBuffer::writeCount() on the same scale, which every
+        //     downstream alignment depends on.
+        //
+        //     They are equal only between iterations. Inside the body they
+        //     are two independent atomics updated at different statements,
+        //     so another thread can observe the clock ahead of either ring
+        //     by up to one batch (kCaptureChunkFrames = 4096, i.e. 10.7 ms
+        //     at 384 kHz). Sample-space ARITHMETIC may use either counter;
+        //     a READINESS test ("are these samples in that ring yet?") must
+        //     interrogate the ring itself. Reordering the statements does
+        //     not help — no ordering of two atomics makes them equal to a
+        //     third thread. EventClipWriter learned this the expensive way;
+        //     see the comment on its wait loop.
         if (m_cfg.collection.enabled) {
             m_sampleClock.advance(static_cast<std::uint64_t>(n));
         }

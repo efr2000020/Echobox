@@ -207,6 +207,11 @@ bool DspPipeline::drainCollectionEvents(std::vector<EventFeatures>& out) {
     return m_tracker->drainCollectionEvents(out);
 }
 
+bool DspPipeline::readNoiseFloor(std::vector<float>& out) const {
+    if (!m_tracker) return false;
+    return m_tracker->readNoiseFloor(out);
+}
+
 bool DspPipeline::currentTunables(
         std::vector<echobox::recorder::TunableValue>& out) const {
     if (!m_tracker) return false;

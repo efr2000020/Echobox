@@ -18,10 +18,28 @@
 ///                                   verdict for the clip that spans
 ///                                   these events, plus the gate clause
 ///                                   that attributed any rejection.
+///   { "kind":"noise_floor", ...} — emitted by @c EventPoller on a timer
+///                                   (default 60 s). The detector's live
+///                                   per-bin floor, float32-base64 in the
+///                                   same encoding and field names the WAV
+///                                   sidecar uses, stamped with the
+///                                   sample-clock position it was taken at.
+///                                   Unlike the other two this is not
+///                                   event-driven: it is the only record
+///                                   that keeps arriving through a stretch
+///                                   with no detections, which is exactly
+///                                   the stretch in which a chorus masking
+///                                   the 20–45 kHz band would otherwise
+///                                   leave no trace.
 ///
-/// Offline tools correlate the two families by sample overlap: a decision
-/// covers the events whose @c start_sample falls in
-/// [@c clip_start_sample, @c clip_end_sample].
+/// Offline tools correlate the event/decision families by sample overlap: a
+/// decision covers the events whose @c start_sample falls in
+/// [@c clip_start_sample, @c clip_end_sample]. Floor records join to both by
+/// @c at_sample, and to Stream A by the same number.
+///
+/// Readers MUST ignore record kinds they do not recognise rather than
+/// failing on them — that is what let this third kind be added without
+/// touching the offline verifiers.
 
 #include <filesystem>
 #include <mutex>

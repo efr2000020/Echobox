@@ -192,6 +192,11 @@ const char* helpText() {
         "                            (default: 100)\n"
         "  --collection-site-note <text>   Free-form note stamped into the session\n"
         "                            header for provenance.\n"
+        "  --collection-noise-floor-sec <int>  Cadence of the periodic per-bin\n"
+        "                            noise-floor snapshot written to Stream C as\n"
+        "                            {\"kind\":\"noise_floor\"}. ~11 kB each, so ~6.5 MB\n"
+        "                            over a 10 h night at the default.\n"
+        "                            (default: 60; 0 disables)\n"
         "  --collection-streams <list>     Which streams to enable, comma-separated\n"
         "                            from {a,b,c,d} (default: a,b,c,d)\n"
         "\n"
@@ -311,6 +316,16 @@ CliResult parseCli(int argc, char** argv, Config& cfg) {
         }
         else if (k == "collection-site-note") {
             cfg.collection.siteNote = std::string(v);
+        }
+        else if (k == "collection-noise-floor-sec") {
+            // No upper bound worth enforcing: the cost is one ~11 kB JSONL
+            // line per interval, so even 1 s is only ~40 MB over a night —
+            // large, but a deliberate choice an operator is entitled to make
+            // when chasing a masking event at finer resolution.
+            std::uint32_t u;
+            if (!parseUInt(v, u))
+                return err("invalid --collection-noise-floor-sec");
+            cfg.collection.noiseFloorIntervalSec = u;
         }
         else if (k == "collection-streams") {
             // Comma-separated toggle list: pass "a,b,c,d" to enable all, or

@@ -75,6 +75,28 @@ struct CollectionConfig {
     StreamToggles          streams{};
     GovernorConfig         governor{};
 
+    /// Cadence, in seconds, of the periodic per-bin noise-floor snapshot
+    /// written to Stream C as {"kind":"noise_floor",...}. 0 disables it.
+    ///
+    /// Why this exists at all: the detector's noise floor is what decides
+    /// whether a faint call clears threshold, and until now it was captured
+    /// only once per saved clip. That makes "the call was too faint" and
+    /// "the background pushed the floor up" indistinguishable across a whole
+    /// night — an ambiguity that limited a recent recall audit — and it fails
+    /// worst exactly where it matters, because interference loud enough to
+    /// mask bats also suppresses the clips that would have carried a floor
+    /// snapshot. A timed trace does not depend on detections happening.
+    ///
+    /// Why 60 s: the floor is a slow EMA driven by ambient conditions, so
+    /// the trace only has to resolve the timescale on which a chorus starts,
+    /// saturates and stops — minutes, not seconds. 60 s costs ~11 kB per
+    /// snapshot (2049 bins x 4 B, base64), i.e. ~600 snapshots and ~6.5 MB
+    /// over a 10 h night: a rounding error beside Stream A's ~2.76 GB/h, and
+    /// small enough that decisions.jsonl stays comfortably greppable.
+    /// Exposed as --collection-noise-floor-sec so a field session that wants
+    /// finer resolution can have it without a cross-compile.
+    std::uint32_t          noiseFloorIntervalSec{60};
+
     /// Free-form site note stamped into the session header for later
     /// provenance (e.g. "site=oak-woodland-N; mic=UltraMic384K; gain=+40dB").
     std::string            siteNote{};

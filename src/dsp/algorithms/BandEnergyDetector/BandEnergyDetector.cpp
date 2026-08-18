@@ -1051,6 +1051,37 @@ bool BandEnergyDetector::seedNoiseFloor(std::span<const float> floor) {
     return true;
 }
 
+bool BandEnergyDetector::readNoiseFloor(std::vector<float>& out) const {
+    std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+    // Gate on m_floorSeeded, not merely on the vector being sized. configure()
+    // assigns numBins zeros and the first processFrame overwrites them with
+    // that frame's magnitudes; a caller landing between the two would get an
+    // all-zero array that is not a noise floor at all but would decode as a
+    // perfectly plausible one. "Not seeded yet" is a real answer and false is
+    // how this header spells it.
+    if (!m_floorSeeded || m_noiseFloor.empty()) return false;
+    out.assign(m_noiseFloor.begin(), m_noiseFloor.end());
+    return true;
+}
+
+// Precision note for the above, since it is weaker than it looks and the
+// difference should not be rediscovered by someone debugging a floor trace.
+// m_noiseFloor is owned by the audio thread and its per-frame EMA update
+// runs WITHOUT this mutex — deliberately, for the same reason the sweep
+// scratch fields above are lock-free: taking a mutex per frame is the RT
+// hazard this file refuses everywhere else. Holding the lock here therefore
+// serialises this copy against the other diagnostic sites (event open/close,
+// the drains) but NOT against that update, so a poll landing mid-update can
+// return a few bins from before it and the rest from after.
+//
+// That is acceptable for what this is used for and for nothing else. The
+// floor is an EMA with a per-frame coefficient near 1, so two adjacent
+// frames differ per bin by well under the dB resolution any consumer reads
+// it at, and the overlay samples this once every ~60 s as a trend trace.
+// It is NOT a reproducibility input: seedNoiseFloor() feeds replay from the
+// sidecar snapshot, which the audio thread takes of itself under this lock
+// and is therefore internally consistent. Do not swap one for the other.
+
 std::uint64_t BandEnergyDetector::totalEventsSinceBoot() const {
     std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
     return m_eventsTotalSinceBoot;

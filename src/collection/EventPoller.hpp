@@ -9,6 +9,13 @@
 /// EventClipWriter (if set) so Stream B can save the surrounding audio
 /// window.
 ///
+/// It also carries the one Stream C record that is NOT event-driven: a
+/// periodic "noise_floor" snapshot of the detector's live per-bin floor
+/// (default every 60 s). This thread is the right place for it precisely
+/// because it already wakes on a timer and already owns a DecisionLog
+/// handle — a second thread would buy nothing and cost a stack. The 8 kB
+/// copy happens here, on this thread; the audio thread is not involved.
+///
 /// The tracker maintains a second queue populated in parallel with the
 /// sidecar queue (see @c ISweepTracker::drainCollectionEvents), so this
 /// poller can pull events without racing the recorder's per-clip
@@ -26,6 +33,7 @@
 /// collection concerns. See DATA_COLLECTION_IMPL_VALIDATION_PLAN §2.2 C.
 
 #include "DecisionLog.hpp"
+#include "SampleClock.hpp"
 
 #include "dsp/ISweepTracker.hpp"   // EventFeatures
 
@@ -35,6 +43,7 @@
 #include <cstdint>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace echobox::dsp { class DspPipeline; }
 
@@ -54,13 +63,22 @@ struct EventPollerConfig {
     std::chrono::milliseconds pollInterval{50};
     std::size_t               hopSize{512};           // frame→sample conversion
     int                       sampleRate{384000};
+    /// Cadence of the periodic {"kind":"noise_floor"} record. Zero disables
+    /// it. Rounded down to a whole number of @c pollInterval ticks by the
+    /// loop, which is why it is expressed in seconds: at the 50 ms poll
+    /// cadence the 60 s default lands within one tick of nominal, and the
+    /// record carries the sample position anyway, so a reader never has to
+    /// assume the interval was exact. See
+    /// CollectionConfig::noiseFloorIntervalSec for why 60 s.
+    std::chrono::seconds      noiseFloorInterval{60};
 };
 
 class EventPoller {
 public:
     EventPoller(EventPollerConfig cfg,
                 echobox::dsp::DspPipeline& pipeline,
-                DecisionLog& log);
+                DecisionLog& log,
+                const SampleClock& clock);
     ~EventPoller();
 
     EventPoller(const EventPoller&)            = delete;
@@ -78,9 +96,19 @@ public:
         return m_eventsLogged.load(std::memory_order_acquire);
     }
 
+    /// Periodic noise-floor snapshots written since start(). Surfaced on
+    /// STREAM_C_STOP so an operator can see the trace exists without
+    /// parsing the log.
+    std::uint64_t floorsLogged() const {
+        return m_floorsLogged.load(std::memory_order_acquire);
+    }
+
 private:
     void loop();
     void handleNew(const EventFeatures& e);
+    /// @return true if a record was written; false when the tracker has no
+    ///         floor to report yet (not constructed, or not yet seeded).
+    bool snapshotNoiseFloor();
     std::string encodeEventJson(const EventFeatures& e,
                                 std::uint64_t start_sample,
                                 std::uint64_t end_sample) const;
@@ -88,11 +116,17 @@ private:
     EventPollerConfig       m_cfg;
     echobox::dsp::DspPipeline& m_pipeline;
     DecisionLog&            m_log;
+    const SampleClock&      m_clock;
     EventClipWriter*        m_clipWriter{nullptr};
 
     std::atomic<bool>       m_running{false};
     std::thread             m_thread;
     std::atomic<std::uint64_t> m_eventsLogged{0};
+    std::atomic<std::uint64_t> m_floorsLogged{0};
+
+    /// Reused across snapshots so the 8 kB floor buffer is allocated once
+    /// on the poller thread and never again. Poller-thread-only.
+    std::vector<float>      m_floorScratch;
 };
 
 } // namespace echobox::collection

@@ -323,6 +323,93 @@ port. `verify_stream_a` gains falsifier **F6**: a session whose header
 declares Stream A enabled but whose manifest lists no chunks now fails
 instead of passing vacuously.
 
+### Stream B clip loss was a readiness bug, not a small ring
+
+A live loopback run at the densest corpus rate (887 calls/min, 12.3
+events/s) dropped **32 of 1790** event clips — 1.8 % — with Stream A
+clean and `dsp_dropped=0`. The ring looked like the obvious suspect and
+was not it. All 32 drops logged `still incomplete at clip time` and none
+logged `aged out of preroll`, and every shortfall was **≤ 4096 samples:
+exactly one capture batch**.
+
+`EventClipWriter` waited on `SampleClock::now()` and then read from the
+Stream B pre-roll ring. `Application::captureLoop` advances the clock
+two statements before it mirrors the same batch into that ring, so the
+clock leads the ring by up to one 4096-frame batch — 10.7 ms at 384 kHz
+— and a writer polling at 5 ms lands inside that window regularly. The
+writer now waits on the ring's own `writeCount()`, which closes the
+window by construction and needs no ordering guarantee from the capture
+loop. Reordering `captureLoop` would not have been a fix: no ordering of
+two independent atomics makes them equal to a third thread. Comments in
+`SampleClock.hpp` and `captureLoop` that claimed the two counters were
+"equal by construction" now state the real invariant — equal *between*
+iterations, skewed by up to a batch *within* one — and the drop warning
+logs both counters so a recurrence is classifiable at a glance.
+
+**Measured: 32 drops → 0** on a re-run of the same worst case, with
+`verify_stream_a` and `verify_ab_identity` still passing.
+
+Separately, the Stream B pre-roll ring goes **8 s → 45 s** (45 × 384000
+× 2 = 34.6 MB; with Stream A's unchanged 8 s ring the overlay's audio
+residency is 40.7 MB, ~9 % of a Pi Zero 2 W's 512 MB). This is headroom,
+not the fix, and is labelled as such in the code. Its job is surviving
+an SD-card stall: Stream B sustains ~2.1 MB/s of clip writes at this
+event rate on top of Stream A's 768 kB/s, and 45 s covers a ~30 s stall
+plus catch-up drain. 60 s was rejected — the extra 11.5 MB comes out of
+page cache, which is what absorbs the bursts that cause those stalls in
+the first place. The full 2 s → 8 s → 45 s progression and what each
+step did and did not fix is recorded at the constant.
+
+### Stream C: periodic noise-floor trace
+
+`decisions.jsonl` gains a third record kind alongside `event` and
+`decision`:
+
+```
+{"kind":"noise_floor","at_sample":<u64>,"n_bins":2049,
+ "interval_sec":60,"encoding":"float32_base64","data":"<base64>"}
+```
+
+Default cadence 60 s, `--collection-noise-floor-sec` (0 disables),
+`CollectionConfig::noiseFloorIntervalSec`. Measured **11 039 bytes/record
+on disk** (2049 bins × 4 B = 8196 B raw → 10 928 B base64, + 110 B of
+JSON framing + newline), so ~600 records and **~6.6 MB over a 10 h
+night** — against Stream A's ~2.76 GB/h.
+
+The detector's per-bin floor is what decides whether a faint call clears
+threshold, and it was captured only once per saved clip. Across a night
+that makes "the call was too faint" and "the background pushed the floor
+up" indistinguishable — an ambiguity that limited the per-call recall
+audit. It fails worst exactly where it matters most: interference loud
+enough to mask bats also suppresses the clips that would have carried a
+floor snapshot, so the stronger the masking the less evidence of it the
+sidecars hold. This record is the only one in Stream C that keeps
+arriving through a stretch with no detections, which is the stretch in
+which a cricket chorus lifting the 20–45 kHz band would otherwise leave
+no trace at all.
+
+Encoding and field names (`n_bins` / `encoding` / `data`) are the WAV
+sidecar's, reusing `base64EncodeFloats` rather than adding a second
+float encoding, so one decoder serves both artefacts. `at_sample` is
+read before the copy, making it a lower bound on the audio the floor
+reflects, and joins directly against Stream A and the `event` records.
+
+Mechanically it rides `EventPoller`'s existing timer — no new thread,
+and the 8 kB copy happens on the poller thread, never on the audio
+thread. `ISweepTracker` gains `readNoiseFloor()` as a defaulted no-op
+returning `false`, so out-of-tree plugins keep compiling and the
+collection layer reads "not implemented" as "no floor available" and
+emits nothing rather than a misleading empty record. The
+`BandEnergyDetector` implementation also returns `false` until the floor
+has been seeded from real audio, so the all-zero window between
+`configure()` and the first frame can never be logged as a plausible
+floor. `--collection-mode off` is untouched: no thread, no allocation,
+no hot-loop work.
+
+The offline verifiers needed no change — they select on `kind` and
+ignore what they do not recognise, which is now stated as a contract in
+`DecisionLog.hpp` rather than left as an accident.
+
 ### Test suite
 
 Repaired five unit tests that had been red since the 0.3.0-rc1 / 0.4.0

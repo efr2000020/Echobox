@@ -39,10 +39,19 @@ namespace echobox::collection {
  *
  *  - This clock counts **samples captured**. It is advanced once per
  *    ALSA read, in the same @c captureLoop statement group that pushes
- *    the same batch into @c Recorder's @c PreRollBuffer — so
- *    @c SampleClock::now() and @c PreRollBuffer::writeCount() are equal
- *    by construction, and every collection artefact can be sliced out of
- *    either without conversion.
+ *    the same batch into the @c PreRollBuffer rings — so
+ *    @c SampleClock::now() and @c PreRollBuffer::writeCount() are on one
+ *    scale, and every collection artefact can be sliced out of either
+ *    without conversion.
+ *
+ *    They are equal only *between* capture iterations. They are separate
+ *    atomics advanced at different statements within one iteration, so a
+ *    third thread can catch the clock leading a ring by up to one capture
+ *    batch (4096 samples, 10.7 ms at 384 kHz). Use either for sample-space
+ *    arithmetic; never use this clock to decide whether a sample range has
+ *    landed in a particular ring yet — ask that ring's @c writeCount().
+ *    Stream B's clip writer originally asked the clock and dropped 1.8% of
+ *    its clips to exactly that skew.
  *  - @c IRecorderClock supplies **steady and wall time** to the
  *    recorder's state machine (the @c silenceMs idle timeout, filename
  *    stamps). It exists so @c echobox-replay can run the pipeline faster

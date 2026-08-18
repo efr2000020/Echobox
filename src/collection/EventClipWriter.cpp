@@ -88,14 +88,28 @@ void EventClipWriter::loop() {
             m_queue.pop_front();
         }
 
-        // Wait for the audio thread to have captured up to
-        // end_sample + postSamples, or give up after tailWaitTimeout and
-        // let writeClipWav decide whether the window is usable. Do NOT
-        // exit early on m_running=false — we still want to flush queued
-        // jobs at shutdown.
+        // Wait for the pre-roll ring to actually CONTAIN end_sample +
+        // postSamples, or give up after tailWaitTimeout and let writeClipWav
+        // decide whether the window is usable. Do NOT exit early on
+        // m_running=false — we still want to flush queued jobs at shutdown.
+        //
+        // The predicate is m_preRoll.writeCount(), not m_clock.now(), and the
+        // difference is not cosmetic. Application::captureLoop advances the
+        // sample clock (step 1b) two statements before it mirrors the same
+        // batch into this ring (step 1d), so from any other thread the clock
+        // leads the ring by up to one 4096-sample capture batch — 10.7 ms at
+        // 384 kHz. This loop polls at 5 ms, so it lands inside that window
+        // often: waiting on the clock and then reading the ring cost 32 of
+        // 1790 clips (1.8%) in a live loopback run, every one of them logged
+        // "still incomplete at clip time" with a shortfall of at most one
+        // batch. Gating on the counter we are about to read from closes the
+        // window by construction and needs no ordering guarantee from the
+        // capture loop, which is the property that makes it the right fix —
+        // reordering captureLoop would only move the skew, since no ordering
+        // of two independent atomics makes them equal to a third thread.
         const std::uint64_t desiredEnd = j.end_sample + m_cfg.postSamples;
         const auto waitStart = std::chrono::steady_clock::now();
-        while (m_clock.now() < desiredEnd) {
+        while (m_preRoll.writeCount() < desiredEnd) {
             if (std::chrono::steady_clock::now() - waitStart
                 >= m_cfg.tailWaitTimeout) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -121,20 +135,27 @@ bool EventClipWriter::writeClipWav(const Job& j) {
     // The audio thread writes into it monotonically; its writeCount ==
     // total samples ever pushed. Convert absolute window → cursor:
     //   cursor.pos = windowStart (in absolute sample space).
-    // The SampleClock and PreRollBuffer.writeCount() both start at 0 at
-    // Application-run start and advance by the same batches in the same
-    // captureLoop iteration, so they are identical.
+    // Both this counter and the SampleClock start at 0 at Application-run
+    // start and advance by the same batches, but they are two independent
+    // atomics updated a few statements apart, so a reader on this thread can
+    // see the clock ahead of the ring by up to one capture batch. Sample
+    // arithmetic may use either; "is this range readable yet" must use the
+    // ring, which is why the wait above does.
     const std::uint64_t writeCount = m_preRoll.writeCount();
     if (windowEnd > writeCount) {
         // We waited above; the audio thread simply didn't produce more.
         // Skip this event rather than write a WAV that ends abruptly on
         // a stale cursor — the §3 A/B check would fail on a partial clip.
+        // The clock reading is logged alongside so a recurrence is
+        // immediately classifiable: clock ≈ want means the ring lagged the
+        // clock again, clock also short means capture itself stalled.
         LS_WARN("collection",
                 "stream-b: event %llu still incomplete at clip time "
-                "(want %llu, have %llu) — skipping",
+                "(want %llu, have %llu, clock %llu) — skipping",
                 static_cast<unsigned long long>(j.start_sample),
                 static_cast<unsigned long long>(windowEnd),
-                static_cast<unsigned long long>(writeCount));
+                static_cast<unsigned long long>(writeCount),
+                static_cast<unsigned long long>(m_clock.now()));
         return false;
     }
     if (writeCount - windowStart > m_preRoll.capacity()) {

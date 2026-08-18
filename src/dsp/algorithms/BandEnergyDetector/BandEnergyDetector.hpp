@@ -58,6 +58,7 @@ public:
     bool          drainSidecarPayload(SidecarPayload& out) override;
     bool          drainCollectionEvents(std::vector<EventFeatures>& out) override;
     bool          seedNoiseFloor(std::span<const float> floor) override;
+    bool          readNoiseFloor(std::vector<float>& out) const override;
     std::uint64_t totalEventsSinceBoot() const override;
 
     /**

@@ -167,6 +167,11 @@ public:
     /// sidecar drain. Returns false for trackers that don't implement it.
     /// Off-hot-loop; takes the tracker's diagnostics lock.
     bool        drainCollectionEvents(std::vector<EventFeatures>& out);
+    /// Non-destructive snapshot of the tracker's live per-bin noise floor,
+    /// for the collection overlay's periodic Stream C floor trace. Returns
+    /// false for trackers that model no floor, and before configure() has
+    /// sized it. Off-hot-loop; takes the tracker's diagnostics lock.
+    bool        readNoiseFloor(std::vector<float>& out) const;
     bool        currentTunables(std::vector<echobox::recorder::TunableValue>& out) const override;
 
     /**

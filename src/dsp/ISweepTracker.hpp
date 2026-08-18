@@ -299,6 +299,40 @@ public:
     virtual bool seedNoiseFloor(std::span<const float> /*floor*/) { return false; }
 
     /**
+     * Read back the algorithm's LIVE per-bin noise floor — the same array
+     * @c seedNoiseFloor writes, and the same one that gets snapshotted into
+     * @c SidecarPayload::noise_floor_at_first_event, but sampled on demand
+     * instead of at an event boundary.
+     *
+     * Why a second way to reach the same array: the sidecar floor only
+     * exists where a clip exists. That makes a night's logs able to separate
+     * "the call was too faint" from "the background pushed the floor up"
+     * only at the moments a call already fired — which is precisely backwards
+     * for studying masking. A sustained cricket chorus lifts the 20–45 kHz
+     * band and suppresses the events that would otherwise have carried a
+     * floor snapshot, so the louder the interference the less evidence of it
+     * the sidecars hold. The data-collection overlay polls this on a timer
+     * to get a floor trace that does not depend on detections happening.
+     *
+     * @param out  Resized to `fftSize/2 + 1` and filled on success; left
+     *             untouched when this returns false.
+     * @return true if a floor was produced.
+     *
+     * Default no-op returning false, matching the rest of this header, so
+     * plugins that model no noise floor keep compiling and the collection
+     * layer reads "not implemented" as "no floor available" — it then emits
+     * no record at all rather than a misleading empty one.
+     *
+     * Implementations MUST copy under the same lock the other diagnostic
+     * accessors take, and MUST NOT move the copy onto the audio thread:
+     * this is called from the collection poller thread at a ~60 s cadence,
+     * never from @c processFrame.
+     */
+    virtual bool readNoiseFloor(std::vector<float>& /*out*/) const {
+        return false;
+    }
+
+    /**
      * Read back the algorithm's monotonic event counter (events triggered
      * since this plugin instance was constructed). Recorder logs this for
      * sidecar context; validator uses it to spot-check reproducibility.
