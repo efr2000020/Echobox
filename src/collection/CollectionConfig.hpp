@@ -9,7 +9,7 @@
 /// with @c enabled=false it must be a byte-identical no-op (nothing
 /// constructed, no threads spawned, no code paths reached in the audio hot
 /// loop). The default is off. The plan doc that motivates this module is
-/// private_docs/plans/DATA_COLLECTION_IMPL_VALIDATION_PLAN.md.
+/// private_docs/plans/03_DATA_COLLECTION_IMPL_VALIDATION_PLAN.md.
 
 #include <cstdint>
 #include <filesystem>
@@ -23,8 +23,10 @@ namespace echobox::collection {
  *   A — continuous reference audio (pre-detector tap; §2.2 A);
  *   B — per-event WAV clips, saved for BOTH accepted and rejected events
  *       (§2.2 B);
- *   C — per-event JSONL decision log with shadow @c would_save_R2v3
- *       (§2.2 C);
+ *   C — per-event JSONL decision log, plus the recorder's own per-clip
+ *       save/discard verdict (§2.2 C — the plan calls that verdict the
+ *       shadow @c would_save_R2v3; see RecorderDecisionSink.hpp for why
+ *       the name is retired and the artefact is not);
  *   D — operational-log passthrough (§2.2 D). Landed as-is via the existing
  *       operational log; this flag is a documentation anchor rather than a
  *       code toggle in this commit.

@@ -27,9 +27,33 @@ namespace echobox::collection {
  * At 384 kHz mono this counter takes ~1.5 million years to wrap uint64,
  * so no rollover handling is needed.
  *
- * @note Kill-switch discipline: this class is constructed by
- *       @c Session only when @c CollectionConfig::enabled is true, so a
- *       shipping unit with the overlay disabled pays zero cost.
+ * @note Kill-switch discipline: @c advance() is called from
+ *       @c Application::captureLoop only when
+ *       @c CollectionConfig::enabled is true, so a shipping unit with the
+ *       overlay disabled never executes the atomic RMW.
+ *
+ * Relationship to @c recorder::IRecorderClock
+ * ------------------------------------------
+ * The two do not overlap and cannot double-count, because they measure
+ * different quantities:
+ *
+ *  - This clock counts **samples captured**. It is advanced once per
+ *    ALSA read, in the same @c captureLoop statement group that pushes
+ *    the same batch into @c Recorder's @c PreRollBuffer — so
+ *    @c SampleClock::now() and @c PreRollBuffer::writeCount() are equal
+ *    by construction, and every collection artefact can be sliced out of
+ *    either without conversion.
+ *  - @c IRecorderClock supplies **steady and wall time** to the
+ *    recorder's state machine (the @c silenceMs idle timeout, filename
+ *    stamps). It exists so @c echobox-replay can run the pipeline faster
+ *    than real time; it is compiled out of the field build entirely.
+ *
+ * Nothing reads one to derive the other. In particular
+ * @c Recorder::m_clipStartSample — the only sample-space value the
+ * recorder publishes to this overlay — is taken from the pre-roll
+ * cursor, i.e. from the audio thread's write count, never from a clock.
+ * So a clip's reported sample range stays correct even under an injected
+ * time source running at 20-30x real time.
  */
 class SampleClock {
 public:

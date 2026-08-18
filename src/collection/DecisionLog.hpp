@@ -14,13 +14,14 @@
 ///   { "kind": "decision", ... }  — emitted by @c Recorder via
 ///                                   @c IRecorderDecisionSink at
 ///                                   clip-close. Carries the shipping
-///                                   R2v3 firmware's actual save/discard
+///                                   firmware's actual save/discard
 ///                                   verdict for the clip that spans
-///                                   these events.
+///                                   these events, plus the gate clause
+///                                   that attributed any rejection.
 ///
-/// The offline verifier (§4.1 tool) correlates event↔decision by sample
-/// overlap and diffs against @c recorder_model.py; matches promote the
-/// model from YELLOW to GREEN.
+/// Offline tools correlate the two families by sample overlap: a decision
+/// covers the events whose @c start_sample falls in
+/// [@c clip_start_sample, @c clip_end_sample].
 
 #include <filesystem>
 #include <mutex>

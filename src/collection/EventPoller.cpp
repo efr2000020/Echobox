@@ -24,6 +24,19 @@ EventPoller::~EventPoller() { stop(); }
 
 void EventPoller::start() {
     if (m_running.exchange(true, std::memory_order_acq_rel)) return;
+    // Arming drain, issued synchronously before the thread exists.
+    // BandEnergyDetector only mirrors events into its collection queue
+    // once something has drained it at least once — that is the gate
+    // that keeps the shipping unit from accumulating events nothing
+    // reads. Application::run() calls start() before DspPipeline::start(),
+    // so arming here means the mirror is live before the first frame is
+    // ever processed and no event can be lost to the arming window.
+    std::vector<EventFeatures> arming;
+    if (!m_pipeline.drainCollectionEvents(arming)) {
+        LS_WARN("collection",
+                "STREAM_C: tracker does not implement drainCollectionEvents; "
+                "no per-event records will be written for this session");
+    }
     m_thread = std::thread(&EventPoller::loop, this);
 }
 
@@ -55,8 +68,33 @@ std::string EventPoller::encodeEventJson(const EventFeatures& e,
         << "\"drift_khz\":"    << e.drift_khz                     << ","
         << "\"path_ratio\":"   << e.path_ratio                    << ","
         << "\"mono_fraction\":" << e.mono_fraction                << ","
-        << "\"gate_rejected\":" << (e.gate_rejected ? "true" : "false")
-        << "}";
+        << "\"gate_rejected\":" << (e.gate_rejected ? "true" : "false") << ","
+        // --- decision-path diagnostics ---
+        // These six fields did not exist when this overlay was first
+        // written; the gate they describe replaced the sweep-shape gate
+        // it was built against. gate_rejected is still the binding
+        // verdict, but the four sweep-shape features above are now pure
+        // diagnostics, and WHICH clause fired is only recoverable from
+        // this block: veto_applied distinguishes a temporal rep-guard
+        // reject from a confident-reject noise-rule reject, which is
+        // exactly the "which clause fired" the plan's §2.2 C asks for.
+        // Logging the stale field set instead would have made Stream C
+        // unable to explain any rejection this firmware makes.
+        << "\"sweep_bat_like\":" << (e.sweep_bat_like ? "true" : "false") << ","
+        << "\"veto_applied\":"   << (e.veto_applied   ? "true" : "false") << ","
+        << "\"provisional_rejected\":"
+                                 << (e.provisional_rejected ? "true" : "false") << ","
+        << "\"rep_rate_hz\":"    << e.rep_rate_hz                 << ","
+        << "\"rep_cv\":"         << e.rep_cv                      << ","
+        << "\"rep_n_onsets\":"   << e.rep_n_onsets                << ","
+        // Derived, so an offline reader never has to re-derive the same
+        // rule from the two booleans and get it subtly wrong. Mirrors
+        // Recorder::classifyRejection exactly: the temporal guard is the
+        // more specific cause because it only fires on an event the noise
+        // rule had already decided to keep.
+        << "\"reject_clause\":\""
+        << (!e.gate_rejected ? "none" : (e.veto_applied ? "temporal" : "noise"))
+        << "\"}";
     return oss.str();
 }
 

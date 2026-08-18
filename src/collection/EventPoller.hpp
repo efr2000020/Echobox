@@ -12,9 +12,13 @@
 /// The tracker maintains a second queue populated in parallel with the
 /// sidecar queue (see @c ISweepTracker::drainCollectionEvents), so this
 /// poller can pull events without racing the recorder's per-clip
-/// @c drainSidecarPayload — earlier revisions used a non-destructive
-/// peek + start_frame dedupe and silently lost events whose entire
-/// lifetime fit between two poller wake-ups.
+/// @c drainSidecarPayload — a non-destructive peek + start_frame dedupe
+/// silently loses events whose entire lifetime fits between two poller
+/// wake-ups.
+///
+/// @c start() issues one synchronous arming drain before spawning the
+/// thread, because the tracker's mirror queue stays cold (and therefore
+/// free for the shipping unit) until something drains it once.
 ///
 /// Runs on its own thread so the DSP hot loop is untouched by
 /// collection concerns. See DATA_COLLECTION_IMPL_VALIDATION_PLAN §2.2 C.
