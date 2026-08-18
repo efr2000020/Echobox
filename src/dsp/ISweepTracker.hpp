@@ -257,6 +257,35 @@ public:
     virtual bool drainSidecarPayload(SidecarPayload& /*out*/) { return false; }
 
     /**
+     * Destructive drain of a SECOND, collection-only events queue that runs
+     * alongside the sidecar queue. Populated by @c processFrame at the same
+     * point as @c m_pendingEvents (event close), but consumed independently
+     * by the data-collection overlay's Stream C poller.
+     *
+     * Why a second queue rather than a non-destructive peek at the sidecar
+     * one: the sidecar queue is cleared by the recorder at every clip close
+     * (and at every @c beginRecording, which drops stale events) via
+     * @c drainSidecarPayload. A poller that merely peeks — even with a
+     * @c start_frame dedupe — still LOSES any event whose entire lifetime
+     * fits between two poller wake-ups with a recorder drain in between.
+     * This queue is touched only by the collection poller, so no such race
+     * exists and Stream C sees every event exactly once.
+     *
+     * Default no-op keeps older plugins compiling; the collection layer
+     * treats "not implemented" as "no live event stream from this plugin"
+     * and logs nothing rather than silently logging a partial stream.
+     * Implementations MUST take the same internal lock @c drainSidecarPayload
+     * takes, so the collection reader and the recorder drain observe a
+     * mutually consistent view of an event's fields.
+     *
+     * Off the audio hot loop: called from the collection poller thread at a
+     * ~50 ms cadence, never from @c processFrame.
+     */
+    virtual bool drainCollectionEvents(std::vector<EventFeatures>& /*out*/) {
+        return false;
+    }
+
+    /**
      * Seed the per-bin noise floor estimate. Used by the offline validator
      * to bypass the EMA's cold-start convergence period on short clips,
      * by feeding in a snapshot the device captured at trigger time.

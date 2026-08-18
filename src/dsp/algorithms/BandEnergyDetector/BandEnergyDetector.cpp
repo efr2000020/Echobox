@@ -108,6 +108,7 @@ void BandEnergyDetector::configure(int sampleRate, std::size_t fftSize,
     {
         std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
         m_pendingEvents.clear();
+        m_collectionEvents.clear();
         m_floorSnapshotAtFirstEvent.clear();
         m_inProgressEvent          = EventFeatures{};
         m_framesProcessedSinceBoot = 0;
@@ -550,6 +551,17 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                     m_inProgressEvent.rep_cv               = dxRepCv;
                     m_inProgressEvent.rep_n_onsets         = dxRepNOnsets;
                     m_pendingEvents.push_back(m_inProgressEvent);
+                    // Mirror into the collection-only queue, but ONLY once a
+                    // collection poller has armed it. Without that gate the
+                    // shipping unit would push a second copy of every event
+                    // into a vector nothing ever drains — on the 9.7 h field
+                    // session that is ~80k events of unbounded growth on a
+                    // 512 MB Pi Zero 2 W. Armed state is a plain bool read
+                    // under a lock we already hold, so the shipping cost of
+                    // the mirror is one predictable branch.
+                    if (m_collectionEventsWanted) {
+                        m_collectionEvents.push_back(m_inProgressEvent);
+                    }
                 }
 
                 // --- Publish the per-event verdict to the recorder ---
@@ -1007,6 +1019,18 @@ bool BandEnergyDetector::drainSidecarPayload(SidecarPayload& out) {
     out.frames_processed_since_boot    = m_framesProcessedSinceBoot;
     m_pendingEvents.clear();
     m_floorSnapshotAtFirstEvent.clear();
+    return true;
+}
+
+bool BandEnergyDetector::drainCollectionEvents(std::vector<EventFeatures>& out) {
+    std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
+    // First call arms the mirror. The collection poller issues one arming
+    // drain from Application::run() before DspPipeline::start(), so no event
+    // is ever produced while the mirror is still cold — and a shipping unit,
+    // which never constructs a poller, never arms it at all.
+    m_collectionEventsWanted = true;
+    out.assign(m_collectionEvents.begin(), m_collectionEvents.end());
+    m_collectionEvents.clear();
     return true;
 }
 

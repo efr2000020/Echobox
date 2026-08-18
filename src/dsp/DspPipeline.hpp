@@ -150,6 +150,12 @@ public:
     // off the audio hot loop. drainSidecarPayload() and currentTunables()
     // take the tracker's internal lock briefly; the rest are pure accessors.
     bool        drainSidecarPayload(SidecarPayload& out) override;
+    /// Destructive drain of the tracker's collection-only events queue.
+    /// The data-collection overlay's Stream C poller sees every event
+    /// exactly once here, with no race against the recorder's per-clip
+    /// sidecar drain. Returns false for trackers that don't implement it.
+    /// Off-hot-loop; takes the tracker's diagnostics lock.
+    bool        drainCollectionEvents(std::vector<EventFeatures>& out);
     bool        currentTunables(std::vector<echobox::recorder::TunableValue>& out) const override;
 
     /**

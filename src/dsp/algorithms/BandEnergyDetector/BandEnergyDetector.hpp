@@ -56,6 +56,7 @@ public:
     std::span<const PresetInfo>  listPresets()  const override;
 
     bool          drainSidecarPayload(SidecarPayload& out) override;
+    bool          drainCollectionEvents(std::vector<EventFeatures>& out) override;
     bool          seedNoiseFloor(std::span<const float> floor) override;
     std::uint64_t totalEventsSinceBoot() const override;
 
@@ -426,6 +427,22 @@ private:
     mutable std::mutex          m_diagnosticsMutex;
     EventFeatures               m_inProgressEvent{};
     std::vector<EventFeatures>  m_pendingEvents;
+    // Second, collection-only mirror of m_pendingEvents. Populated at the
+    // same point under the same lock, but drained by the collection
+    // overlay's Stream C poller and never touched by drainSidecarPayload.
+    // Lets that poller pull events destructively at its own cadence
+    // without racing the recorder's per-clip drain, which would otherwise
+    // swallow events that opened and closed between two poller wake-ups.
+    // Stays empty in the shipping unit: nothing drains it unless
+    // --collection-mode on, and nothing pushes to it either (see the
+    // m_collectionEventsWanted gate below).
+    std::vector<EventFeatures>  m_collectionEvents;
+    // Kill switch for the mirror. False in the shipping unit, so event
+    // close does not push a second copy and the vector never allocates.
+    // Latched true by the first drainCollectionEvents() call — i.e. only
+    // once the collection poller exists, which only happens under
+    // --collection-mode on.
+    bool                        m_collectionEventsWanted{false};
     // Snapshot of m_noiseFloor taken at the open of the FIRST event since the
     // last drain. Empty between drain and the next event-open. The recorder
     // drains both the events vector and this snapshot atomically.

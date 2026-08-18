@@ -186,6 +186,11 @@ bool DspPipeline::drainSidecarPayload(SidecarPayload& out) {
     return m_tracker->drainSidecarPayload(out);
 }
 
+bool DspPipeline::drainCollectionEvents(std::vector<EventFeatures>& out) {
+    if (!m_tracker) return false;
+    return m_tracker->drainCollectionEvents(out);
+}
+
 bool DspPipeline::currentTunables(
         std::vector<echobox::recorder::TunableValue>& out) const {
     if (!m_tracker) return false;
