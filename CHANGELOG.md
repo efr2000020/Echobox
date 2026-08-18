@@ -245,6 +245,81 @@ of detector events — that is a separate, known work package and no
 amount of base-detector tuning moves it. Expect this change to be
 largely invisible in end-to-end figures until the gate is addressed.
 
+### Data-collection overlay, forward-ported onto mainline
+
+The `feat/data-collection` branch — the firmware that produced the
+`session_01` / `session_02` field corpora everyone still validates
+against — is now part of the mainline instead of a stale side branch
+eight commits behind a detector rewrite. It is a validation-only
+superset of the shipping recorder, off by default, enabled at **runtime**
+with `--collection-mode on`. There is no build flag: one binary serves
+both a field unit and a collection deployment.
+
+Four streams, all stamped from one monotonic sample clock so they are
+alignable without ever consulting wall time:
+
+| | Stream | Output |
+|---|---|---|
+| **A** | continuous raw reference audio, tapped off ALSA *before* the float conversion and DSP | rolling 60 s WAV chunks + `chunks.jsonl` |
+| **B** | one WAV per detector event — accepted **and** rejected | `events/{accepted,rejected}/<start_sample>.wav` |
+| **C** | one record per event, one per recorder clip decision | `decisions.jsonl` |
+| **D** | the ordinary operational log | a documentation label, not separate code |
+
+Plus a session governor that stops cleanly on a duration cap or a
+free-space floor, and a `SESSION_HEADER.json` carrying the firmware SHA,
+the full decision-relevant config, and the `start_wallclock ↔
+start_sample` anchor.
+
+**Collection-off is the load-bearing property.** With the default
+`--collection-mode off`: nothing is constructed, no thread is spawned,
+no ring is allocated, and the audio capture loop's added cost is exactly
+**three predictable, never-taken branches per 4096-frame ALSA read** —
+verified by disassembling `Application::captureLoop` before and after.
+GCC lays all three collection taps out as cold, out-of-line blocks, so
+the off path executes no atomic RMW, no call, and no memory write. The
+recorder pays one null check per clip close.
+
+Two places the branch disagreed with current code, and what was done:
+
+- **`EventFeatures` gained six decision-path fields** since the overlay
+  was written. Stream C logs the current set and derives a
+  `reject_clause` from `veto_applied` — `"temporal"` vs `"noise"`. The
+  plan asked Stream C to record "which clause fired"; its original
+  vocabulary named the retired sweep-shape gate, so the question is
+  re-asked against the rule that actually decides today.
+- **The shadow `would_save_R2v3` field never existed.** It was the
+  plan's name for the recorder's own per-clip verdict record. That
+  record is kept — it is the only device-side ground truth for what the
+  recorder half of the cricket filter did — and the `R2v3` label is
+  dropped, because it named a gate this firmware no longer has.
+
+Not ported: `verify_recorder_model.py`, `verify_feature_parity.py`, and
+the `ECHOBOX_STRICT_MATH` CMake option. All three served
+`tools/validator/recorder_model.py`, a Python shadow model of the
+recorder that is stale and unused now that `tools/session_screen` drives
+the real C++ through `echobox-replay`. The docs that referenced them are
+updated rather than left pointing at absent tools. The cost is recorded
+rather than glossed: the ARM-vs-x86 numerical question `§4.2` measured
+is now **unmeasured, not answered**, and `VALIDATION_PROVENANCE.md`
+row 4b keeps it YELLOW.
+
+Two bugs found in the stale code and fixed on the way in:
+
+- The collection event mirror was pushed to **unconditionally**, so a
+  shipping unit accumulated a second copy of every event in a vector
+  nothing ever drained — ~80k events of unbounded growth over the 9.7 h
+  field session, on a 512 MB Pi Zero 2 W. It is now armed by the
+  collection poller's first drain and never armed in a shipping unit.
+- `--save-rejected` preserving a cricket-discarded clip is an exit path
+  from `endRecording()` that postdates the overlay. Left unpublished,
+  every rejected-sink clip vanished from Stream C whenever that mode was
+  on.
+
+Shipping-config per-call recall on `session_02` is unchanged by the
+port. `verify_stream_a` gains falsifier **F6**: a session whose header
+declares Stream A enabled but whose manifest lists no chunks now fails
+instead of passing vacuously.
+
 ### Test suite
 
 Repaired five unit tests that had been red since the 0.3.0-rc1 / 0.4.0
