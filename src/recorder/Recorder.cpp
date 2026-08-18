@@ -8,6 +8,7 @@
 #include "Recorder.hpp"
 #include "Sidecar.hpp"
 #include "WavWriter.hpp"
+#include "collection/RecorderDecisionSink.hpp"
 #include "logging/Logger.hpp"
 
 #include <algorithm>
@@ -244,6 +245,14 @@ void Recorder::beginRecording(const DetectorStateSnapshot& s) {
     const std::size_t preRollSamples =
         static_cast<std::size_t>(m_cfg.preRollMs) * m_cfg.sampleRate / 1000u;
     m_cursor = m_preRoll.openCursor(preRollSamples);
+    // Snapshot the absolute sample position at the clip's leading edge.
+    // PreRollBuffer::writeCount() and the collection SampleClock advance
+    // together in Application::captureLoop, so this equals the SampleClock
+    // reading at clip start — the anchor Stream A and the event log use.
+    // Deliberately read from the cursor rather than from any clock: it
+    // must stay right when echobox-replay drives the recorder from a
+    // virtual time source. Costs one uint64 copy when the overlay is off.
+    m_clipStartSample = m_cursor.pos;
 
     // Discard any sidecar events that accumulated between recordings —
     // they belong to past WAVs (or none at all, if the detector triggered
@@ -322,6 +331,31 @@ void Recorder::endRecording() {
     const float loHz = m_eventLoHz > 0.0f ? m_eventLoHz : 0.0f;
     const float hiHz = m_eventHiHz > 0.0f ? m_eventHiHz : 0.0f;
 
+    // Helper: publish this clip's verdict to the collection sink (if any).
+    // Kept as a lambda so all five exit paths from this function agree on
+    // the payload shape and cannot drift apart; a shipping unit with no
+    // sink attached pays one null check per clip close, on the recorder
+    // thread. @p clause is the gate attribution and is empty on the save
+    // paths, where no clause fired.
+    const std::uint64_t clipEndSample = m_clipStartSample + frames;
+    auto publishDecision = [&](bool saved, const char* reason,
+                               std::uint64_t batLikeEnd,
+                               std::string clause = {}) {
+        if (!m_decisionSink) return;
+        collection::RecorderDecision d;
+        d.clip_start_sample = m_clipStartSample;
+        d.clip_end_sample   = clipEndSample;
+        d.bat_like_at_start = m_batLikeAtStart;
+        d.bat_like_at_end   = batLikeEnd;
+        d.duration_ms       = durationMs;
+        d.event_lo_hz       = loHz;
+        d.event_hi_hz       = hiHz;
+        d.saved             = saved;
+        d.reason            = reason;
+        d.clause            = std::move(clause);
+        m_decisionSink->onRecorderDecision(d);
+    };
+
     // Min-length gate: anything shorter is dropped on the floor rather than
     // finalized, so the output dir stays free of clip-sized noise events.
     if (m_cfg.minLengthMs > 0
@@ -334,6 +368,8 @@ void Recorder::endRecording() {
                  loHz / 1000.0f, hiHz / 1000.0f);
         m_writer->abort();
         m_writer.reset();
+        publishDecision(/*saved=*/false, "min-length",
+                        m_detector.snapshot().batLikeEvents);
         m_state = State::Idle;
         return;
     }
@@ -361,8 +397,14 @@ void Recorder::endRecording() {
             // no consumer needs it (writeSidecar off AND saveRejected
             // off) to preserve the pre-feature fast path exactly.
             SidecarPayload payload;
+            // The collection sink is a third consumer: without the drained
+            // features, classifyRejection() can only answer "unknown" and
+            // Stream C loses the clause attribution that is the whole point
+            // of logging the rejection. Null sink ⇒ the term folds away and
+            // the shipping fast path is exactly as it was.
             const bool needPayload = m_cfg.writeSidecar
-                                     || m_cfg.saveRejected != SaveRejectedMode::Off;
+                                     || m_cfg.saveRejected != SaveRejectedMode::Off
+                                     || m_decisionSink != nullptr;
             if (needPayload) {
                 m_detector.drainSidecarPayload(payload);
             }
@@ -380,6 +422,16 @@ void Recorder::endRecording() {
                 && saveRejectedClip(payload)) {
                 recordRejectedWrite();
                 m_writer.reset();
+                // Same verdict as the abort branch below — the clip is
+                // not a detection — but a distinct reason so an offline
+                // reader can tell "discarded, gone" from "discarded, but
+                // the WAV survives under rejected/" without re-walking
+                // the output tree. This exit path did not exist when the
+                // overlay was written; leaving it unpublished would have
+                // silently dropped every rejected-sink clip out of
+                // Stream C whenever --save-rejected was on.
+                publishDecision(/*saved=*/false, "cricket-gate-rejected-sink",
+                                s.batLikeEvents, classifyRejection(payload));
                 m_state = State::Idle;
                 return;
             }
@@ -391,6 +443,8 @@ void Recorder::endRecording() {
                      durationMs, loHz / 1000.0f, hiHz / 1000.0f);
             m_writer->abort();
             m_writer.reset();
+            publishDecision(/*saved=*/false, "cricket-gate",
+                            s.batLikeEvents, classifyRejection(payload));
             m_state = State::Idle;
             return;
         }
@@ -444,6 +498,9 @@ void Recorder::endRecording() {
         }
     }
 
+    publishDecision(/*saved=*/true,
+                    m_lastCloseWasMaxLenActive ? "max-len-active" : "saved",
+                    m_detector.snapshot().batLikeEvents);
     m_state = State::Idle;
 }
 

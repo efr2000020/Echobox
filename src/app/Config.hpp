@@ -7,6 +7,7 @@
 /// production binary. Populated by CliParser, validated by ConfigValidator,
 /// then handed to Application which fans the fields out to each subsystem.
 
+#include "collection/CollectionConfig.hpp"
 #include "logging/LogRecord.hpp"
 
 #include <cstdint>
@@ -152,6 +153,17 @@ struct Config {
     /// deployments set a real cap (default 200); local runs pass 0 for
     /// unlimited when the "all" mode is used for offline validation.
     std::uint32_t         saveRejectedMaxPerHour{200};
+
+    // --- Data-collection overlay (validation firmware) ---
+    // Off by default. When enabled, spawns the collection module: the
+    // global sample clock, the session header/governor, and the four
+    // validation streams. Runtime-gated, not build-gated, so one binary
+    // covers both the field unit and a collection deployment — the
+    // operator turns it on with --collection-mode on and nothing else
+    // changes. With enabled=false nothing here is constructed, no thread
+    // is spawned, and no ring is allocated.
+    // See private_docs/plans/03_DATA_COLLECTION_IMPL_VALIDATION_PLAN.md §2.
+    ::echobox::collection::CollectionConfig collection{};
 };
 
 } // namespace echobox::app

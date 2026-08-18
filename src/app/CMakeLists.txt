@@ -8,7 +8,7 @@ add_library(ls_app STATIC
 )
 target_include_directories(ls_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(ls_app
-    PUBLIC  ls_logging ls_common ls_audio ls_dsp_pipeline ls_recorder dsp_interface
+    PUBLIC  ls_logging ls_common ls_audio ls_dsp_pipeline ls_recorder ls_collection dsp_interface
     PRIVATE Threads::Threads
 )
 

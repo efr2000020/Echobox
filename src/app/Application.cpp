@@ -19,9 +19,18 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <thread>
+
+// Stamped into the collection session header for provenance. No build
+// system sets it today, so a header records "unknown" rather than lying
+// about which firmware produced the session; wiring it to a real SHA is a
+// build-script change, not a code change.
+#ifndef ECHOBOX_FIRMWARE_SHA
+#define ECHOBOX_FIRMWARE_SHA "unknown"
+#endif
 
 #ifndef ECHOBOX_DYNAMIC_PLUGINS
 // Release builds statically link the detector; its plugin entry points are
@@ -87,6 +96,43 @@ std::size_t dspRingCapacity(const Config& cfg) {
 }
 
 } // namespace
+
+// Adapter: turns IRecorderDecisionSink calls into JSONL lines on the
+// shared DecisionLog. Lives inside Application because it is wired
+// exclusively between Application-owned components; no reason to expose
+// it to callers.
+class Application::RecorderDecisionForwarder
+    : public ::echobox::collection::IRecorderDecisionSink {
+public:
+    explicit RecorderDecisionForwarder(::echobox::collection::DecisionLog& log)
+        : m_log(log) {}
+
+    void onRecorderDecision(
+        const ::echobox::collection::RecorderDecision& d) override {
+        // Deliberately hand-rolled — the JSON body is a fixed schema and
+        // dragging in a JSON library for ten fields is not worth the
+        // link-size hit on the Pi Zero 2 W. Same posture as Sidecar.cpp.
+        std::ostringstream oss;
+        oss << "{\"kind\":\"decision\","
+            << "\"clip_start_sample\":" << d.clip_start_sample << ","
+            << "\"clip_end_sample\":"   << d.clip_end_sample   << ","
+            << "\"bat_like_at_start\":" << d.bat_like_at_start << ","
+            << "\"bat_like_at_end\":"   << d.bat_like_at_end   << ","
+            << "\"duration_ms\":"       << d.duration_ms       << ","
+            << "\"event_lo_hz\":"       << d.event_lo_hz       << ","
+            << "\"event_hi_hz\":"       << d.event_hi_hz       << ","
+            << "\"saved\":"             << (d.saved ? "true" : "false") << ","
+            << "\"reason\":\""          << d.reason            << "\","
+            // Which gate clause attributed the rejection ("noise" /
+            // "temporal" / "unknown"); empty string on the save paths.
+            << "\"clause\":\""          << d.clause            << "\""
+            << "}";
+        m_log.append(oss.str());
+    }
+
+private:
+    ::echobox::collection::DecisionLog& m_log;
+};
 
 Application::Application(Config cfg)
     : m_cfg(std::move(cfg)),
@@ -197,6 +243,118 @@ int Application::run() {
     rcfg.saveRejectedMaxPerHour  = m_cfg.saveRejectedMaxPerHour;
     m_recorder = std::make_unique<recorder::Recorder>(rcfg, m_preRoll, *m_dsp);
 
+    // Data-collection overlay: constructed only when enabled, so a shipping
+    // unit with the flag off allocates nothing and spawns no thread here.
+    // Session::start() writes the pre-flight header + capacity report,
+    // spawns the governor thread, and is the first artefact on the card.
+    if (m_cfg.collection.enabled) {
+        // Stream A ring: ~8 s at the configured sample rate. Comfortable
+        // headroom for SD-card fsync stalls without inviting drops. Only
+        // allocated when Stream A is selected — a small-card deployment
+        // that drops A still keeps the sample clock and Session for B/C/D.
+        if (m_cfg.collection.streams.streamA) {
+            const std::size_t refCapacity =
+                static_cast<std::size_t>(m_cfg.sampleRate) * 8;
+            m_referenceRing = std::make_unique<
+                ::echobox::collection::ReferenceRing>(refCapacity);
+            ::echobox::collection::ContinuousWriterConfig cwCfg;
+            cwCfg.outputDir  = m_cfg.collection.dir / "reference";
+            cwCfg.sampleRate = m_cfg.sampleRate;
+            cwCfg.channels   = m_cfg.channels;
+            m_continuousWriter = std::make_unique<
+                ::echobox::collection::ContinuousWriter>(
+                cwCfg, *m_referenceRing, m_sampleClock);
+        }
+        // Stream B pre-roll: 8 seconds — comfortably wider than any clip
+        // window we ask for, and sized so a cricket-heavy burst can back
+        // the writer thread up for several seconds without a job aging out
+        // of the ring (a 2 s ring silently lost ~3% of events over a 9.7 h
+        // field session). At 384 kHz mono int16 that is ~6 MB, cheap
+        // against the Pi Zero 2 W's 512 MB. Independent of the Stream A
+        // ring; the two are fed in lockstep from the capture loop so the
+        // §3 byte-identity check diffs matching sample ranges.
+        if (m_cfg.collection.streams.streamB) {
+            const std::size_t bufSamples =
+                static_cast<std::size_t>(m_cfg.sampleRate) * 8;
+            m_collectionPreRoll =
+                std::make_unique<recorder::PreRollBuffer>(bufSamples);
+        }
+        // Stream C lands at <collection-dir>/decisions.jsonl; Stream B's
+        // WAVs at <collection-dir>/events/{accepted,rejected}/.
+        if (m_cfg.collection.streams.streamC) {
+            m_decisionLog = std::make_unique<::echobox::collection::DecisionLog>(
+                m_cfg.collection.dir / "decisions.jsonl");
+        }
+        m_session = std::make_unique<::echobox::collection::Session>(
+            m_cfg.collection, m_sampleClock, m_cfg.collection.dir);
+        ::echobox::collection::SessionMetadata meta;
+        meta.firmwareSha = ECHOBOX_FIRMWARE_SHA;
+        meta.algorithm   = m_cfg.algorithm;
+        meta.sampleRate  = m_cfg.sampleRate;
+        meta.channels    = m_cfg.channels;
+        meta.micDevice   = m_cfg.device;
+        meta.siteNote    = m_cfg.collection.siteNote;
+        // Small JSON blob of the decision-relevant knobs, so the header
+        // alone reproduces the shipping recorder's behaviour on this run.
+        std::ostringstream cfgBlob;
+        cfgBlob << "{"
+                << "\"preroll_ms\":"     << m_cfg.preRollMs      << ","
+                << "\"silence_ms\":"     << m_cfg.silenceMs      << ","
+                << "\"min_length_ms\":"  << m_cfg.minLengthMs    << ","
+                << "\"max_length_ms\":"  << m_cfg.maxLengthMs    << ","
+                << "\"snr_threshold\":"  << m_cfg.snrThreshold   << ","
+                << "\"fft_size\":"       << m_cfg.fftSize        << ","
+                << "\"hop_size\":"       << m_cfg.hopSize        << ","
+                << "\"freq_lo_hz\":"     << m_cfg.freqLoHz       << ","
+                << "\"freq_hi_hz\":"     << m_cfg.freqHiHz       << ","
+                << "\"cricket_filter\":" << (m_cfg.cricketFilter ? "true" : "false")
+                << "}";
+        meta.configJsonBlob = cfgBlob.str();
+        if (!m_session->start(meta)) {
+            LS_ERROR("collection",
+                     "collection overlay failed to start; aborting so a partial "
+                     "session is never mistaken for a good one");
+            m_recorder.reset();
+            m_source->close();
+            logging::Logger::instance().stop();
+            return 4;
+        }
+        // Wire the Stream C poller, the Stream B clip writer, and the
+        // recorder decision forwarder. Each is skipped when its stream
+        // toggle is off.
+        if (m_decisionLog) {
+            if (m_collectionPreRoll) {
+                ::echobox::collection::EventClipConfig ecCfg;
+                ecCfg.outputDir  = m_cfg.collection.dir / "events";
+                ecCfg.sampleRate = m_cfg.sampleRate;
+                ecCfg.channels   = m_cfg.channels;
+                ecCfg.hopSize    = m_cfg.hopSize;
+                m_eventClipWriter =
+                    std::make_unique<::echobox::collection::EventClipWriter>(
+                        ecCfg, *m_collectionPreRoll, m_sampleClock);
+            }
+            ::echobox::collection::EventPollerConfig epCfg;
+            epCfg.hopSize    = m_cfg.hopSize;
+            epCfg.sampleRate = m_cfg.sampleRate;
+            m_eventPoller = std::make_unique<::echobox::collection::EventPoller>(
+                epCfg, *m_dsp, *m_decisionLog);
+            if (m_eventClipWriter) m_eventPoller->setClipWriter(m_eventClipWriter.get());
+
+            m_decisionForwarder =
+                std::make_unique<RecorderDecisionForwarder>(*m_decisionLog);
+            m_recorder->setDecisionSink(m_decisionForwarder.get());
+        }
+        // Stream A starts AFTER the session header is on disk, so a crash
+        // during Session::start() leaves no orphan WAV chunks with no
+        // header to interpret them. The event poller must also start
+        // before m_dsp->start() below: its arming drain is what enables
+        // the tracker's collection queue, and arming it before the first
+        // frame is processed is what guarantees no event is missed.
+        if (m_continuousWriter) m_continuousWriter->start();
+        if (m_eventClipWriter)  m_eventClipWriter->start();
+        if (m_eventPoller)      m_eventPoller->start();
+    }
+
     try {
         m_dsp->start();
     } catch (const std::exception& e) {
@@ -251,6 +409,16 @@ int Application::run() {
     const auto startedAt = std::chrono::steady_clock::now();
     auto lastHeartbeat  = startedAt;
     while (!common::SignalHandler::shouldExit()) {
+        // The collection governor coordinates through the same clean-
+        // shutdown path as SIGINT rather than getting its own teardown
+        // branch — one shutdown sequence means one thing to get right.
+        // Null (and so free) when the overlay is off.
+        if (m_session && m_session->stopRequested()) {
+            LS_INFO("app", "shutdown requested (governor: %s)",
+                    m_session->stopReason().c_str());
+            common::SignalHandler::requestExit();
+            break;
+        }
         std::this_thread::sleep_for(pollInterval);
         if (heartbeatInterval.count() > 0) {
             const auto now = std::chrono::steady_clock::now();
@@ -291,6 +459,15 @@ int Application::run() {
     m_recorder->stop();
     m_dsp->stop();
     m_source->close();
+    // Collection teardown order: poller first (stops feeding jobs to the
+    // clip writer), clip writer next (drains in-flight jobs rather than
+    // discarding them), then the continuous writer, then the session
+    // end-marker. Every collection artefact is on disk before SESSION_END
+    // lands, so a reader that sees the marker can trust the tree.
+    if (m_eventPoller)      m_eventPoller->stop();
+    if (m_eventClipWriter)  m_eventClipWriter->stop();
+    if (m_continuousWriter) m_continuousWriter->stop();
+    if (m_session)          m_session->stop();
 
     LS_INFO("app", "stopped");
     logging::Logger::instance().stop();
@@ -327,6 +504,54 @@ void Application::captureLoop() {
 
         // 1. Feed the recorder's pre-roll buffer (raw int16, mono).
         m_preRoll.write(std::span<const std::int16_t>(intBuf.data(), n));
+
+        // 1b. Advance the global collection sample clock. Gated on the
+        //     enabled flag, so a shipping unit with the overlay off pays
+        //     one predictable branch on an immutable member and never
+        //     executes the atomic RMW. Advancing it here — in the same
+        //     statement group as the pre-roll write above, on the same
+        //     batch — is what makes SampleClock::now() and
+        //     PreRollBuffer::writeCount() equal by construction, which
+        //     every downstream alignment depends on.
+        if (m_cfg.collection.enabled) {
+            m_sampleClock.advance(static_cast<std::uint64_t>(n));
+        }
+
+        // 1c. Stream A tap: push the raw int16 samples into the reference
+        //     ring for the continuous writer thread. This is deliberately
+        //     upstream of the float conversion and the DSP below, so the
+        //     reference audio is what the ADC delivered and not what our
+        //     own pipeline made of it. Wait-free; drops are counted on the
+        //     ring and surfaced via a rate-limited warning, matching the
+        //     DSP-drop discipline further down. The plan (§2.2 A, §3)
+        //     treats any drop as a session-invalidating event that the
+        //     offline integrity checks must catch.
+        if (m_referenceRing) {
+            const std::size_t refDropped = m_referenceRing->pushBatch(
+                std::span<const std::int16_t>(intBuf.data(), n));
+            if (refDropped > 0) {
+                const auto now = std::chrono::steady_clock::now();
+                if (now - m_lastRefDropWarnAt >= std::chrono::seconds(1)) {
+                    LS_WARN("collection",
+                            "STREAM_A_OVERFLOW dropped=%zu total=%llu — "
+                            "writer is not keeping up; the §3 gap check will fail",
+                            refDropped,
+                            static_cast<unsigned long long>(
+                                m_referenceRing->dropped()));
+                    m_lastRefDropWarnAt = now;
+                }
+            }
+        }
+
+        // 1d. Stream B tap: mirror the same samples into the collection
+        //     pre-roll ring so EventClipWriter can extract per-event
+        //     windows on cursor-open. Same wait-free discipline; the ring
+        //     overwrites, so a lagging clip writer costs at worst an old
+        //     window (logged as "aged out"), never an audio-thread stall.
+        if (m_collectionPreRoll) {
+            m_collectionPreRoll->write(
+                std::span<const std::int16_t>(intBuf.data(), n));
+        }
 
         // 2. Convert + push into the DSP ring, best-effort. The audio thread
         //    MUST NOT block on a downstream consumer: a stalled DSP would

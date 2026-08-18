@@ -8,8 +8,10 @@
 
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <system_error>
 
 namespace echobox::app {
 
@@ -129,6 +131,28 @@ std::optional<std::string> checkSaveRejectedRequiresFilter(const Config& cfg) {
     return std::nullopt;
 }
 
+// When the collection overlay is on, storing its artefacts in the same
+// directory as the shipping recorder's WAVs is a foot-gun: the offline
+// audit tools can't tell "clip the recorder saved" from "clip the
+// collection tap wrote" without extra bookkeeping, and both writers race
+// on the same free-space budget for the governor. Force a distinct dir so
+// the mistake fails fast at launch rather than silently at analysis time.
+std::optional<std::string> checkCollectionDirDistinct(const Config& cfg) {
+    if (!cfg.collection.enabled) return std::nullopt;
+    std::error_code ec;
+    const auto a = std::filesystem::weakly_canonical(cfg.collection.dir, ec);
+    if (ec) return std::nullopt;   // let the filesystem check fail loudly at start()
+    const auto b = std::filesystem::weakly_canonical(cfg.outputDir, ec);
+    if (ec) return std::nullopt;
+    if (a == b) {
+        return "--collection-dir (" + cfg.collection.dir.string()
+             + ") must differ from --output-dir (" + cfg.outputDir.string()
+             + ") so the collection tap and the shipping recorder don't share "
+               "a free-space budget or overwrite each other's manifests";
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> checkRecordingBudget(const Config& cfg) {
     if (cfg.maxLengthMs == 0) return std::nullopt;   // cap disabled
     const std::uint32_t minNeeded = cfg.preRollMs + cfg.silenceMs;
@@ -158,6 +182,7 @@ std::vector<std::string> validateConfig(const Config& cfg) {
     run(checkRecordingBudget(cfg));
     run(checkSilenceExceedsHangover(cfg));
     run(checkSaveRejectedRequiresFilter(cfg));
+    run(checkCollectionDirDistinct(cfg));
 
     return errors;
 }
