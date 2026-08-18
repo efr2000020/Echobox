@@ -24,19 +24,10 @@ EventPoller::~EventPoller() { stop(); }
 
 void EventPoller::start() {
     if (m_running.exchange(true, std::memory_order_acq_rel)) return;
-    // Arming drain, issued synchronously before the thread exists.
-    // BandEnergyDetector only mirrors events into its collection queue
-    // once something has drained it at least once — that is the gate
-    // that keeps the shipping unit from accumulating events nothing
-    // reads. Application::run() calls start() before DspPipeline::start(),
-    // so arming here means the mirror is live before the first frame is
-    // ever processed and no event can be lost to the arming window.
-    std::vector<EventFeatures> arming;
-    if (!m_pipeline.drainCollectionEvents(arming)) {
-        LS_WARN("collection",
-                "STREAM_C: tracker does not implement drainCollectionEvents; "
-                "no per-event records will be written for this session");
-    }
+    // No arming call here: the tracker does not exist until
+    // DspPipeline::start() creates it, which happens after this. Arming
+    // is a DspPipelineConfig::collectEvents concern, applied at the point
+    // the tracker is constructed — see DspPipeline::start().
     m_thread = std::thread(&EventPoller::loop, this);
 }
 

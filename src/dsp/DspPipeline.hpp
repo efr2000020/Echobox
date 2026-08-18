@@ -68,6 +68,17 @@ struct DspPipelineConfig {
     ///       recall, not 63); see Config.hpp. Update the two together.
     bool         cricketFilter{true};
 
+    /// Arm the tracker's collection-only events queue at start(), so the
+    /// data-collection overlay's Stream C poller can drain every event
+    /// exactly once. False (the shipping default) leaves the mirror cold:
+    /// the tracker never pushes to it and the vector never allocates.
+    ///
+    /// This is a config field rather than something the poller arms
+    /// itself because the tracker does not exist until start() creates
+    /// it — the poller is constructed and started earlier, so a
+    /// poller-side arming call would silently no-op.
+    bool         collectEvents{false};
+
     /// Diagnostic tracker-tunable overrides applied at the end of
     /// @c start(), immediately after the built-in setTunable() calls
     /// (@c band_snr_threshold, @c noise_reject_enabled, @c hop_size_samples)

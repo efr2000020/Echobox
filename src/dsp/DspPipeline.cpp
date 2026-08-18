@@ -101,6 +101,22 @@ void DspPipeline::start() {
                  m_cfg.algorithm.c_str());
     }
 
+    // Arm the tracker's collection-only events queue, if the overlay
+    // asked for it. Done here rather than from the collection poller
+    // because the tracker is created three lines up — the poller is
+    // constructed and started before this point, so arming from there
+    // would no-op against a null tracker. Draining an empty queue is
+    // exactly what arms it; see ISweepTracker::drainCollectionEvents.
+    if (m_cfg.collectEvents) {
+        std::vector<EventFeatures> arming;
+        if (!m_tracker->drainCollectionEvents(arming)) {
+            LS_WARN("dsp", "tracker '%s' does not implement "
+                           "drainCollectionEvents; collection Stream C will "
+                           "record no per-event data this session",
+                    m_cfg.algorithm.c_str());
+        }
+    }
+
     // The temporal repetition-rate guard needs the hop size to convert
     // onset frame indices into seconds. Pipeline is the authoritative
     // source (configure() takes sampleRate + fftSize but not hop). Older

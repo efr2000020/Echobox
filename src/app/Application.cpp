@@ -213,6 +213,11 @@ int Application::run() {
     dcfg.algorithm     = m_cfg.algorithm;
     dcfg.snrThreshold  = m_cfg.snrThreshold;
     dcfg.cricketFilter = m_cfg.cricketFilter;
+    // Arm the tracker's collection event mirror only when Stream C will
+    // actually drain it. Anything else leaves the queue growing with no
+    // reader — see DspPipelineConfig::collectEvents.
+    dcfg.collectEvents = m_cfg.collection.enabled
+                         && m_cfg.collection.streams.streamC;
     m_dsp = std::make_unique<dsp::DspPipeline>(dcfg, m_dspRing);
 
     recorder::RecorderConfig rcfg;
@@ -346,10 +351,10 @@ int Application::run() {
         }
         // Stream A starts AFTER the session header is on disk, so a crash
         // during Session::start() leaves no orphan WAV chunks with no
-        // header to interpret them. The event poller must also start
-        // before m_dsp->start() below: its arming drain is what enables
-        // the tracker's collection queue, and arming it before the first
-        // frame is processed is what guarantees no event is missed.
+        // header to interpret them. Starting the poller before
+        // m_dsp->start() is harmless: the tracker's mirror is armed
+        // inside DspPipeline::start() via DspPipelineConfig::collectEvents,
+        // so no event can close before the queue is live.
         if (m_continuousWriter) m_continuousWriter->start();
         if (m_eventClipWriter)  m_eventClipWriter->start();
         if (m_eventPoller)      m_eventPoller->start();

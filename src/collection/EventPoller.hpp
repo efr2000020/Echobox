@@ -16,9 +16,11 @@
 /// silently loses events whose entire lifetime fits between two poller
 /// wake-ups.
 ///
-/// @c start() issues one synchronous arming drain before spawning the
-/// thread, because the tracker's mirror queue stays cold (and therefore
-/// free for the shipping unit) until something drains it once.
+/// The tracker's mirror queue stays cold — and therefore free for the
+/// shipping unit — until something drains it once. That arming drain is
+/// issued by @c DspPipeline::start() under
+/// @c DspPipelineConfig::collectEvents, not by this class: the tracker
+/// does not exist yet when this poller is started.
 ///
 /// Runs on its own thread so the DSP hot loop is untouched by
 /// collection concerns. See DATA_COLLECTION_IMPL_VALIDATION_PLAN §2.2 C.

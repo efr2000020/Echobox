@@ -1024,10 +1024,11 @@ bool BandEnergyDetector::drainSidecarPayload(SidecarPayload& out) {
 
 bool BandEnergyDetector::drainCollectionEvents(std::vector<EventFeatures>& out) {
     std::lock_guard<std::mutex> lk(m_diagnosticsMutex);
-    // First call arms the mirror. The collection poller issues one arming
-    // drain from Application::run() before DspPipeline::start(), so no event
-    // is ever produced while the mirror is still cold — and a shipping unit,
-    // which never constructs a poller, never arms it at all.
+    // First call arms the mirror. DspPipeline::start() issues that arming
+    // drain immediately after constructing this tracker, and only when
+    // DspPipelineConfig::collectEvents is set, so no event can close while
+    // the mirror is still cold — and a shipping unit, which never sets
+    // that flag, never arms it at all.
     m_collectionEventsWanted = true;
     out.assign(m_collectionEvents.begin(), m_collectionEvents.end());
     m_collectionEvents.clear();
