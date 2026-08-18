@@ -68,17 +68,16 @@ Per `DATA_COLLECTION_IMPL_VALIDATION_PLAN.md` §7 (deliverables) and §9
       ```
       PYTHONPATH=. python -m tools.collection.verify_stream_a <session>
       PYTHONPATH=. python -m tools.collection.verify_ab_identity <session>
-      PYTHONPATH=. python -m tools.collection.verify_feature_parity <session>
-      PYTHONPATH=. python -m tools.collection.verify_recorder_model <session>
       ```
-      `verify_feature_parity` MUST run before `verify_recorder_model` —
-      it writes `parity_report.json` which calibrates the
-      recorder-model tool's boundary-drift tolerance. Every step must
-      exit 0 for the session to be report-eligible; any non-zero result
-      blocks the row-promotion in `VALIDATION_PROVENANCE.md`.
+      Both must exit 0 for the session to be report-eligible; any
+      non-zero result blocks the row-promotion in
+      `VALIDATION_PROVENANCE.md`. (The plan's §4.1/§4.2 model
+      cross-checks are not run: the Python shadow model they validated
+      is retired — see `tools/collection/README.md`.)
+- [ ] Screen the session with `tools/session_screen`, which drives the
+      real C++ recorder through `echobox-replay` rather than a model.
 - [ ] Fold results into the run report: number of clips saved by real
-      firmware, model agreement %, drops, front-end caveats (per plan
-      §4.4).
+      firmware, drops, front-end caveats (per plan §4.4).
 
 ## What kills the run epistemically (per plan §9)
 

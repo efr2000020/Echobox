@@ -31,6 +31,11 @@ audio for downstream science):
   F4. `drops_snapshot` decreases across chunks (impossible in the
       firmware; would mean the log was reordered or truncated).
   F5. SESSION_END.samples_captured < last_chunk.end_sample.
+  F6. The session header says Stream A was enabled, but the manifest
+      lists no chunks at all. Without this the script passes VACUOUSLY on
+      a session whose continuous writer never wrote a byte — which is
+      exactly the failure the zero-gap check exists to catch, and the
+      loudest possible version of it.
 
 Exit code 0 = all checks pass. Non-zero = at least one falsifier hit;
 stderr carries the details.
@@ -53,6 +58,18 @@ def verify(session_root: Path) -> int:
     ref_dir = session_root / "reference"
     prev_end = None
     prev_drops = 0
+
+    # F6: an empty manifest is not "nothing to check", it is "the writer
+    # produced nothing". Only an assertion in the header that Stream A was
+    # meant to run distinguishes that from a legitimately A-less session
+    # (--collection-streams b,c on a small card), so key off the header.
+    if session.header.get("streams", {}).get("a") and not session.chunks:
+        errors.append(
+            "[F6] header declares stream A enabled but reference/chunks.jsonl "
+            f"lists no chunks (reference dir exists={ref_dir.is_dir()}); "
+            "the continuous writer produced nothing, or the reference audio "
+            "was pruned from this copy of the session"
+        )
 
     for i, ch in enumerate(session.chunks):
         wav_path = ref_dir / ch.path

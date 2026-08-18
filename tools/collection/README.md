@@ -2,7 +2,7 @@
 
 Run these against a session directory produced by
 `--collection-mode on` (see the plan doc,
-`private_docs/plans/DATA_COLLECTION_IMPL_VALIDATION_PLAN.md`, §3–4).
+`private_docs/plans/03_DATA_COLLECTION_IMPL_VALIDATION_PLAN.md`, §3–4).
 
 Operator-facing docs live in `docs/`:
 
@@ -36,6 +36,11 @@ documentation-only.
 - **F3** (Stream A): non-contiguous chunks with no drop increment.
 - **F4** (Stream A): `drops_snapshot` decreases across chunks.
 - **F5** (Stream A): `SESSION_END.end_sample` < last chunk's `end_sample`.
+- **F6** (Stream A): header declares Stream A enabled but the manifest
+  lists no chunks — the writer produced nothing (or the reference audio
+  was pruned from this copy). Without F6 such a session passes
+  vacuously, which is how `session_02/on_device/` passed check 2 while
+  containing no Stream A at all.
 - **F1** (A/B): event WAV sample range not covered by A.
 - **F2** (A/B): single-sample PCM divergence between B and the A slice.
 - **F3** (A/B): event WAV length ≠ configured window width.
@@ -51,83 +56,30 @@ and its per-writer WAV outputs are **GREEN**. Passing check 1 as well
 promotes the front-end (mic + HPF + capture path) from unverified to
 GREEN — the only §3 element requiring hardware to close.
 
-## §4.1 recorder-model cross-check
+## What is NOT here: the §4.1 / §4.2 model cross-checks
 
-`verify_recorder_model.py <session_root>` — the "does the Python
-`recorder_model.py` agree with the shipping C++ recorder on real field
-data?" test. Reads decisions from Stream C, runs `recorder_model` on
-Stream A chunk-by-chunk, correlates predictions with real decisions by
-sample-range overlap, and classifies each divergence:
+The plan's §4.1 (`verify_recorder_model.py`) and §4.2
+(`verify_feature_parity.py`) both existed to validate
+`tools/validator/recorder_model.py` — a Python shadow model of the C++
+recorder — and to measure the x86-harness ↔ ARM-device numerical drift
+that could make that model look wrong when it was not.
 
-- **Every real decision matches** ⇒ **GREEN**. Model promoted from
-  YELLOW to GREEN.
-- **Divergence explained by boundary-proximity numerical drift**
-  (event feature within the parity check's `max_delta` of a gate
-  threshold) ⇒ **YELLOW**. Reported separately, does NOT fail. Fix
-  the numerical drift (see §4.2 / row 4b), not the model logic.
-- **Unexplained divergence** ⇒ **RED**. Real state-machine drift.
-  Fix the model. Per the plan's §4.1 rule: "flag it, quantify the
-  disagreement, and correct the model before any further use." This
-  tool does NOT apply a blanket percentage tolerance.
+Both tools are gone, along with the `ECHOBOX_STRICT_MATH` CMake option
+that served them, because the thing they validated is no longer used.
+`tools/session_screen` drives the **real C++ recorder** through
+`echobox-replay`, so there is no second implementation left to disagree
+with the first. The circularity the plan's §4.1 was designed to break —
+"a Python model agrees with the C++ it was copied from" — is not broken
+by a better cross-check; it is dissolved by deleting the copy.
 
-This tool reads `<session_root>/parity_report.json` — produced by
-`verify_feature_parity.py` — to size the "boundary-proximity" bound.
-Run parity first; without it, the tool announces a conservative
-fallback and warns.
-
-Unit tests for the correlation + boundary logic
-(`tests/test_verify_recorder_model.py`) run without the native lib.
-End-to-end (real chunks + real firmware decisions) requires the
-bench-rehearsal path documented in
-`private_docs/plans/DATA_COLLECTION_IMPL_VALIDATION_PLAN.md` §5.
-
-## §4.2 harness-vs-device — YELLOW; measured by `verify_feature_parity.py`
-
-The plan asks whether the offline detector harness computes the same
-per-frame features as the device. `tools/validator/native.py` loads
-`libechobox_validator.so` via ctypes, so the offline path **shares
-source** with the device (`BandEnergyDetector.cpp` and the STFT + HPF
-code). But sharing source is not the same as producing identical
-outputs:
-
-- The dev `.so` is built **x86** with `-march=native -ffast-math` (see
-  the top-level `CMakeLists.txt`). The device is **ARM** (Pi Zero 2 W).
-  Different ISAs, different SIMD lanes, non-IEEE-strict math on both
-  sides.
-- Near the gate's hard thresholds — `min_bandwidth_khz = 0.9`,
-  `rep_cv_min = 0.50`, `rep_cv_max = 1.30` — small numerical drift can
-  flip a per-event verdict. If that happens, `verify_recorder_model.py`
-  (§4.1) will report divergences that are numerical, not model-logic
-  bugs.
-
-`verify_feature_parity.py` is the tool that measures this drift so we
-can distinguish "numerical noise near a threshold" from "the model is
-wrong". It:
-
-1. Replays each Stream A chunk through the offline detector.
-2. Correlates each harness event with the device's own event record in
-   Stream C by `start_frame` (± a small tolerance).
-3. Emits max + p50/p95/p99 deltas per feature
-   (`bandwidth_khz / drift_khz / path_ratio / mono_fraction / cv_idi`).
-4. Counts **boundary-proximity events** — how many device events fall
-   within `max_delta` of any gate threshold, i.e. how many verdicts
-   could flip under the measured harness↔device drift.
-
-**Promotion rule**:
-
-- **YELLOW** by default. This is the honest starting position.
-- Promoted to **GREEN** only when the parity check runs on real bench
-  data (x86 harness output vs an actual ARM device on the same audio),
-  every per-feature delta is within tolerance, AND the
-  boundary-proximity count is zero.
-- Non-zero boundary-proximity count keeps 4b YELLOW *and* calibrates
-  the tolerance §4.1's tool uses to distinguish boundary drift from
-  model-logic errors.
-
-**Pre-registered falsifier**: any single event with a feature delta
-larger than `--max-delta`, or any boundary-proximity flip that
-`verify_recorder_model.py` cannot explain, is treated as a failure —
-do not average it away.
+What that costs, stated rather than glossed: the ARM-vs-x86 numerical
+question §4.2 measured is now **unmeasured**, not answered. Replay runs
+on x86; the field unit runs on ARM. Near the gate's hard thresholds that
+drift can still flip a per-event verdict, and nothing in this directory
+currently quantifies it. Treat any replay-derived per-event verdict as
+**YELLOW** on that axis. The §3 checks below are unaffected — they
+compare the device against itself and against an externally injected
+signal, never against a re-implementation.
 
 ## Running the pytest suite
 
