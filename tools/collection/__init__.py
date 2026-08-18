@@ -7,6 +7,8 @@ These scripts run against the on-disk artefacts a collection-mode session
 produces (SESSION_HEADER.json, reference/chunks.jsonl + WAV chunks,
 events/{accepted,rejected}/*.wav, decisions.jsonl, SESSION_END.json).
 
-See DATA_COLLECTION_IMPL_VALIDATION_PLAN.md §3 for the checks and their
-pre-registered falsifiers.
+See private_docs/plans/03_DATA_COLLECTION_IMPL_VALIDATION_PLAN.md §3 for
+the checks and their pre-registered falsifiers, and this package's
+README.md for what the §4.1/§4.2 model cross-checks were and why they
+are not here.
 """

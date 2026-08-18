@@ -273,11 +273,14 @@ start_sample` anchor.
 **Collection-off is the load-bearing property.** With the default
 `--collection-mode off`: nothing is constructed, no thread is spawned,
 no ring is allocated, and the audio capture loop's added cost is exactly
-**three predictable, never-taken branches per 4096-frame ALSA read** —
-verified by disassembling `Application::captureLoop` before and after.
-GCC lays all three collection taps out as cold, out-of-line blocks, so
-the off path executes no atomic RMW, no call, and no memory write. The
-recorder pays one null check per clip close.
+**8 instructions — three loads, two tests, three perfectly-predicted
+conditional branches — per 4096-frame ALSA read**. Verified by
+disassembling `Application::captureLoop` from a clean Release build
+before and after the port: GCC lays all three collection taps out as
+cold, out-of-line blocks, so the off path executes no atomic RMW, no
+call, and no memory write. Both `lock add` instructions (the sample
+clock and the Stream A drop counter) sit in blocks the off path never
+reaches. The recorder pays one null check per clip close.
 
 Two places the branch disagreed with current code, and what was done:
 
