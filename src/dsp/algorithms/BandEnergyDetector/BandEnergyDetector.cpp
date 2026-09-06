@@ -400,6 +400,20 @@ bool BandEnergyDetector::processFrame(std::span<const float> magnitudes,
                     m_dominantAnchorBin,
                     m_dominantBandLoBin, m_dominantBandHiBin,
                     m_binResolution);
+
+                // --- Optional fourth reject clause: narrowband ---
+                // The three open-time clauses cannot see this: an event's
+                // bandwidth is only defined once the ring has filled, i.e.
+                // here. Narrowing the conjunction can only ever reject
+                // FEWER events, so recall is monotone in this knob and the
+                // clause cannot strand an event the open-time verdict kept.
+                // m_noiseBandwidthMax == 0 (the shipped default) leaves
+                // gateRejected exactly as the open-time evaluation set it.
+                if (gateRejected && m_noiseBandwidthMax > 0.0f
+                    && !(shape.bandwidth_khz < m_noiseBandwidthMax)) {
+                    gateRejected = false;
+                }
+
                 // --- Decision-path diagnostic state, hoisted so the
                 //     sidecar drain (below) can record which rejection
                 //     path fired.
@@ -796,6 +810,7 @@ bool BandEnergyDetector::setTunable(const char* key, double value) {
     if (std::strcmp(key, "noise_snr_max")        == 0) { m_noiseSnrMax       = static_cast<float>(value); return true; }
     if (std::strcmp(key, "noise_flatness_min")   == 0) { m_noiseFlatnessMin  = static_cast<float>(value); return true; }
     if (std::strcmp(key, "noise_band_max")       == 0) { m_noiseBandMax      = static_cast<int>(value);   return true; }
+    if (std::strcmp(key, "noise_bandwidth_max")  == 0) { m_noiseBandwidthMax = static_cast<float>(value); return true; }
     if (std::strcmp(key, "min_bandwidth_khz")    == 0) { m_minBandwidthKhz   = static_cast<float>(value); return true; }
     if (std::strcmp(key, "sweep_drift_khz")      == 0) { m_sweepDriftKhz     = static_cast<float>(value); return true; }
     if (std::strcmp(key, "sweep_path_ratio_max") == 0) { m_sweepPathRatioMax = static_cast<float>(value); return true; }
@@ -828,6 +843,7 @@ bool BandEnergyDetector::getTunable(const char* key, double* outValue) const {
     if (std::strcmp(key, "noise_snr_max")        == 0) { *outValue = m_noiseSnrMax;       return true; }
     if (std::strcmp(key, "noise_flatness_min")   == 0) { *outValue = m_noiseFlatnessMin;  return true; }
     if (std::strcmp(key, "noise_band_max")       == 0) { *outValue = m_noiseBandMax;      return true; }
+    if (std::strcmp(key, "noise_bandwidth_max")  == 0) { *outValue = m_noiseBandwidthMax; return true; }
     if (std::strcmp(key, "min_bandwidth_khz")    == 0) { *outValue = m_minBandwidthKhz;   return true; }
     if (std::strcmp(key, "sweep_drift_khz")      == 0) { *outValue = m_sweepDriftKhz;     return true; }
     if (std::strcmp(key, "sweep_path_ratio_max") == 0) { *outValue = m_sweepPathRatioMax; return true; }
@@ -880,6 +896,13 @@ std::span<const TunableInfo> BandEnergyDetector::listTunables() const {
         {"noise_band_max",       TunableType::Int,   1.0,   0.0,    4.0,
          "Reject only events triggering at or below this 1-based sub-band. "
          "1 = the 20-45 kHz band, where the non-bat population sits."},
+        {"noise_bandwidth_max",  TunableType::Float, 0.0,   0.0,    50.0,
+         "Optional 4th reject clause: ...AND the event's 10-dB bandwidth is "
+         "below this (kHz). Narrowband = tonal = cricket-like. Evaluated at "
+         "event close, unlike the other three. 0 (default) disables the "
+         "clause and leaves every decision bit-identical to the 3-clause "
+         "gate. Only useful at a relaxed recall floor: worst-night non-bat "
+         "rejection 51%->67% at an 80% per-call floor, no gain at 99%."},
         {"min_bandwidth_khz",    TunableType::Float, 0.9,   0.0,    50.0,
          "DIAGNOSTIC ONLY since the gate replacement: threshold the retired "
          "sweep verdict used, still applied to the sidecar's sweep_bat_like "

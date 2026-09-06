@@ -303,6 +303,18 @@ private:
     float m_noiseSnrMax        = 12.0f;  // reject only below this trigger SNR
     float m_noiseFlatnessMin   = 0.55f;  //   AND above this spectral flatness
     int   m_noiseBandMax       = 1;      //   AND at or below this sub-band (1-based)
+    // Optional FOURTH clause: ...AND the event's 10-dB bandwidth is below
+    // this. Unlike the three above it is not knowable at event open, so it is
+    // applied at close, where computeSweepShape() has already run. 0 disables
+    // the clause, which is the shipped default — with it off the conjunction
+    // and therefore every keep/discard decision is bit-for-bit unchanged.
+    //
+    // Rationale: a cricket's stridulation is narrowband at its carrier, while
+    // even a short FM sweep smears across bins. Measured on the four field
+    // nights, adding `bandwidth < 0.75 kHz` to the conjunction lifts
+    // worst-night non-bat rejection from 51 % to 67 % at an 80 % per-call
+    // recall floor. It buys nothing at a 99 % floor — see the ceiling work.
+    float m_noiseBandwidthMax  = 0.0f;
 
     // --- Sweep-shape features: DIAGNOSTICS ONLY ---
     // The four sweep features are still computed and written to the sidecar
